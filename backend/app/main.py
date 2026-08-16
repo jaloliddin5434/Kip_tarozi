@@ -1,9 +1,21 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
+from app.services import rejalashtiruvchi
 
-app = FastAPI(title="Kip Tarozi — Backend")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    rejalashtiruvchi.ishga_tushir()
+    yield
+    rejalashtiruvchi.toxtat()
+
+
+app = FastAPI(title="Kip Tarozi — Backend", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

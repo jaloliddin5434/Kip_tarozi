@@ -46,6 +46,6 @@ o'rnatiladi (mavjud tarozi-tizimidagi pattern bilan bir xil).
 ## Loyiha bosqichlari
 
 1. **✅** Baza sxemasi + backend skeleton + auth/RBAC + RS232 agent
-2. **✅ (joriy)** Operator jarayoni (tortish, partiya/kip logikasi) + anti-o'g'irlik nazorati + offline queue
-3. Admin panel — Hujjatlar, Statistika, Partiyalar, Dashboard, Sozlamalar, Telegram
+2. **✅** Operator jarayoni (tortish, partiya/kip logikasi) + anti-o'g'irlik nazorati + offline queue
+3. **✅ (joriy)** Admin panel — Hujjatlar, Statistika, Partiyalar, Dashboard, Sozlamalar, Telegram
 4. Moliyaviy bo'lim, mobil ilova, to'liq sinov va VPS'ga joylashtirish

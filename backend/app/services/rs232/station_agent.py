@@ -32,6 +32,7 @@ from app.services.rs232 import navbat
 from app.services.rs232.anti_ogirlik import AntiOgirlikHolati, AntiOgirlikNazorati
 from app.services.rs232.bus import OgirlikKanali
 from app.services.rs232.camera import snapshot_ol
+from app.services.rs232.holat_xabarchisi import HolatXabarchisi
 from app.services.rs232.reader import OgirlikOquvchi
 from app.services.rs232.sinxron import SinxronIshchisi
 from app.services.rs232.stability import BarqarorlikTekshiruvchisi
@@ -70,11 +71,25 @@ def _hodisani_backendga_yubor(ogirlik: float, vaqt: datetime, smena: str | None,
 anti_ogirlik = AntiOgirlikNazorati(kanal, _hodisani_backendga_yubor)
 
 
+def _joriy_holat() -> dict:
+    return {
+        "ulangan": watchdog.holat.ulangan,
+        "oxirgi_xato": watchdog.holat.oxirgi_xato,
+        "anti_ogirlik_holati": anti_ogirlik.holat.value,
+        "navbat_uzunligi": navbat.uzunlik(),
+    }
+
+
+holat_xabarchisi = HolatXabarchisi(_joriy_holat)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     watchdog.ishga_tushir()
     sinxron_ishchisi.ishga_tushir()
+    holat_xabarchisi.ishga_tushir()
     yield
+    holat_xabarchisi.toxtat()
     sinxron_ishchisi.toxtat()
     watchdog.toxtat()
 
@@ -85,12 +100,9 @@ app = FastAPI(title="Kip Tarozi — Stansiya Agenti", lifespan=lifespan)
 @app.get("/holat")
 def holat() -> dict:
     return {
-        "ulangan": watchdog.holat.ulangan,
-        "oxirgi_xato": watchdog.holat.oxirgi_xato,
+        **_joriy_holat(),
         "joriy_ogirlik": barqarorlik.joriy_ogirlik,
         "barqarormi": barqarorlik.barqarormi(),
-        "anti_ogirlik_holati": anti_ogirlik.holat.value,
-        "navbat_uzunligi": navbat.uzunlik(),
     }
 
 

@@ -47,9 +47,16 @@ class Settings(BaseSettings):
     BACKEND_URL: str = "http://localhost:8000"
     AGENT_QUEUE_DB_PATH: str = "./storage/agent_navbat.db"
     AGENT_SYNC_INTERVAL_SONIYA: int = 15
+    AGENT_HOLAT_YUBORISH_SONIYA: int = 30
+    # Shu muddatdan uzoq vaqt xabar kelmasa, dashboard agentni "offline" deb ko'rsatadi
+    AGENT_HOLAT_ESKIRISH_SONIYA: int = 90
 
     # Kamera (snapshot HTTP endpoint — indikator kabi, model aniqlangach o'zgaradi)
     CAMERA_SNAPSHOT_URL: str | None = None
+
+    # Kunlik Telegram hisoboti (F.3)
+    VAQT_ZONASI: str = "Asia/Tashkent"
+    KUNLIK_HISOBOT_VAQTI: str = "20:00"
 
     # Brend
     BRAND_COLOR: str = "#0F6E56"

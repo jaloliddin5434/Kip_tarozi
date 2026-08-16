@@ -10,7 +10,7 @@ from app.models.foydalanuvchi import Foydalanuvchi, Rol, Smena
 from app.models.shubhali_holat import ShubhaliHolat, ShubhaliHolatStatusi
 from app.schemas.shubhali_holat import ShubhaliHolatJavob
 from app.services.storage.rasm import rasm_saqla
-from app.services.telegram import xabar_yubor
+from app.services.telegram import xatolik_xabari
 
 router = APIRouter(prefix="/shubhali-holatlar", tags=["shubhali-holatlar"])
 
@@ -44,7 +44,7 @@ async def hodisa_royxatga_ol(
     db.refresh(hodisa)
 
     smena_matni = smena or "noma'lum"
-    xabar_yubor(f"⚠️ YUK SAQLANMADI!\nSmena: {smena_matni}\nOg'irlik: {ogirlik} kg\nVaqt: {vaqt.isoformat()}")
+    xatolik_xabari(db, f"⚠️ YUK SAQLANMADI!\nSmena: {smena_matni}\nOg'irlik: {ogirlik} kg\nVaqt: {vaqt.isoformat()}")
     return hodisa
 
 
