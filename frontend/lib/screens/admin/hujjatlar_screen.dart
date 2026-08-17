@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/hujjat.dart';
 import '../../services/hujjat_pdf.dart';
 import '../../state/app_state.dart';
+import '../../widgets/kip_batafsil_dialog.dart';
 
 class HujjatlarEkrani extends StatefulWidget {
   const HujjatlarEkrani({super.key});
@@ -121,6 +122,7 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
+                showCheckboxColumn: false,
                 columns: [
                   DataColumn(label: Text(lok.t('sana'))),
                   DataColumn(label: Text(lok.t('mahsulot'))),
@@ -134,23 +136,28 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
                 ],
                 rows: sahifa.items
                     .map(
-                      (k) => DataRow(cells: [
-                        DataCell(Text('${k.vaqt.toLocal()}'.substring(0, 16))),
-                        DataCell(Text(k.mahsulotNomi)),
-                        DataCell(Text('#${k.partiyaRaqami}')),
-                        DataCell(Text('${k.kipRaqami}')),
-                        DataCell(Text(k.ogirlik.toStringAsFixed(1))),
-                        DataCell(Text(k.smena)),
-                        DataCell(Text(k.operatorIsm)),
-                        DataCell(Text(k.holati, style: TextStyle(color: k.holati == 'aktiv' ? Colors.green : Colors.orange))),
-                        DataCell(
-                          IconButton(
-                            icon: const Icon(Icons.print, size: 20),
-                            tooltip: lok.t('chop_etish'),
-                            onPressed: () => _chopEtish(k, lok),
+                      (k) => DataRow(
+                        onSelectChanged: (_) => kipBatafsilDialogniKorsat(context: context, kipId: k.id),
+                        cells: [
+                          DataCell(Text('${k.vaqt.toLocal()}'.substring(0, 16))),
+                          DataCell(Text(k.mahsulotNomi)),
+                          DataCell(Text('#${k.partiyaRaqami}')),
+                          DataCell(Text('${k.kipRaqami}')),
+                          DataCell(Text(k.ogirlik.toStringAsFixed(1))),
+                          DataCell(Text(k.smena)),
+                          DataCell(Text(k.operatorIsm)),
+                          DataCell(
+                            Text(k.holati, style: TextStyle(color: k.holati == 'aktiv' ? Colors.green : Colors.orange)),
                           ),
-                        ),
-                      ]),
+                          DataCell(
+                            IconButton(
+                              icon: const Icon(Icons.print, size: 20),
+                              tooltip: lok.t('chop_etish'),
+                              onPressed: () => _chopEtish(k, lok),
+                            ),
+                          ),
+                        ],
+                      ),
                     )
                     .toList(),
               ),

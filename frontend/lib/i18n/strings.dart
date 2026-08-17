@@ -123,6 +123,18 @@ const Map<String, Map<Til, String>> _matnlar = {
   // Moliyaviy hisobot ekrani
   'uzex_narxlari': {Til.uz: 'UZEX narxlari', Til.ru: 'Цены UZEX'},
   'som': {Til.uz: 'so\'m', Til.ru: 'сум'},
+
+  // Kip batafsil oynasi
+  'kip_batafsil': {Til.uz: 'Kip haqida', Til.ru: 'О кипе'},
+  'audit_tarixi': {Til.uz: 'O\'zgarishlar tarixi', Til.ru: 'История изменений'},
+  'sabab': {Til.uz: 'Sabab', Til.ru: 'Причина'},
+  'surat': {Til.uz: 'Surat', Til.ru: 'Фото'},
+  'yaratildi': {Til.uz: 'Yaratildi', Til.ru: 'Создано'},
+  'tahrirlandi': {Til.uz: 'Tahrirlandi', Til.ru: 'Изменено'},
+  'ochirildi': {Til.uz: 'O\'chirildi', Til.ru: 'Удалено'},
+  'holati_aktiv': {Til.uz: 'Aktiv', Til.ru: 'Активен'},
+  'holati_bekor_qilingan': {Til.uz: 'Bekor qilingan', Til.ru: 'Отменён'},
+  'holati_tahrirlangan': {Til.uz: 'Tahrirlangan', Til.ru: 'Изменён'},
 };
 
 class Lokalizatsiya {
