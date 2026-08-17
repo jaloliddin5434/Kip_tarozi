@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../api/api_exception.dart';
 import '../../state/app_state.dart';
+import 'moliyaviy_hisobot_screen.dart';
 
 class MoliyaviyKirishEkrani extends StatefulWidget {
   const MoliyaviyKirishEkrani({super.key});
@@ -81,24 +82,7 @@ class _MoliyaviyKirishEkraniState extends State<MoliyaviyKirishEkrani> {
   }
 
   void _hisobotSahifasigaOtish() {
-    final lok = context.read<AppState>().lok;
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: Text(lok.t('moliyaviy'))),
-          body: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.construction, size: 48, color: Colors.grey),
-                const SizedBox(height: 12),
-                Text(lok.t('tez_orada'), style: const TextStyle(color: Colors.grey)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MoliyaviyHisobotEkrani()));
   }
 
   @override

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api/api_client.dart';
+import '../api/api_exception.dart';
 import '../i18n/strings.dart';
 import '../models/foydalanuvchi.dart';
 
@@ -68,6 +69,18 @@ class AppState extends ChangeNotifier {
     moliyaviyToken = null;
     moliyaviyTokenMuddati = null;
     notifyListeners();
+  }
+
+  /// Moliyaviy-token bilan himoyalangan endpointlarga so'rov yuboradi. Token
+  /// muddati tugagan/rad etilgan bo'lsa (401), sessiyani tozalab xatoni qayta
+  /// uloqtiradi — chaqiruvchi ekran shu orqali kirish ekraniga qaytishi kerak.
+  Future<dynamic> moliyaviyGet(String yol, {Map<String, dynamic>? query}) async {
+    try {
+      return await api.get(yol, query: query, tokenOverride: moliyaviyToken);
+    } on ApiException catch (e) {
+      if (e.statusCode == 401) moliyaviyChiqish();
+      rethrow;
+    }
   }
 
   Future<void> chiqish() async {

@@ -119,7 +119,10 @@ const Map<String, Map<Til, String>> _matnlar = {
     Til.uz: 'Moliyaviy sessiya muddati tugadi, qaytadan kiring',
     Til.ru: 'Срок финансовой сессии истёк, войдите снова',
   },
-  'tez_orada': {Til.uz: 'Tez orada', Til.ru: 'Скоро'},
+
+  // Moliyaviy hisobot ekrani
+  'uzex_narxlari': {Til.uz: 'UZEX narxlari', Til.ru: 'Цены UZEX'},
+  'som': {Til.uz: 'so\'m', Til.ru: 'сум'},
 };
 
 class Lokalizatsiya {

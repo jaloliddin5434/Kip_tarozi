@@ -14,10 +14,13 @@ class ApiClient {
 
   String? token;
 
-  Map<String, String> get _sarlavhalar => {
-        'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      };
+  Map<String, String> _sarlavhalar([String? tokenOverride]) {
+    final amaldagiToken = tokenOverride ?? token;
+    return {
+      'Content-Type': 'application/json',
+      if (amaldagiToken != null) 'Authorization': 'Bearer $amaldagiToken',
+    };
+  }
 
   Uri _uri(String yol, [Map<String, dynamic>? query]) {
     final tozaQuery = query?.map((k, v) => MapEntry(k, v.toString()));
@@ -52,29 +55,29 @@ class ApiClient {
     throw ApiException(javob.statusCode, xabar, tafsilot: detail);
   }
 
-  Future<dynamic> get(String yol, {Map<String, dynamic>? query}) async {
-    final javob = await http.get(_uri(yol, query), headers: _sarlavhalar);
+  Future<dynamic> get(String yol, {Map<String, dynamic>? query, String? tokenOverride}) async {
+    final javob = await http.get(_uri(yol, query), headers: _sarlavhalar(tokenOverride));
     return _javobniQayta(javob);
   }
 
   Future<dynamic> post(String yol, {Map<String, dynamic>? tana}) async {
-    final javob = await http.post(_uri(yol), headers: _sarlavhalar, body: tana == null ? null : jsonEncode(tana));
+    final javob = await http.post(_uri(yol), headers: _sarlavhalar(), body: tana == null ? null : jsonEncode(tana));
     return _javobniQayta(javob);
   }
 
   Future<dynamic> patch(String yol, {Map<String, dynamic>? tana}) async {
-    final javob = await http.patch(_uri(yol), headers: _sarlavhalar, body: tana == null ? null : jsonEncode(tana));
+    final javob = await http.patch(_uri(yol), headers: _sarlavhalar(), body: tana == null ? null : jsonEncode(tana));
     return _javobniQayta(javob);
   }
 
   Future<dynamic> put(String yol, {Map<String, dynamic>? tana}) async {
-    final javob = await http.put(_uri(yol), headers: _sarlavhalar, body: tana == null ? null : jsonEncode(tana));
+    final javob = await http.put(_uri(yol), headers: _sarlavhalar(), body: tana == null ? null : jsonEncode(tana));
     return _javobniQayta(javob);
   }
 
   Future<dynamic> delete(String yol, {Map<String, dynamic>? tana}) async {
     final sorov = http.Request('DELETE', _uri(yol))
-      ..headers.addAll(_sarlavhalar)
+      ..headers.addAll(_sarlavhalar())
       ..body = tana == null ? '' : jsonEncode(tana);
     final oqim = await sorov.send();
     final javob = await http.Response.fromStream(oqim);
