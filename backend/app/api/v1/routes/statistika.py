@@ -73,22 +73,24 @@ def jamlanma(
 def smena_boyicha(
     davr: str = Query("kunlik"),
     sana: date = Query(default_factory=date.today),
+    mahsulot_kodi: str | None = Query(None),
     db: Session = Depends(get_db),
     _: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.admin)),
 ) -> list[SmenaJamlanmasi]:
     _davrni_tekshir(davr)
     boshlanish, tugash = davr_oraligi(davr, sana)
 
-    qatorlar = db.execute(
-        select(Kip.smena, func.count(Kip.id), func.coalesce(func.sum(Kip.ogirlik), 0))
-        .where(
-            Kip.holati == KipHolati.aktiv,
-            func.date(Kip.vaqt) >= boshlanish,
-            func.date(Kip.vaqt) <= tugash,
-        )
-        .group_by(Kip.smena)
-        .order_by(Kip.smena)
-    ).all()
+    sorov = select(Kip.smena, func.count(Kip.id), func.coalesce(func.sum(Kip.ogirlik), 0))
+    if mahsulot_kodi is not None:
+        sorov = sorov.join(Partiya, Partiya.id == Kip.partiya_id).join(Mahsulot, Mahsulot.id == Partiya.mahsulot_id)
+    sorov = sorov.where(
+        Kip.holati == KipHolati.aktiv,
+        func.date(Kip.vaqt) >= boshlanish,
+        func.date(Kip.vaqt) <= tugash,
+        *([Mahsulot.kod == mahsulot_kodi] if mahsulot_kodi is not None else []),
+    ).group_by(Kip.smena).order_by(Kip.smena)
+
+    qatorlar = db.execute(sorov).all()
 
     return [SmenaJamlanmasi(smena=smena.value, soni=soni, jami_kg=float(kg)) for smena, soni, kg in qatorlar]
 
