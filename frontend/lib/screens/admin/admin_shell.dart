@@ -7,6 +7,7 @@ import 'hujjatlar_screen.dart';
 import 'moliyaviy_kirish_screen.dart';
 import 'partiyalar_screen.dart';
 import 'shubhali_holatlar_screen.dart';
+import 'sozlamalar_screen.dart';
 import 'statistika_screen.dart';
 
 class AdminShell extends StatefulWidget {
@@ -33,6 +34,7 @@ class _AdminShellState extends State<AdminShell> {
       if (!tayyorMahsulotRoli) const PartiyalarEkrani(),
       if (!tayyorMahsulotRoli) const ShubhaliHolatlarEkrani(),
       if (adminRoli) const MoliyaviyKirishEkrani(),
+      if (adminRoli) const SozlamalarEkrani(),
     ];
     final yorliqlar = [
       if (!tayyorMahsulotRoli) NavigationRailDestination(icon: const Icon(Icons.dashboard), label: Text(lok.t('dashboard'))),
@@ -42,6 +44,7 @@ class _AdminShellState extends State<AdminShell> {
       if (!tayyorMahsulotRoli)
         NavigationRailDestination(icon: const Icon(Icons.warning_amber_rounded), label: Text(lok.t('shubhali_holatlar_royxati'))),
       if (adminRoli) NavigationRailDestination(icon: const Icon(Icons.lock), label: Text(lok.t('moliyaviy'))),
+      if (adminRoli) NavigationRailDestination(icon: const Icon(Icons.settings), label: Text(lok.t('sozlamalar'))),
     ];
 
     if (_tanlanganIndeks >= sahifalar.length) _tanlanganIndeks = 0;

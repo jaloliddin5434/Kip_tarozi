@@ -135,6 +135,27 @@ const Map<String, Map<Til, String>> _matnlar = {
   'holati_aktiv': {Til.uz: 'Aktiv', Til.ru: 'Активен'},
   'holati_bekor_qilingan': {Til.uz: 'Bekor qilingan', Til.ru: 'Отменён'},
   'holati_tahrirlangan': {Til.uz: 'Tahrirlangan', Til.ru: 'Изменён'},
+
+  // Sozlamalar ekrani
+  'sozlamalar': {Til.uz: 'Sozlamalar', Til.ru: 'Настройки'},
+  'sozlama_saqlandi': {Til.uz: 'Sozlama saqlandi', Til.ru: 'Настройка сохранена'},
+  'boshqa_sozlamalar': {Til.uz: 'Boshqa sozlamalar', Til.ru: 'Другие настройки'},
+  'parolni_korsatish': {Til.uz: 'Ko\'rsatish', Til.ru: 'Показать'},
+  'parolni_yashirish': {Til.uz: 'Yashirish', Til.ru: 'Скрыть'},
+  'telegram_xatolik_bolimi': {Til.uz: 'Xatolik xabarnomalari (Telegram)', Til.ru: 'Уведомления об ошибках (Telegram)'},
+  'telegram_xatolik_tavsif': {
+    Til.uz: 'Texnik xatoliklar (masalan "yuk saqlanmadi") shu Telegram botga yuboriladi',
+    Til.ru: 'Технические ошибки (например «груз не сохранён») отправляются в этот Telegram-бот',
+  },
+  'telegram_xatolik_bot_token': {Til.uz: 'Bot tokeni', Til.ru: 'Токен бота'},
+  'telegram_xatolik_chat_id': {Til.uz: 'Chat ID', Til.ru: 'ID чата'},
+  'telegram_statistika_bolimi': {Til.uz: 'Statistika xabarnomalari (Telegram)', Til.ru: 'Уведомления статистики (Telegram)'},
+  'telegram_statistika_tavsif': {
+    Til.uz: 'Kunlik/smena statistik hisobotlari shu Telegram guruhiga yuboriladi',
+    Til.ru: 'Ежедневные/сменные статистические отчёты отправляются в эту Telegram-группу',
+  },
+  'telegram_statistika_bot_token': {Til.uz: 'Bot tokeni', Til.ru: 'Токен бота'},
+  'telegram_statistika_chat_id': {Til.uz: 'Chat ID', Til.ru: 'ID чата'},
 };
 
 class Lokalizatsiya {
