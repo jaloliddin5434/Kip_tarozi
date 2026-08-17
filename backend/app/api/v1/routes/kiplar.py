@@ -13,7 +13,8 @@ from app.models.kip import Kip, KipHolati
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya, PartiyaHolati
 from app.models.shubhali_holat import ShubhaliHolat, ShubhaliHolatStatusi
-from app.schemas.kip import KipJavob, KipSinxronNatija, KipTahrirlash, KipYaratish
+from app.schemas.hujjat import AuditLogJavob
+from app.schemas.kip import KipBatafsilJavob, KipJavob, KipSinxronNatija, KipTahrirlash, KipYaratish
 from app.schemas.smena import MahsulotBoyichaHolat, SmenaHolati
 
 router = APIRouter(prefix="/kiplar", tags=["kiplar"])
@@ -175,6 +176,73 @@ def saqlash(
     db.commit()
     db.refresh(kip)
     return kip
+
+
+@router.get("/{kip_id}", response_model=KipBatafsilJavob)
+def batafsil(
+    kip_id: int,
+    db: Session = Depends(get_db),
+    foydalanuvchi: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.admin, Rol.tayyor_mahsulotlar, Rol.operator)),
+) -> KipBatafsilJavob:
+    natija = db.execute(
+        select(Kip, Partiya.partiya_raqami, Mahsulot.kod, Mahsulot.nomi, Foydalanuvchi.ism)
+        .join(Partiya, Kip.partiya_id == Partiya.id)
+        .join(Mahsulot, Partiya.mahsulot_id == Mahsulot.id)
+        .join(Foydalanuvchi, Kip.operator_id == Foydalanuvchi.id)
+        .where(Kip.id == kip_id)
+    ).first()
+    if natija is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kip topilmadi")
+
+    kip, partiya_raqami, mahsulot_kodi, mahsulot_nomi, operator_ism = natija
+
+    if foydalanuvchi.rol == Rol.operator and kip.smena != foydalanuvchi.smena:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Faqat o'z smenangizdagi kipni ko'rishingiz mumkin"
+        )
+
+    audit_qatorlari = db.execute(
+        select(AuditLog, Foydalanuvchi.ism)
+        .join(Foydalanuvchi, AuditLog.foydalanuvchi_id == Foydalanuvchi.id)
+        .where(AuditLog.jadval_nomi == "kiplar", AuditLog.yozuv_id == kip_id)
+        .order_by(AuditLog.vaqt.desc())
+    ).all()
+    audit_log = [
+        AuditLogJavob(
+            id=log.id,
+            foydalanuvchi_id=log.foydalanuvchi_id,
+            foydalanuvchi_ism=ism,
+            jadval_nomi=log.jadval_nomi,
+            yozuv_id=log.yozuv_id,
+            amal=log.amal,
+            eski_qiymat=log.eski_qiymat,
+            yangi_qiymat=log.yangi_qiymat,
+            sabab=log.sabab,
+            vaqt=log.vaqt,
+        )
+        for log, ism in audit_qatorlari
+    ]
+
+    return KipBatafsilJavob(
+        id=kip.id,
+        mijoz_id=kip.mijoz_id,
+        partiya_id=kip.partiya_id,
+        partiya_raqami=partiya_raqami,
+        mahsulot_kodi=mahsulot_kodi,
+        mahsulot_nomi=mahsulot_nomi,
+        kip_raqami=kip.kip_raqami,
+        ogirlik=float(kip.ogirlik),
+        smena=kip.smena,
+        operator_id=kip.operator_id,
+        operator_ism=operator_ism,
+        mahalliy_vaqt=kip.mahalliy_vaqt,
+        vaqt=kip.vaqt,
+        sinxronlangan=kip.sinxronlangan,
+        surat_yoli=kip.surat_yoli,
+        holati=kip.holati,
+        stansiya_id=kip.stansiya_id,
+        audit_log=audit_log,
+    )
 
 
 @router.post("/{kip_id}/bekor-qilish", response_model=KipJavob)
