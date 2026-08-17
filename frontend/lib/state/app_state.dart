@@ -11,8 +11,13 @@ class AppState extends ChangeNotifier {
   ThemeMode temaRejimi = ThemeMode.light;
   Til til = Til.uz;
 
+  String? moliyaviyToken;
+  DateTime? moliyaviyTokenMuddati;
+
   Lokalizatsiya get lok => Lokalizatsiya(til);
   bool get kirilgan => foydalanuvchi != null && api.token != null;
+  bool get moliyaviySessiyaAmalda =>
+      moliyaviyToken != null && moliyaviyTokenMuddati != null && moliyaviyTokenMuddati!.isAfter(DateTime.now());
 
   Future<void> tiklash() async {
     final prefs = await SharedPreferences.getInstance();
@@ -48,9 +53,28 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> moliyaviyParolOrnatish(String parol) async {
+    await api.post('/moliyaviy/parolni-ornatish', tana: {'parol': parol});
+  }
+
+  Future<void> moliyaviyKirish(String parol) async {
+    final javob = await api.post('/moliyaviy/kirish', tana: {'parol': parol});
+    moliyaviyToken = javob['access_token'];
+    moliyaviyTokenMuddati = DateTime.now().add(Duration(minutes: javob['muddat_daqiqa']));
+    notifyListeners();
+  }
+
+  void moliyaviyChiqish() {
+    moliyaviyToken = null;
+    moliyaviyTokenMuddati = null;
+    notifyListeners();
+  }
+
   Future<void> chiqish() async {
     api.token = null;
     foydalanuvchi = null;
+    moliyaviyToken = null;
+    moliyaviyTokenMuddati = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
     notifyListeners();

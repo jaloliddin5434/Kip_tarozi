@@ -4,6 +4,7 @@ import '../../state/app_state.dart';
 import '../../widgets/clock_widget.dart';
 import 'dashboard_screen.dart';
 import 'hujjatlar_screen.dart';
+import 'moliyaviy_kirish_screen.dart';
 import 'partiyalar_screen.dart';
 import 'shubhali_holatlar_screen.dart';
 import 'statistika_screen.dart';
@@ -23,6 +24,7 @@ class _AdminShellState extends State<AdminShell> {
     final holat = context.watch<AppState>();
     final lok = holat.lok;
     final tayyorMahsulotRoli = holat.foydalanuvchi?.rol == 'tayyor_mahsulotlar';
+    final adminRoli = holat.foydalanuvchi?.rol == 'admin';
 
     final sahifalar = [
       if (!tayyorMahsulotRoli) const DashboardEkrani(),
@@ -30,6 +32,7 @@ class _AdminShellState extends State<AdminShell> {
       if (!tayyorMahsulotRoli) const StatistikaEkrani(),
       if (!tayyorMahsulotRoli) const PartiyalarEkrani(),
       if (!tayyorMahsulotRoli) const ShubhaliHolatlarEkrani(),
+      if (adminRoli) const MoliyaviyKirishEkrani(),
     ];
     final yorliqlar = [
       if (!tayyorMahsulotRoli) NavigationRailDestination(icon: const Icon(Icons.dashboard), label: Text(lok.t('dashboard'))),
@@ -38,6 +41,7 @@ class _AdminShellState extends State<AdminShell> {
       if (!tayyorMahsulotRoli) NavigationRailDestination(icon: const Icon(Icons.folder), label: Text(lok.t('partiyalar'))),
       if (!tayyorMahsulotRoli)
         NavigationRailDestination(icon: const Icon(Icons.warning_amber_rounded), label: Text(lok.t('shubhali_holatlar_royxati'))),
+      if (adminRoli) NavigationRailDestination(icon: const Icon(Icons.lock), label: Text(lok.t('moliyaviy'))),
     ];
 
     if (_tanlanganIndeks >= sahifalar.length) _tanlanganIndeks = 0;

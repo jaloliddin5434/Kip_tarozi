@@ -103,6 +103,23 @@ const Map<String, Map<Til, String>> _matnlar = {
   'sana_dan': {Til.uz: 'Sana dan', Til.ru: 'Дата с'},
   'sana_gacha': {Til.uz: 'Sana gacha', Til.ru: 'Дата по'},
   'smena_boyicha': {Til.uz: 'Smena bo\'yicha', Til.ru: 'По сменам'},
+
+  // Moliyaviy bo'lim kirish ekrani
+  'moliyaviy': {Til.uz: 'Moliyaviy', Til.ru: 'Финансы'},
+  'moliyaviy_parol': {Til.uz: 'Moliyaviy parol', Til.ru: 'Финансовый пароль'},
+  'moliyaviy_parol_tasdiqlash': {Til.uz: 'Parolni tasdiqlang', Til.ru: 'Подтвердите пароль'},
+  'moliyaviy_parol_ornatish': {Til.uz: 'Parolni o\'rnatish', Til.ru: 'Установить пароль'},
+  'moliyaviy_birinchi_marta_matni': {
+    Til.uz: 'Moliyaviy bo\'lim uchun hali parol o\'rnatilmagan. Yangi parol yarating.',
+    Til.ru: 'Пароль для финансового раздела ещё не установлен. Придумайте новый пароль.',
+  },
+  'parollar_mos_emas': {Til.uz: 'Parollar mos emas', Til.ru: 'Пароли не совпадают'},
+  'moliyaviy_parol_notogri': {Til.uz: 'Moliyaviy parol noto\'g\'ri', Til.ru: 'Неверный финансовый пароль'},
+  'moliyaviy_sessiya_tugadi': {
+    Til.uz: 'Moliyaviy sessiya muddati tugadi, qaytadan kiring',
+    Til.ru: 'Срок финансовой сессии истёк, войдите снова',
+  },
+  'tez_orada': {Til.uz: 'Tez orada', Til.ru: 'Скоро'},
 };
 
 class Lokalizatsiya {
