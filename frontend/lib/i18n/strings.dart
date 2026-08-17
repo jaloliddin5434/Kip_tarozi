@@ -238,6 +238,16 @@ const Map<String, Map<Til, String>> _matnlar = {
     Til.uz: 'Sort/og\'irlik to\'ldirish',
     Til.ru: 'Заполнить сорт/вес',
   },
+
+  // Login ekrani — rol tanlash
+  'rolni_tanlang': {Til.uz: 'Rolingizni tanlang', Til.ru: 'Выберите свою роль'},
+  'admin_rol': {Til.uz: 'Admin', Til.ru: 'Администратор'},
+  'tayyor_mahsulotlar_rol': {
+    Til.uz: 'Tayyor mahsulotlar bo\'limi',
+    Til.ru: 'Отдел готовой продукции',
+  },
+  'smena_login_belgi': {Til.uz: 'Smena login', Til.ru: 'Логин смены'},
+  'orqaga': {Til.uz: 'Orqaga', Til.ru: 'Назад'},
 };
 
 class Lokalizatsiya {
