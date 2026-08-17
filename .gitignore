@@ -10,14 +10,11 @@ storage/
 build/
 .dart_tool/
 .flutter-plugin-dependencies
-
 # Byte-compiled / optimized / DLL files
 *.py[codz]
 *$py.class
-
 # C extensions
 *.so
-
 # Distribution / packaging
 .Python
 develop-eggs/
@@ -25,8 +22,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+backend/lib/
+backend/lib64/
 parts/
 sdist/
 var/
@@ -36,15 +33,12 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-
 # PyInstaller
 *.manifest
 *.spec
-
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
-
 # Unit test / coverage reports
 htmlcov/
 .tox/
@@ -58,11 +52,9 @@ coverage.xml
 *.py.cover
 .hypothesis/
 cover/
-
 # Translations
 *.mo
 *.pot
-
 # Django/Flask stuff
 *.log
 local_settings.py
@@ -70,22 +62,17 @@ db.sqlite3
 db.sqlite3-journal
 instance/
 .webassets-cache
-
 # Sphinx documentation
 docs/_build/
-
 # PyBuilder
 .pybuilder/
 target/
-
 # Jupyter/IPython
 .ipynb_checkpoints
 profile_default/
 ipython_config.py
-
 # Environments
 .envrc
-
 # Type checkers
 .mypy_cache/
 .dmypy.json
@@ -93,12 +80,9 @@ dmypy.json
 .pyre/
 .pytype/
 cython_debug/
-
 # Ruff
 .ruff_cache/
-
 # PyPI
 .pypirc
-
 # Temp
 tempCodeRunnerFile.py
