@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 /// Kip saqlangandan keyin ~30s davomida ko'rinadigan tezkor "Bekor qilish"
-/// tugmasi — hisoblagich bilan, muddat tugagach o'zi yo'qoladi.
+/// boshqaruvi — doiraviy progress-halqa bilan, muddat tugagach o'zi yo'qoladi.
 class BekorQilishHisoblagichi extends StatefulWidget {
   final int muddatSoniya;
   final String matn;
@@ -45,18 +45,67 @@ class _BekorQilishHisoblagichiState extends State<BekorQilishHisoblagichi> {
     super.dispose();
   }
 
+  Future<void> _bosildi() async {
+    if (_yuborilmoqda) return;
+    setState(() => _yuborilmoqda = true);
+    await widget.onBekorQilish();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: _yuborilmoqda
-          ? null
-          : () async {
-              setState(() => _yuborilmoqda = true);
-              await widget.onBekorQilish();
-            },
-      icon: const Icon(Icons.undo),
-      label: Text('${widget.matn} ($_qolgan s)'),
-      style: OutlinedButton.styleFrom(foregroundColor: Colors.red.shade700, side: BorderSide(color: Colors.red.shade300)),
+    final progress = _qolgan / widget.muddatSoniya;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 88,
+          height: 88,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 88,
+                height: 88,
+                child: CircularProgressIndicator(
+                  value: progress.clamp(0, 1),
+                  strokeWidth: 5,
+                  color: Colors.red.shade400,
+                  backgroundColor: Colors.red.shade100,
+                ),
+              ),
+              Material(
+                color: Colors.transparent,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: _yuborilmoqda ? null : _bosildi,
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: _yuborilmoqda
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.red.shade700),
+                          )
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.undo, color: Colors.red.shade700, size: 22),
+                              Text(
+                                '$_qolgan s',
+                                style: TextStyle(color: Colors.red.shade700, fontSize: 13, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(widget.matn, style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
+      ],
     );
   }
 }

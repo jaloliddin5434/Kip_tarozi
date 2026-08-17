@@ -250,6 +250,18 @@ const Map<String, Map<Til, String>> _matnlar = {
   },
   'orqaga': {Til.uz: 'Orqaga', Til.ru: 'Назад'},
   'smenani_tanlang': {Til.uz: 'Smenani tanlang', Til.ru: 'Выберите смену'},
+
+  // Operator ekrani — qayta dizayn
+  'server': {Til.uz: 'Server', Til.ru: 'Сервер'},
+  'kamera': {Til.uz: 'Kamera', Til.ru: 'Камера'},
+  'tarozi': {Til.uz: 'Tarozi', Til.ru: 'Весы'},
+  'barqaror': {Til.uz: 'Barqaror', Til.ru: 'Стабильно'},
+  'kutilmoqda': {Til.uz: 'Kutilmoqda...', Til.ru: 'Ожидание...'},
+  'song_ishlatilganlar': {
+    Til.uz: 'So\'nggi ishlatilganlar',
+    Til.ru: 'Недавно использованные',
+  },
+  'oxirgi_tortishlar': {Til.uz: 'Oxirgi tortishlar', Til.ru: 'Последние взвешивания'},
 };
 
 class Lokalizatsiya {
