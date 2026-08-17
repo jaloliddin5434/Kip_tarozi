@@ -20,6 +20,8 @@ class KipYaratish(BaseModel):
 
 class KipTahrirlash(BaseModel):
     ogirlik: float | None = None
+    mahsulot_kodi: str | None = None
+    partiya_raqami: int | None = None
     sabab: str
 
 

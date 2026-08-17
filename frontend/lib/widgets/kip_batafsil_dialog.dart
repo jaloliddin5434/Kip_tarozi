@@ -1,61 +1,97 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../api/api_exception.dart';
 import '../i18n/strings.dart';
 import '../models/kip_batafsil.dart';
+import '../models/mahsulot.dart';
 import '../services/kip_chop_etish.dart';
 import '../state/app_state.dart';
 
 /// Hujjatlar jadvalidagi bir qatorni bosganda kipning to'liq ma'lumoti va
 /// (agar tahrirlangan/o'chirilgan bo'lsa) audit tarixini ko'rsatadi.
 Future<void> kipBatafsilDialogniKorsat({required BuildContext context, required int kipId}) {
-  final holat = context.read<AppState>();
-  final lok = holat.lok;
-  final natija = holat.api.get('/kiplar/$kipId').then((j) => KipBatafsil.fromJson(j));
-
   return showDialog(
     context: context,
     builder: (dialogContext) => Dialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480, maxHeight: 640),
-        child: FutureBuilder<KipBatafsil>(
-          future: natija,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Padding(
-                padding: EdgeInsets.all(40),
-                child: SizedBox(height: 80, child: Center(child: CircularProgressIndicator())),
-              );
-            }
-            if (snapshot.hasError) {
-              return Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text('${snapshot.error}', style: const TextStyle(color: Colors.red)),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      child: Text(lok.t('yopish')),
-                    ),
-                  ],
-                ),
-              );
-            }
-            return _KipBatafsilTarkibi(kip: snapshot.data!, lok: lok);
-          },
-        ),
+        child: _KipBatafsilIchki(kipId: kipId),
       ),
     ),
   );
 }
 
+class _KipBatafsilIchki extends StatefulWidget {
+  final int kipId;
+
+  const _KipBatafsilIchki({required this.kipId});
+
+  @override
+  State<_KipBatafsilIchki> createState() => _KipBatafsilIchkiState();
+}
+
+class _KipBatafsilIchkiState extends State<_KipBatafsilIchki> {
+  late Future<KipBatafsil> _natija;
+
+  @override
+  void initState() {
+    super.initState();
+    _natija = _yuklash();
+  }
+
+  Future<KipBatafsil> _yuklash() {
+    final holat = context.read<AppState>();
+    return holat.api.get('/kiplar/${widget.kipId}').then((j) => KipBatafsil.fromJson(j));
+  }
+
+  void _qaytaYuklash() {
+    setState(() {
+      _natija = _yuklash();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lok = context.watch<AppState>().lok;
+
+    return FutureBuilder<KipBatafsil>(
+      future: _natija,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Padding(
+            padding: EdgeInsets.all(40),
+            child: SizedBox(height: 80, child: Center(child: CircularProgressIndicator())),
+          );
+        }
+        if (snapshot.hasError) {
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('${snapshot.error}', style: const TextStyle(color: Colors.red)),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(lok.t('yopish')),
+                ),
+              ],
+            ),
+          );
+        }
+        return _KipBatafsilTarkibi(kip: snapshot.data!, lok: lok, qaytaYuklash: _qaytaYuklash);
+      },
+    );
+  }
+}
+
 class _KipBatafsilTarkibi extends StatelessWidget {
   final KipBatafsil kip;
   final Lokalizatsiya lok;
+  final VoidCallback qaytaYuklash;
 
-  const _KipBatafsilTarkibi({required this.kip, required this.lok});
+  const _KipBatafsilTarkibi({required this.kip, required this.lok, required this.qaytaYuklash});
 
   String _holatiMatni() {
     switch (kip.holati) {
@@ -87,6 +123,8 @@ class _KipBatafsilTarkibi extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final adminRoli = context.watch<AppState>().foydalanuvchi?.rol == 'admin';
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -100,6 +138,15 @@ class _KipBatafsilTarkibi extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
+              if (adminRoli)
+                IconButton(
+                  icon: const Icon(Icons.edit),
+                  tooltip: lok.t('tahrirlash'),
+                  onPressed: () async {
+                    final saqlandi = await _tahrirlashFormasiniOchish(context, kip);
+                    if (saqlandi == true) qaytaYuklash();
+                  },
+                ),
               IconButton(
                 icon: const Icon(Icons.print),
                 tooltip: lok.t('chop_etish'),
@@ -235,4 +282,104 @@ class _KipBatafsilTarkibi extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Admin uchun kipning og'irligi, mahsuloti va partiyasini tuzatish formasi.
+/// Muvaffaqiyatli saqlansa `true` qaytaradi.
+Future<bool?> _tahrirlashFormasiniOchish(BuildContext context, KipBatafsil kip) async {
+  final holat = context.read<AppState>();
+  final lok = holat.lok;
+
+  List<Mahsulot> mahsulotlar;
+  try {
+    final javob = await holat.api.get('/mahsulotlar');
+    mahsulotlar = (javob as List).map((e) => Mahsulot.fromJson(e)).toList();
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$e'), backgroundColor: Colors.red.shade700),
+      );
+    }
+    return null;
+  }
+
+  final ogirlikKontrolleri = TextEditingController(text: kip.ogirlik.toStringAsFixed(1));
+  final partiyaRaqamiKontrolleri = TextEditingController(text: '${kip.partiyaRaqami}');
+  final sababKontrolleri = TextEditingController();
+  String tanlanganMahsulotKodi = kip.mahsulotKodi;
+  String? xato;
+
+  if (!context.mounted) return null;
+  return showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext, setState) => AlertDialog(
+        title: Text('${lok.t("tahrirlash")} — #${kip.kipRaqami}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: tanlanganMahsulotKodi,
+                decoration: InputDecoration(labelText: lok.t('mahsulot')),
+                items: mahsulotlar.map((m) => DropdownMenuItem(value: m.kod, child: Text(m.nomi))).toList(),
+                onChanged: (v) => setState(() => tanlanganMahsulotKodi = v ?? tanlanganMahsulotKodi),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: partiyaRaqamiKontrolleri,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(labelText: lok.t('partiya_raqami')),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ogirlikKontrolleri,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(labelText: lok.t('ogirlik')),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: sababKontrolleri,
+                decoration: InputDecoration(labelText: lok.t('sabab')),
+              ),
+              if (xato != null) ...[
+                const SizedBox(height: 12),
+                Text(xato!, style: const TextStyle(color: Colors.red)),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: Text(lok.t('bekor'))),
+          FilledButton(
+            onPressed: () async {
+              final ogirlik = double.tryParse(ogirlikKontrolleri.text.trim().replaceAll(',', '.'));
+              final partiyaRaqami = int.tryParse(partiyaRaqamiKontrolleri.text.trim());
+              final sabab = sababKontrolleri.text.trim();
+              if (ogirlik == null || partiyaRaqami == null || sabab.isEmpty) {
+                setState(() => xato = lok.t('maydonlar_toldirilmagan'));
+                return;
+              }
+              try {
+                await holat.api.patch(
+                  '/kiplar/${kip.id}',
+                  tana: {
+                    'ogirlik': ogirlik,
+                    'mahsulot_kodi': tanlanganMahsulotKodi,
+                    'partiya_raqami': partiyaRaqami,
+                    'sabab': sabab,
+                  },
+                );
+                if (dialogContext.mounted) Navigator.of(dialogContext).pop(true);
+              } on ApiException catch (e) {
+                setState(() => xato = e.xabar);
+              }
+            },
+            child: Text(lok.t('saqlash')),
+          ),
+        ],
+      ),
+    ),
+  );
 }

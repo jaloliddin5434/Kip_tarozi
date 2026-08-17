@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from app.core.security import parolni_hash
 from app.models.foydalanuvchi import Foydalanuvchi, Rol, Smena
+from app.models.mahsulot import Mahsulot
 
 
 def _kip_yaratish_payload(partiya_id: int, ogirlik: float = 135.5) -> dict:
@@ -96,3 +97,82 @@ def test_batafsil_tahrirlangan_kip_audit_log_qaytaradi(client, operator_headers,
     assert yozuv["eski_qiymat"]["ogirlik"] == 120.0
     assert yozuv["yangi_qiymat"]["ogirlik"] == 125.0
     assert yozuv["foydalanuvchi_ism"] == "Test Admin"
+
+
+def test_tahrirlash_mahsulot_partiya_ozgartirish_ishlaydi(db, client, operator_headers, admin_headers, mahsulot_tola):
+    lint = Mahsulot(kod="lint", nomi="Lint")
+    db.add(lint)
+    db.commit()
+
+    eski_partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 300}, headers=operator_headers
+    ).json()
+    yangi_partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "lint", "partiya_raqami": 301}, headers=operator_headers
+    ).json()
+    kip = client.post(
+        "/api/v1/kiplar", json=_kip_yaratish_payload(eski_partiya["id"], 130.0), headers=operator_headers
+    ).json()
+
+    tahrirlash = client.patch(
+        f"/api/v1/kiplar/{kip['id']}",
+        json={"mahsulot_kodi": "lint", "partiya_raqami": 301, "sabab": "Operator xato partiya tanlagan edi"},
+        headers=admin_headers,
+    )
+    assert tahrirlash.status_code == 200
+    assert tahrirlash.json()["partiya_id"] == yangi_partiya["id"]
+
+    javob = client.get(f"/api/v1/kiplar/{kip['id']}", headers=admin_headers).json()
+    assert javob["mahsulot_kodi"] == "lint"
+    assert javob["mahsulot_nomi"] == "Lint"
+    assert javob["partiya_raqami"] == 301
+    assert javob["holati"] == "tahrirlangan"
+
+    yozuv = javob["audit_log"][0]
+    assert yozuv["sabab"] == "Operator xato partiya tanlagan edi"
+    assert yozuv["eski_qiymat"]["mahsulot_kodi"] == "tola"
+    assert yozuv["eski_qiymat"]["partiya_raqami"] == 300
+    assert yozuv["yangi_qiymat"]["mahsulot_kodi"] == "lint"
+    assert yozuv["yangi_qiymat"]["partiya_raqami"] == 301
+
+
+def test_tahrirlash_notogri_mahsulot_kodi_400(client, operator_headers, admin_headers, mahsulot_tola):
+    partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 302}, headers=operator_headers
+    ).json()
+    kip = client.post("/api/v1/kiplar", json=_kip_yaratish_payload(partiya["id"]), headers=operator_headers).json()
+
+    javob = client.patch(
+        f"/api/v1/kiplar/{kip['id']}",
+        json={"mahsulot_kodi": "mavjud_emas", "partiya_raqami": 1, "sabab": "sinov"},
+        headers=admin_headers,
+    )
+    assert javob.status_code == 400
+
+
+def test_tahrirlash_notogri_partiya_raqami_400(client, operator_headers, admin_headers, mahsulot_tola):
+    partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 303}, headers=operator_headers
+    ).json()
+    kip = client.post("/api/v1/kiplar", json=_kip_yaratish_payload(partiya["id"]), headers=operator_headers).json()
+
+    javob = client.patch(
+        f"/api/v1/kiplar/{kip['id']}",
+        json={"mahsulot_kodi": "tola", "partiya_raqami": 999999, "sabab": "sinov"},
+        headers=admin_headers,
+    )
+    assert javob.status_code == 400
+
+
+def test_tahrirlash_faqat_mahsulot_kodi_400(client, operator_headers, admin_headers, mahsulot_tola):
+    partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 304}, headers=operator_headers
+    ).json()
+    kip = client.post("/api/v1/kiplar", json=_kip_yaratish_payload(partiya["id"]), headers=operator_headers).json()
+
+    javob = client.patch(
+        f"/api/v1/kiplar/{kip['id']}",
+        json={"mahsulot_kodi": "tola", "sabab": "sinov"},
+        headers=admin_headers,
+    )
+    assert javob.status_code == 400

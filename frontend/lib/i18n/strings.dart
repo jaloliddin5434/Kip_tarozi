@@ -185,6 +185,8 @@ const Map<String, Map<Til, String>> _matnlar = {
   // Kip batafsil oynasi
   'kip_batafsil': {Til.uz: 'Kip haqida', Til.ru: 'О кипе'},
   'audit_tarixi': {Til.uz: 'O\'zgarishlar tarixi', Til.ru: 'История изменений'},
+  'tahrirlash': {Til.uz: 'Tahrirlash', Til.ru: 'Редактировать'},
+  'maydonlar_toldirilmagan': {Til.uz: 'Barcha maydonlarni to\'ldiring', Til.ru: 'Заполните все поля'},
   'sabab': {Til.uz: 'Sabab', Til.ru: 'Причина'},
   'surat': {Til.uz: 'Surat', Til.ru: 'Фото'},
   'surat_yoq': {Til.uz: 'Surat mavjud emas', Til.ru: 'Фото отсутствует'},

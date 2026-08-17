@@ -290,11 +290,47 @@ def tahrirlash(
     if kip is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kip topilmadi")
 
-    eski_qiymat = {"ogirlik": float(kip.ogirlik), "holati": kip.holati.value}
+    eski_partiya = db.get(Partiya, kip.partiya_id)
+    eski_mahsulot = db.get(Mahsulot, eski_partiya.mahsulot_id)
+    eski_qiymat = {
+        "ogirlik": float(kip.ogirlik),
+        "holati": kip.holati.value,
+        "mahsulot_kodi": eski_mahsulot.kod,
+        "partiya_raqami": eski_partiya.partiya_raqami,
+    }
+
     if malumot.ogirlik is not None:
         kip.ogirlik = malumot.ogirlik
+
+    if malumot.mahsulot_kodi is not None or malumot.partiya_raqami is not None:
+        if malumot.mahsulot_kodi is None or malumot.partiya_raqami is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Mahsulot va partiya raqami birga ko'rsatilishi kerak",
+            )
+        yangi_mahsulot = db.scalar(select(Mahsulot).where(Mahsulot.kod == malumot.mahsulot_kodi))
+        if yangi_mahsulot is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mahsulot topilmadi")
+        yangi_partiya = db.scalar(
+            select(Partiya).where(
+                Partiya.mahsulot_id == yangi_mahsulot.id,
+                Partiya.partiya_raqami == malumot.partiya_raqami,
+            )
+        )
+        if yangi_partiya is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Partiya topilmadi")
+        kip.partiya_id = yangi_partiya.id
+
     kip.holati = KipHolati.tahrirlangan
-    yangi_qiymat = {"ogirlik": float(kip.ogirlik), "holati": kip.holati.value}
+
+    joriy_partiya = db.get(Partiya, kip.partiya_id)
+    joriy_mahsulot = db.get(Mahsulot, joriy_partiya.mahsulot_id)
+    yangi_qiymat = {
+        "ogirlik": float(kip.ogirlik),
+        "holati": kip.holati.value,
+        "mahsulot_kodi": joriy_mahsulot.kod,
+        "partiya_raqami": joriy_partiya.partiya_raqami,
+    }
 
     db.add(
         AuditLog(
