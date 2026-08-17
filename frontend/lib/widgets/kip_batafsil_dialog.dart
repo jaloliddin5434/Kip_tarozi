@@ -124,7 +124,10 @@ class _KipBatafsilTarkibi extends StatelessWidget {
                 _qator(lok.t('operator'), kip.operatorIsm),
                 _qator(lok.t('vaqt'), _vaqtMatni(kip.vaqt)),
                 _qator(lok.t('holati'), _holatiMatni()),
-                if (kip.suratYoli != null) _qator(lok.t('surat'), kip.suratYoli!),
+                const SizedBox(height: 12),
+                Text(lok.t('surat'), style: const TextStyle(color: Colors.grey)),
+                const SizedBox(height: 6),
+                _suratKorinishi(kip.suratYoli),
                 if (kip.auditLog.isNotEmpty) ...[
                   const SizedBox(height: 20),
                   Text(lok.t('audit_tarixi'), style: Theme.of(context).textTheme.titleMedium),
@@ -147,6 +150,61 @@ class _KipBatafsilTarkibi extends StatelessWidget {
         children: [
           SizedBox(width: 130, child: Text(sarlavha, style: const TextStyle(color: Colors.grey))),
           Expanded(child: Text(qiymat)),
+        ],
+      ),
+    );
+  }
+
+  Widget _suratKorinishi(String? suratYoli) {
+    if (suratYoli == null || suratYoli.isEmpty) {
+      return _suratPlaceholder(Icons.image_not_supported_outlined, lok.t('surat_yoq'));
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.network(
+        suratYoli,
+        height: 180,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return SizedBox(
+            height: 180,
+            child: Container(
+              color: Colors.grey.shade100,
+              alignment: Alignment.center,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                value: progress.expectedTotalBytes != null
+                    ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                    : null,
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) =>
+            _suratPlaceholder(Icons.broken_image_outlined, lok.t('surat_yuklanmadi')),
+      ),
+    );
+  }
+
+  Widget _suratPlaceholder(IconData ikonka, String matn) {
+    return Container(
+      height: 140,
+      width: double.infinity,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(ikonka, color: Colors.grey.shade400, size: 32),
+          const SizedBox(height: 6),
+          Text(matn, style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
         ],
       ),
     );

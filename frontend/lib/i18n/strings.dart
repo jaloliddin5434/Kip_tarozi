@@ -189,6 +189,8 @@ const Map<String, Map<Til, String>> _matnlar = {
   'audit_tarixi': {Til.uz: 'O\'zgarishlar tarixi', Til.ru: 'История изменений'},
   'sabab': {Til.uz: 'Sabab', Til.ru: 'Причина'},
   'surat': {Til.uz: 'Surat', Til.ru: 'Фото'},
+  'surat_yoq': {Til.uz: 'Surat mavjud emas', Til.ru: 'Фото отсутствует'},
+  'surat_yuklanmadi': {Til.uz: 'Rasm yuklanmadi', Til.ru: 'Не удалось загрузить фото'},
   'yaratildi': {Til.uz: 'Yaratildi', Til.ru: 'Создано'},
   'tahrirlandi': {Til.uz: 'Tahrirlandi', Til.ru: 'Изменено'},
   'ochirildi': {Til.uz: 'O\'chirildi', Til.ru: 'Удалено'},
