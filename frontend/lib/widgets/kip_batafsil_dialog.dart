@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../i18n/strings.dart';
 import '../models/kip_batafsil.dart';
+import '../services/kip_chop_etish.dart';
 import '../state/app_state.dart';
 
 /// Hujjatlar jadvalidagi bir qatorni bosganda kipning to'liq ma'lumoti va
@@ -98,6 +99,11 @@ class _KipBatafsilTarkibi extends StatelessWidget {
                   '${lok.t("kip_batafsil")} — #${kip.kipRaqami}',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.print),
+                tooltip: lok.t('chop_etish'),
+                onPressed: () => kipniChopEtish(kip, lok),
               ),
               IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop()),
             ],
