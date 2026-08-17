@@ -18,15 +18,21 @@ class _LoginEkraniState extends State<LoginEkrani> {
 
   // 'admin' | 'operator' | 'tayyor_mahsulotlar' | null (hali tanlanmagan)
   String? _tanlanganRol;
+  // Faqat rol == 'operator' bo'lganda ishlatiladi: 'A' | 'B' | 'C' | 'D' | null
+  String? _tanlanganSmena;
 
   Future<void> _kirish() async {
     final holat = context.read<AppState>();
+    final login = _tanlanganRol == 'operator'
+        ? 'operator_${_tanlanganSmena!.toLowerCase()}'
+        : _loginKontrolleri.text.trim();
+
     setState(() {
       _yuklanmoqda = true;
       _xato = null;
     });
     try {
-      await holat.kirish(_loginKontrolleri.text.trim(), _parolKontrolleri.text);
+      await holat.kirish(login, _parolKontrolleri.text);
     } catch (e) {
       setState(() => _xato = e.toString());
     } finally {
@@ -41,11 +47,27 @@ class _LoginEkraniState extends State<LoginEkrani> {
     });
   }
 
+  void _smenaniTanlash(String smena) {
+    setState(() {
+      _tanlanganSmena = smena;
+      _xato = null;
+    });
+  }
+
   void _rolTanlashgaQaytish() {
     setState(() {
       _tanlanganRol = null;
+      _tanlanganSmena = null;
       _xato = null;
       _loginKontrolleri.clear();
+      _parolKontrolleri.clear();
+    });
+  }
+
+  void _smenaTanlashgaQaytish() {
+    setState(() {
+      _tanlanganSmena = null;
+      _xato = null;
       _parolKontrolleri.clear();
     });
   }
@@ -72,14 +94,12 @@ class _LoginEkraniState extends State<LoginEkrani> {
     }
   }
 
-  String _loginYorlagi(String rol, dynamic lok) {
-    return rol == 'operator' ? lok.t('smena_login_belgi') : lok.t('login_belgi');
-  }
 
   @override
   Widget build(BuildContext context) {
     final holat = context.watch<AppState>();
     final lok = holat.lok;
+    final smenaTanlashQadami = _tanlanganRol == 'operator' && _tanlanganSmena == null;
 
     return Scaffold(
       body: Center(
@@ -99,22 +119,14 @@ class _LoginEkraniState extends State<LoginEkrani> {
                 const SizedBox(height: 16),
                 Text(lok.t('login_sarlavha'), style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 8),
-                if (_tanlanganRol == null)
-                  Text(lok.t('rolni_tanlang'), style: const TextStyle(color: Colors.grey))
-                else
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(_rolIkonkasi(_tanlanganRol!), size: 18, color: kipTaroziYashil),
-                      const SizedBox(width: 6),
-                      Text(
-                        _rolNomi(_tanlanganRol!, lok),
-                        style: const TextStyle(color: kipTaroziYashil, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
+                ..._sarlavhaOstQismi(lok, smenaTanlashQadami),
                 const SizedBox(height: 28),
-                if (_tanlanganRol == null) ..._rolTanlashQadami(lok) else ..._kirishQadami(lok),
+                if (_tanlanganRol == null)
+                  ..._rolTanlashQadami(lok)
+                else if (smenaTanlashQadami)
+                  ..._smenaTanlashQadami(lok)
+                else
+                  ..._kirishQadami(lok),
                 const SizedBox(height: 12),
                 TextButton(
                   onPressed: () => holat.tilniAlmashtirish(),
@@ -126,6 +138,36 @@ class _LoginEkraniState extends State<LoginEkrani> {
         ),
       ),
     );
+  }
+
+  List<Widget> _sarlavhaOstQismi(dynamic lok, bool smenaTanlashQadami) {
+    if (_tanlanganRol == null) {
+      return [Text(lok.t('rolni_tanlang'), style: const TextStyle(color: Colors.grey))];
+    }
+    return [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(_rolIkonkasi(_tanlanganRol!), size: 18, color: kipTaroziYashil),
+          const SizedBox(width: 6),
+          Text(
+            _rolNomi(_tanlanganRol!, lok),
+            style: const TextStyle(color: kipTaroziYashil, fontWeight: FontWeight.bold),
+          ),
+          if (_tanlanganSmena != null) ...[
+            const Text(' — ', style: TextStyle(color: kipTaroziYashil)),
+            Text(
+              '${lok.t("smena")} $_tanlanganSmena',
+              style: const TextStyle(color: kipTaroziYashil, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ],
+      ),
+      if (smenaTanlashQadami) ...[
+        const SizedBox(height: 6),
+        Text(lok.t('smenani_tanlang'), style: const TextStyle(color: Colors.grey)),
+      ],
+    ];
   }
 
   List<Widget> _rolTanlashQadami(dynamic lok) {
@@ -162,19 +204,76 @@ class _LoginEkraniState extends State<LoginEkrani> {
     );
   }
 
-  List<Widget> _kirishQadami(dynamic lok) {
+  List<Widget> _smenaTanlashQadami(dynamic lok) {
     return [
-      TextField(
-        controller: _loginKontrolleri,
-        decoration: InputDecoration(labelText: _loginYorlagi(_tanlanganRol!, lok), border: const OutlineInputBorder()),
-        onSubmitted: (_) => _kirish(),
-        autofocus: true,
+      Row(
+        children: [
+          Expanded(child: _smenaTugmasi('A')),
+          const SizedBox(width: 12),
+          Expanded(child: _smenaTugmasi('B')),
+        ],
       ),
       const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(child: _smenaTugmasi('C')),
+          const SizedBox(width: 12),
+          Expanded(child: _smenaTugmasi('D')),
+        ],
+      ),
+      const SizedBox(height: 20),
+      _orqagaTugmasi(lok, onPressed: _rolTanlashgaQaytish),
+    ];
+  }
+
+  Widget _smenaTugmasi(String smena) {
+    return SizedBox(
+      height: 80,
+      child: OutlinedButton(
+        onPressed: () => _smenaniTanlash(smena),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: kipTaroziYashil),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        child: Text(
+          smena,
+          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: kipTaroziYashil),
+        ),
+      ),
+    );
+  }
+
+  Widget _orqagaTugmasi(dynamic lok, {required VoidCallback onPressed}) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton(
+        onPressed: _yuklanmoqda ? null : onPressed,
+        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [const Icon(Icons.arrow_back, size: 18), const SizedBox(width: 4), Text(lok.t('orqaga'))],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _kirishQadami(dynamic lok) {
+    final operatorMi = _tanlanganRol == 'operator';
+    return [
+      if (!operatorMi) ...[
+        TextField(
+          controller: _loginKontrolleri,
+          decoration: InputDecoration(labelText: lok.t('login_belgi'), border: const OutlineInputBorder()),
+          onSubmitted: (_) => _kirish(),
+          autofocus: true,
+        ),
+        const SizedBox(height: 12),
+      ],
       TextField(
         controller: _parolKontrolleri,
         decoration: InputDecoration(labelText: lok.t('parol_belgi'), border: const OutlineInputBorder()),
         obscureText: true,
+        autofocus: operatorMi,
         onSubmitted: (_) => _kirish(),
       ),
       if (_xato != null) ...[
@@ -185,7 +284,7 @@ class _LoginEkraniState extends State<LoginEkrani> {
       Row(
         children: [
           OutlinedButton(
-            onPressed: _yuklanmoqda ? null : _rolTanlashgaQaytish,
+            onPressed: _yuklanmoqda ? null : (operatorMi ? _smenaTanlashgaQaytish : _rolTanlashgaQaytish),
             style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
             child: Row(
               children: [const Icon(Icons.arrow_back, size: 18), const SizedBox(width: 4), Text(lok.t('orqaga'))],

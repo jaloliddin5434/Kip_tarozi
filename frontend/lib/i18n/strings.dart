@@ -248,8 +248,8 @@ const Map<String, Map<Til, String>> _matnlar = {
     Til.uz: 'Tayyor mahsulotlar bo\'limi',
     Til.ru: 'Отдел готовой продукции',
   },
-  'smena_login_belgi': {Til.uz: 'Smena login', Til.ru: 'Логин смены'},
   'orqaga': {Til.uz: 'Orqaga', Til.ru: 'Назад'},
+  'smenani_tanlang': {Til.uz: 'Smenani tanlang', Til.ru: 'Выберите смену'},
 };
 
 class Lokalizatsiya {
