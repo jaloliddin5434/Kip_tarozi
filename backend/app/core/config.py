@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     BEKOR_QILISH_MUDDATI_SONIYA: int = 30
 
     # Stansiya Agenti <-> Backend ichki aloqasi
+    # Agentning o'zi qaysi stansiya ekanini bildiradi (`stansiyalar.id`) — shubhali
+    # holat hodisalarida shu qiymat backendga uzatiladi. Kelajakda 2+ stansiya
+    # bo'lganda har birining .env'ida boshqa-boshqa qiymat qo'yiladi.
+    STANSIYA_ID: int | None = None
     AGENT_API_KEY: str = "CHANGE_ME_AGENT_KEY"
     BACKEND_URL: str = "http://localhost:8000"
     AGENT_QUEUE_DB_PATH: str = "./storage/agent_navbat.db"
@@ -57,6 +61,9 @@ class Settings(BaseSettings):
     # Kunlik Telegram hisoboti (F.3)
     VAQT_ZONASI: str = "Asia/Tashkent"
     KUNLIK_HISOBOT_VAQTI: str = "20:00"
+
+    # Moliyaviy bo'lim — qo'shimcha parol bilan himoyalangan qisqa muddatli sessiya
+    MOLIYAVIY_TOKEN_MUDDATI_DAQIQA: int = 30
 
     # Brend
     BRAND_COLOR: str = "#0F6E56"

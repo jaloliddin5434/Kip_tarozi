@@ -50,9 +50,11 @@ def ishga_tushir() -> None:
         id="kunlik_hisobot",
         replace_existing=True,
     )
-    _scheduler.start()
+    if not _scheduler.running:
+        _scheduler.start()
     logger.info("Kunlik hisobot rejalashtiruvchisi ishga tushdi (%s)", settings.KUNLIK_HISOBOT_VAQTI)
 
 
 def toxtat() -> None:
-    _scheduler.shutdown(wait=False)
+    if _scheduler.running:
+        _scheduler.shutdown(wait=False)

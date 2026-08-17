@@ -14,6 +14,7 @@ class KipYaratish(BaseModel):
     mahalliy_vaqt: datetime
     surat_yoli: str | None = None
     majburiy: bool = False
+    stansiya_id: int | None = None
 
 
 class KipTahrirlash(BaseModel):
@@ -36,6 +37,7 @@ class KipJavob(BaseModel):
     sinxronlangan: bool
     surat_yoli: str | None
     holati: KipHolati
+    stansiya_id: int | None
 
 
 class KipSinxronNatija(BaseModel):

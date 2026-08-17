@@ -17,8 +17,9 @@ def parolni_tekshir(parol: str, parol_hash: str) -> bool:
     return pwd_context.verify(parol, parol_hash)
 
 
-def token_yarat(claims: dict[str, Any]) -> str:
-    muddat = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+def token_yarat(claims: dict[str, Any], muddat_daqiqa: int | None = None) -> str:
+    daqiqa = muddat_daqiqa if muddat_daqiqa is not None else settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    muddat = datetime.now(timezone.utc) + timedelta(minutes=daqiqa)
     to_encode = {**claims, "exp": muddat}
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 

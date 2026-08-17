@@ -7,6 +7,7 @@ from app.api.v1.routes import (
     hujjatlar,
     kiplar,
     mahsulotlar,
+    moliyaviy,
     partiyalar,
     shubhali_holatlar,
     sozlamalar,
@@ -24,3 +25,4 @@ api_router.include_router(statistika.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(sozlamalar.router)
 api_router.include_router(agent.router)
+api_router.include_router(moliyaviy.router)

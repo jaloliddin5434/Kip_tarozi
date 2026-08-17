@@ -52,3 +52,29 @@ def agent_autentifikatsiya(x_agent_key: str = Header(...)) -> None:
     qilganda foydalanuvchi tokeni emas, shu doimiy kalit orqali taniladi."""
     if x_agent_key != settings.AGENT_API_KEY:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Agent kaliti noto'g'ri")
+
+
+def joriy_moliyaviy_foydalanuvchi(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> Foydalanuvchi:
+    """Moliyaviy bo'lim uchun: oddiy login tokeni yetarli emas — avval
+    POST /moliyaviy/kirish orqali qo'shimcha parol bilan qisqa muddatli
+    ('moliyaviy': true belgili) alohida token olinishi kerak."""
+    xato = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Moliyaviy sessiya yaroqsiz yoki muddati o'tgan — qo'shimcha parol bilan qayta kiring",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        malumot = tokenni_ochish(token)
+    except jwt.PyJWTError:
+        raise xato
+
+    if not malumot.get("moliyaviy") or malumot.get("sub") is None:
+        raise xato
+
+    foydalanuvchi = db.get(Foydalanuvchi, int(malumot["sub"]))
+    if foydalanuvchi is None or not foydalanuvchi.faol or foydalanuvchi.rol != Rol.admin:
+        raise xato
+    return foydalanuvchi

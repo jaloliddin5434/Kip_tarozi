@@ -17,3 +17,8 @@ class ShubhaliHolatJavob(BaseModel):
     holati: ShubhaliHolatStatusi
     korib_chiqqan_id: int | None
     korib_chiqilgan_vaqt: datetime | None
+    stansiya_id: int | None = None
+
+
+class ShubhaliHolatRoyxatJavob(ShubhaliHolatJavob):
+    korib_chiqqan_ism: str | None = None

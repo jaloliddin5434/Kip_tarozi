@@ -115,6 +115,7 @@ def sinxronlash(
             operator_id=foydalanuvchi.id,
             mahalliy_vaqt=malumot.mahalliy_vaqt,
             surat_yoli=malumot.surat_yoli,
+            stansiya_id=malumot.stansiya_id,
         )
         db.add(kip)
         db.flush()
@@ -168,6 +169,7 @@ def saqlash(
         operator_id=foydalanuvchi.id,
         mahalliy_vaqt=malumot.mahalliy_vaqt,
         surat_yoli=malumot.surat_yoli,
+        stansiya_id=malumot.stansiya_id,
     )
     db.add(kip)
     db.commit()

@@ -34,8 +34,18 @@ o'zi kameradan surat oladi (`CAMERA_SNAPSHOT_URL`) va backendga
 mustaqil, avtomatik hodisa) yuboradi.
 
 Bu ajratish 7-bandda aytilgan "kelajakda qo'shimcha tortish stansiyalari"
-talabiga ham mos keladi: har bir yangi stansiya — o'zining agenti + `stansiyalar`
-jadvalidagi yozuvi, backend o'zgarmaydi.
+talabiga mos keladi. **Muhim tarix**: dastlab (4-bosqich oxirigacha) `Kip`/
+`ShubhaliHolat`da `stansiya_id` maydoni sxemada bor edi, lekin uni hech kim
+to'ldirmasdi — ya'ni ko'p-stansiyalilik faqat "qog'ozda" tayyor edi. Keyinchalik
+buni to'g'irladik: Stansiya Agentining `.env`ida `STANSIYA_ID` (agentning o'z
+identifikatori), Flutterda `ApiClient.stansiyaId` (build/konfiguratsiya bo'yicha)
+qo'shildi va ikkalasi ham mos so'rovlarga (`POST /kiplar`,
+`POST /shubhali-holatlar`) `stansiya_id` sifatida uzatiladi — endi haqiqatan
+ham DB'da saqlanadi (real Postgresda tekshirilgan). Yangi stansiya qo'shish:
+(1) `stansiyalar` jadvaliga yangi qator, (2) yangi agentning `.env`ida boshqa
+`STANSIYA_ID`, (3) yangi Flutter build/konfiguratsiyada boshqa `stansiyaId` —
+backend kodi o'zgarmaydi. Hujjatlar/Statistika bo'limlarida stansiya bo'yicha
+filtrlash hali qo'shilmagan (kerak bo'lsa qo'shiladi).
 
 ## Offline navbatda qanday chegaralar bor (2-bosqich holatida)
 
@@ -58,6 +68,33 @@ jadvalidagi yozuvi, backend o'zgarmaydi.
 Bitta stansiya, o'rtacha yuklama uchun sync SQLAlchemy + FastAPI'ning threadpool
 executor'i yetarli va soddaroq. Agar kelajakda ko'p stansiya/WebSocket yuklamasi
 ortsa, alohida qaror sifatida asyncpg'ga o'tish mumkin.
+
+## Moliyaviy bo'lim nega alohida token bilan himoyalangan?
+
+Oddiy Admin login (uzoq muddatli JWT) yetarli emas — moliyaviy ma'lumotlarga
+kirish uchun qo'shimcha parol (`POST /moliyaviy/parolni-ornatish` orqali
+o'rnatiladi, hash `sozlamalar` jadvalida saqlanadi) va alohida, QISQA
+muddatli (`MOLIYAVIY_TOKEN_MUDDATI_DAQIQA`, default 30 daqiqa) token talab
+qilinadi. Bu token oddiy JWT'ning ustiga emas, uning O'RNIGA ishlatiladi —
+`joriy_moliyaviy_foydalanuvchi` dependency faqat `moliyaviy: true` claim'i
+bor tokenlarni qabul qiladi. Amalda: Flutter/admin panel avval oddiy token
+bilan ishlaydi, moliyaviy bo'limga kirganda alohida so'rov bilan bu tokenni
+oladi va faqat shu bo'lim so'rovlarida ishlatadi.
+
+## Flutter nega hozircha Stansiya Agentiga emas, backendga to'g'ridan-to'g'ri ulanadi?
+
+2-bosqichda RS232 agent orqali offline-navbat arxitekturasi (Flutter →
+Agent → Backend) loyihalashtirilgan edi. 4-bosqichda, RS232'ning haqiqiy
+qurilmasi hali yo'qligi sababli, operator ekrani og'irlikni QO'LDA
+kiritish bilan simulyatsiya qiladi — bu holatda kip-saqlashni agent orqali
+o'tkazish sun'iy bo'lardi (agent na real vazn oqimini, na anti-o'g'irlik
+holatini kuzatib turadi). Shu sababli Flutter hozircha auth, partiya, kip,
+statistika va h.k. uchun backendga TO'G'RIDAN-TO'G'RI (REST) ulanadi;
+"Yuk saqlanmadi" bloklovchi modal esa backend darajasidagi
+`GET /shubhali-holatlar/bloklovchi`ni pollash orqali ishlaydi (agentning
+lokal holatidan mustaqil, DB — yagona haqiqat manbai). RS232 real qurilma
+ulangach, kip-saqlash yo'lini agent orqali (`POST /agent/kip`) o'tkazish —
+Flutter tomonidagi bitta funksiya almashtiruvi, backend o'zgarmaydi.
 
 ## RS232 parslash nega bitta regex bilan qilingan?
 

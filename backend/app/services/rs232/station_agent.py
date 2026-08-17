@@ -56,6 +56,8 @@ def _hodisani_backendga_yubor(ogirlik: float, vaqt: datetime, smena: str | None,
         malumot["smena"] = smena
     if mahsulot_kodi:
         malumot["mahsulot_kodi"] = mahsulot_kodi
+    if settings.STANSIYA_ID is not None:
+        malumot["stansiya_id"] = str(settings.STANSIYA_ID)
 
     javob = httpx.post(
         f"{settings.BACKEND_URL}/api/v1/shubhali-holatlar",
