@@ -55,7 +55,8 @@ def royxat(
     sana_dan: date | None = Query(None),
     sana_gacha: date | None = Query(None),
     smena: Smena | None = Query(None),
-    holati: ShubhaliHolatStatusi | None = Query(None),
+    operator_id: int | None = Query(None),
+    tasdiqlangan: bool | None = Query(None),
     sahifa: int = Query(1, ge=1),
     sahifa_hajmi: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -66,9 +67,12 @@ def royxat(
     smena=A bilan filtrlab, `jami` maydonidan shu smenadagi hodisalar sonini
     ko'rish mumkin)."""
     korib_chiqqan = Foydalanuvchi.__table__.alias("korib_chiqqan")
+    operator = Foydalanuvchi.__table__.alias("operator")
 
-    sorov = select(ShubhaliHolat, korib_chiqqan.c.ism).outerjoin(
-        korib_chiqqan, ShubhaliHolat.korib_chiqqan_id == korib_chiqqan.c.id
+    sorov = (
+        select(ShubhaliHolat, korib_chiqqan.c.ism, operator.c.ism)
+        .outerjoin(korib_chiqqan, ShubhaliHolat.korib_chiqqan_id == korib_chiqqan.c.id)
+        .outerjoin(operator, ShubhaliHolat.operator_id == operator.c.id)
     )
     if sana_dan is not None:
         sorov = sorov.where(func.date(ShubhaliHolat.vaqt) >= sana_dan)
@@ -76,8 +80,11 @@ def royxat(
         sorov = sorov.where(func.date(ShubhaliHolat.vaqt) <= sana_gacha)
     if smena is not None:
         sorov = sorov.where(ShubhaliHolat.smena == smena)
-    if holati is not None:
-        sorov = sorov.where(ShubhaliHolat.holati == holati)
+    if operator_id is not None:
+        sorov = sorov.where(ShubhaliHolat.operator_id == operator_id)
+    if tasdiqlangan is not None:
+        holati_qiymati = ShubhaliHolatStatusi.korib_chiqildi if tasdiqlangan else ShubhaliHolatStatusi.yangi
+        sorov = sorov.where(ShubhaliHolat.holati == holati_qiymati)
 
     jami = db.scalar(select(func.count()).select_from(sorov.subquery())) or 0
 
@@ -94,12 +101,14 @@ def royxat(
             ogirlik=float(hodisa.ogirlik),
             surat_yoli=hodisa.surat_yoli,
             holati=hodisa.holati,
+            tasdiqlangan=hodisa.holati == ShubhaliHolatStatusi.korib_chiqildi,
             korib_chiqqan_id=hodisa.korib_chiqqan_id,
             korib_chiqilgan_vaqt=hodisa.korib_chiqilgan_vaqt,
             stansiya_id=hodisa.stansiya_id,
-            korib_chiqqan_ism=ism,
+            korib_chiqqan_ism=korib_chiqqan_ism,
+            operator_ism=operator_ism,
         )
-        for hodisa, ism in natijalar
+        for hodisa, korib_chiqqan_ism, operator_ism in natijalar
     ]
     return Sahifalangan(items=items, jami=jami, sahifa=sahifa, sahifa_hajmi=sahifa_hajmi)
 

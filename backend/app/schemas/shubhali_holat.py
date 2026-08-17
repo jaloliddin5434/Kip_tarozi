@@ -22,3 +22,5 @@ class ShubhaliHolatJavob(BaseModel):
 
 class ShubhaliHolatRoyxatJavob(ShubhaliHolatJavob):
     korib_chiqqan_ism: str | None = None
+    operator_ism: str | None = None
+    tasdiqlangan: bool
