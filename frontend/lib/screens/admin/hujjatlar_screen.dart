@@ -22,11 +22,26 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
   final _mahsulotKontrolleri = TextEditingController();
   final _kipRaqamiKontrolleri = TextEditingController();
   String? _smenaFiltri;
+  DateTime? _sanaDan;
+  DateTime? _sanaGacha;
 
   @override
   void initState() {
     super.initState();
+    // Ekran ochilganda standart holatda "bugun" (kunlik) filtr qo'llaniladi.
+    final bugun = DateTime.now();
+    _sanaDan = bugun;
+    _sanaGacha = bugun;
     _yuklash();
+  }
+
+  bool get _bugunTanlanganmi {
+    bool birXilKunmi(DateTime? d) {
+      final bugun = DateTime.now();
+      return d != null && d.year == bugun.year && d.month == bugun.month && d.day == bugun.day;
+    }
+
+    return birXilKunmi(_sanaDan) && birXilKunmi(_sanaGacha);
   }
 
   Future<void> _yuklash() async {
@@ -39,6 +54,8 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
       if (_mahsulotKontrolleri.text.trim().isNotEmpty) query['mahsulot_kodi'] = _mahsulotKontrolleri.text.trim();
       if (_kipRaqamiKontrolleri.text.trim().isNotEmpty) query['kip_raqami'] = int.tryParse(_kipRaqamiKontrolleri.text.trim());
       if (_smenaFiltri != null) query['smena'] = _smenaFiltri;
+      if (_sanaDan != null) query['sana_dan'] = _sanaDan!.toIso8601String().substring(0, 10);
+      if (_sanaGacha != null) query['sana_gacha'] = _sanaGacha!.toIso8601String().substring(0, 10);
 
       final javob = await context.read<AppState>().api.get('/hujjatlar/kiplar', query: query);
       setState(() => _sahifa = Sahifalangan.fromJson(javob, (e) => HujjatKip.fromJson(e)));
@@ -54,10 +71,41 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
     await Printing.layoutPdf(onLayout: (format) async => hujjat.save());
   }
 
+  Future<void> _sanaTanlash({required bool boshlanish}) async {
+    final tanlangan = await showDatePicker(
+      context: context,
+      initialDate: (boshlanish ? _sanaDan : _sanaGacha) ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+    );
+    if (tanlangan == null) return;
+    setState(() {
+      if (boshlanish) {
+        _sanaDan = tanlangan;
+      } else {
+        _sanaGacha = tanlangan;
+      }
+      _joriySahifa = 1;
+    });
+    _yuklash();
+  }
+
+  void _bugunTanlash() {
+    final bugun = DateTime.now();
+    setState(() {
+      _sanaDan = bugun;
+      _sanaGacha = bugun;
+      _joriySahifa = 1;
+    });
+    _yuklash();
+  }
+
   void _filtrniTozalash() {
     _mahsulotKontrolleri.clear();
     _kipRaqamiKontrolleri.clear();
     _smenaFiltri = null;
+    _sanaDan = null;
+    _sanaGacha = null;
     _joriySahifa = 1;
     _yuklash();
   }
@@ -99,6 +147,21 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
                   items: ['A', 'B', 'C', 'D'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                   onChanged: (v) => setState(() => _smenaFiltri = v),
                 ),
+              ),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.calendar_today, size: 16),
+                label: Text(_sanaDan == null ? lok.t('sana_dan') : _sanaDan!.toIso8601String().substring(0, 10)),
+                onPressed: () => _sanaTanlash(boshlanish: true),
+              ),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.calendar_today, size: 16),
+                label: Text(_sanaGacha == null ? lok.t('sana_gacha') : _sanaGacha!.toIso8601String().substring(0, 10)),
+                onPressed: () => _sanaTanlash(boshlanish: false),
+              ),
+              ChoiceChip(
+                label: Text(lok.t('bugun')),
+                selected: _bugunTanlanganmi,
+                onSelected: (_) => _bugunTanlash(),
               ),
               ElevatedButton(onPressed: () { _joriySahifa = 1; _yuklash(); }, child: Text(lok.t('filtr'))),
               OutlinedButton(onPressed: _filtrniTozalash, child: Text(lok.t('tozalash'))),

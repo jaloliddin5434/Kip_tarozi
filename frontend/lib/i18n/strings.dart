@@ -146,6 +146,7 @@ const Map<String, Map<Til, String>> _matnlar = {
   'sana_dan': {Til.uz: 'Sana dan', Til.ru: 'Дата с'},
   'sana_gacha': {Til.uz: 'Sana gacha', Til.ru: 'Дата по'},
   'smena_boyicha': {Til.uz: 'Smena bo\'yicha', Til.ru: 'По сменам'},
+  'bugun': {Til.uz: 'Bugun', Til.ru: 'Сегодня'},
 
   // Moliyaviy bo'lim kirish ekrani
   'moliyaviy': {Til.uz: 'Moliyaviy', Til.ru: 'Финансы'},
