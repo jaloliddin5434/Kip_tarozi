@@ -72,10 +72,7 @@ const Map<String, Map<Til, String>> _matnlar = {
   'statistika': {Til.uz: 'Statistika', Til.ru: 'Статистика'},
   'partiyalar': {Til.uz: 'Partiyalar', Til.ru: 'Партии'},
 
-  'bugungi_statistika': {
-    Til.uz: 'Bugungi statistika',
-    Til.ru: 'Статистика за сегодня',
-  },
+  'davr_statistikasi': {Til.uz: 'Davr statistikasi', Til.ru: 'Статистика за период'},
   'ochiq_partiyalar': {Til.uz: 'Ochiq partiyalar', Til.ru: 'Открытые партии'},
   'shubhali_holatlar': {
     Til.uz: 'Tasdiqlanmagan shubhali holatlar',

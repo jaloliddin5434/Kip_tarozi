@@ -1,7 +1,7 @@
 import json
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -16,9 +16,12 @@ from app.models.partiya import Partiya, PartiyaHolati
 from app.models.shubhali_holat import ShubhaliHolat, ShubhaliHolatStatusi
 from app.models.sozlama import Sozlama
 from app.schemas.dashboard import AgentHolatJavob, DashboardJavob
-from app.schemas.statistika import MahsulotJamlanmasi
+from app.schemas.statistika import MahsulotJamlanmasi, SmenaJamlanmasi
+from app.services.davr import davr_oraligi
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+DAVRLAR = ("kunlik", "haftalik", "oylik", "mavsum")
 
 
 def _agent_holatini_ol(db: Session) -> AgentHolatJavob | None:
@@ -44,10 +47,16 @@ def _agent_holatini_ol(db: Session) -> AgentHolatJavob | None:
 
 @router.get("", response_model=DashboardJavob)
 def dashboard(
+    davr: str = Query("kunlik"),
     db: Session = Depends(get_db),
     _: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.admin)),
 ) -> DashboardJavob:
-    bugun = date.today()
+    if davr not in DAVRLAR:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Noma'lum davr: {davr}. Ruxsat etilgan: {', '.join(DAVRLAR)}",
+        )
+    boshlanish, tugash = davr_oraligi(davr, date.today())
 
     qatorlar = db.execute(
         select(
@@ -58,7 +67,11 @@ def dashboard(
         )
         .join(Partiya, Partiya.mahsulot_id == Mahsulot.id)
         .join(Kip, Kip.partiya_id == Partiya.id)
-        .where(Kip.holati == KipHolati.aktiv, func.date(Kip.vaqt) == bugun)
+        .where(
+            Kip.holati == KipHolati.aktiv,
+            func.date(Kip.vaqt) >= boshlanish,
+            func.date(Kip.vaqt) <= tugash,
+        )
         .group_by(Mahsulot.kod, Mahsulot.nomi)
     ).all()
     mahsulotlar = [
@@ -66,6 +79,21 @@ def dashboard(
         for kod, nomi, soni, kg in qatorlar
     ]
 
+    smena_qatorlari = db.execute(
+        select(Kip.smena, func.count(Kip.id), func.coalesce(func.sum(Kip.ogirlik), 0))
+        .where(
+            Kip.holati == KipHolati.aktiv,
+            func.date(Kip.vaqt) >= boshlanish,
+            func.date(Kip.vaqt) <= tugash,
+        )
+        .group_by(Kip.smena)
+        .order_by(Kip.smena)
+    ).all()
+    smenalar = [
+        SmenaJamlanmasi(smena=smena.value, soni=soni, jami_kg=float(kg)) for smena, soni, kg in smena_qatorlari
+    ]
+
+    # Davrga bog'liq emas — doim joriy holatni ko'rsatadi
     ochiq_partiyalar_soni = db.scalar(
         select(func.count()).select_from(Partiya).where(Partiya.holati == PartiyaHolati.ochiq)
     ) or 0
@@ -75,10 +103,13 @@ def dashboard(
     ) or 0
 
     return DashboardJavob(
-        sana=bugun.isoformat(),
+        davr=davr,
+        boshlanish_sanasi=boshlanish,
+        tugash_sanasi=tugash,
         mahsulotlar=mahsulotlar,
         jami_soni=sum(m.soni for m in mahsulotlar),
         jami_kg=sum(m.jami_kg for m in mahsulotlar),
+        smenalar=smenalar,
         ochiq_partiyalar_soni=ochiq_partiyalar_soni,
         tasdiqlanmagan_shubhali_holatlar_soni=tasdiqlanmagan_soni,
         agent_holati=_agent_holatini_ol(db),
