@@ -10,7 +10,7 @@ from app.models.foydalanuvchi import Foydalanuvchi, Rol
 from app.models.kip import Kip, KipHolati
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya, PartiyaHolati
-from app.schemas.partiya import PartiyaJavob, PartiyaOchish, PartiyaSotish
+from app.schemas.partiya import PartiyaJavob, PartiyaOchish, PartiyaOlchov, PartiyaSotish
 from app.schemas.sahifalash import Sahifalangan
 from app.services.hujjatlar.nakladnoy import nakladnoy_pdf_yarat, nakladnoy_raqami_yarat
 
@@ -138,6 +138,39 @@ def sotish(
 
     partiya.nakladnoy_raqami = nakladnoy_raqami_yarat(partiya)
     partiya.nakladnoy_pdf_yoli = nakladnoy_pdf_yarat(partiya)
+
+    db.commit()
+    db.refresh(partiya)
+
+    mahsulot = db.get(Mahsulot, partiya.mahsulot_id)
+    return _javobga_ayirib(db, partiya, mahsulot)
+
+
+@router.patch("/{partiya_id}/olchov-toldirish", response_model=PartiyaJavob)
+def olchov_toldirish(
+    partiya_id: int,
+    malumot: PartiyaOlchov,
+    db: Session = Depends(get_db),
+    _: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.admin, Rol.tayyor_mahsulotlar)),
+) -> PartiyaJavob:
+    """Tayyor mahsulotlar bo'limi (va Admin) partiya yopilgach sort/og'irlik
+    o'lchovlarini kiritadi — hali savdo emas (holati o'zgarmaydi, nakladnoy
+    generatsiya qilinmaydi). Xaridor/dogovor/narxni faqat Admin POST
+    /{partiya_id}/sotish orqali, savdoni yakunlaganda kiritadi."""
+    partiya = db.get(Partiya, partiya_id)
+    if partiya is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Partiya topilmadi")
+    if partiya.holati != PartiyaHolati.yopiq:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Faqat yopilgan partiyaning sort/og'irligini to'ldirish mumkin",
+        )
+
+    partiya.sort = malumot.sort
+    partiya.urama_bilan_vazn = malumot.urama_bilan_vazn
+    partiya.urama_vazni = malumot.urama_vazni
+    partiya.sof_vazn = malumot.sof_vazn
+    partiya.kondicion_vazni = malumot.kondicion_vazni
 
     db.commit()
     db.refresh(partiya)

@@ -5,34 +5,59 @@ const Map<String, Map<Til, String>> _matnlar = {
   'login_belgi': {Til.uz: 'Login', Til.ru: 'Логин'},
   'parol_belgi': {Til.uz: 'Parol', Til.ru: 'Пароль'},
   'kirish': {Til.uz: 'Kirish', Til.ru: 'Войти'},
-  'login_xato': {Til.uz: 'Login yoki parol noto\'g\'ri', Til.ru: 'Неверный логин или пароль'},
+  'login_xato': {
+    Til.uz: 'Login yoki parol noto\'g\'ri',
+    Til.ru: 'Неверный логин или пароль',
+  },
 
   'smena': {Til.uz: 'Smena', Til.ru: 'Смена'},
-  'smena_holati': {Til.uz: 'Smena joriy holati', Til.ru: 'Текущее состояние смены'},
+  'smena_holati': {
+    Til.uz: 'Smena joriy holati',
+    Til.ru: 'Текущее состояние смены',
+  },
   'partiya_raqami': {Til.uz: 'Partiya raqami', Til.ru: 'Номер партии'},
-  'partiya_raqami_kiriting': {Til.uz: 'Partiya raqamini kiriting', Til.ru: 'Введите номер партии'},
+  'partiya_raqami_kiriting': {
+    Til.uz: 'Partiya raqamini kiriting',
+    Til.ru: 'Введите номер партии',
+  },
   'partiya_ochish': {Til.uz: 'Partiyani tanlash', Til.ru: 'Выбрать партию'},
-  'partiya_majburiy': {Til.uz: 'Partiya raqami majburiy', Til.ru: 'Номер партии обязателен'},
+  'partiya_majburiy': {
+    Til.uz: 'Partiya raqami majburiy',
+    Til.ru: 'Номер партии обязателен',
+  },
   'ogirlik': {Til.uz: 'Og\'irlik (kg)', Til.ru: 'Вес (кг)'},
-  'ogirlik_kiriting': {Til.uz: 'Og\'irlikni kiriting (RS232 simulyatsiyasi)', Til.ru: 'Введите вес (симуляция RS232)'},
+  'ogirlik_kiriting': {
+    Til.uz: 'Og\'irlikni kiriting (RS232 simulyatsiyasi)',
+    Til.ru: 'Введите вес (симуляция RS232)',
+  },
   'saqlash': {Til.uz: 'Saqlash', Til.ru: 'Сохранить'},
   'bekor_qilish': {Til.uz: 'Bekor qilish', Til.ru: 'Отменить'},
   'kip_saqlandi': {Til.uz: 'Kip saqlandi', Til.ru: 'Кип сохранён'},
   'progress': {Til.uz: 'Joriy partiya', Til.ru: 'Текущая партия'},
   'soni': {Til.uz: 'soni', Til.ru: 'шт'},
 
-  'dublikat_sarlavha': {Til.uz: 'Diqqat — ehtimol dublikat', Til.ru: 'Внимание — возможен дубликат'},
+  'dublikat_sarlavha': {
+    Til.uz: 'Diqqat — ehtimol dublikat',
+    Til.ru: 'Внимание — возможен дубликат',
+  },
   'dublikat_matn': {
-    Til.uz: 'Shunga o\'xshash og\'irlikdagi kip bir necha soniya oldin saqlangan. Bu haqiqatan ham yangi kipmi?',
-    Til.ru: 'Кип с похожим весом был сохранён несколько секунд назад. Это действительно новый кип?',
+    Til.uz:
+        'Shunga o\'xshash og\'irlikdagi kip bir necha soniya oldin saqlangan. Bu haqiqatan ham yangi kipmi?',
+    Til.ru:
+        'Кип с похожим весом был сохранён несколько секунд назад. Это действительно новый кип?',
   },
   'ha_yangi_kip': {Til.uz: 'Ha, yangi kip', Til.ru: 'Да, новый кип'},
   'yoq_bekor': {Til.uz: 'Yo\'q, bekor qilish', Til.ru: 'Нет, отменить'},
 
-  'yuk_saqlanmadi_sarlavha': {Til.uz: '⚠️ YUK SAQLANMADI!', Til.ru: '⚠️ ГРУЗ НЕ СОХРАНЁН!'},
+  'yuk_saqlanmadi_sarlavha': {
+    Til.uz: '⚠️ YUK SAQLANMADI!',
+    Til.ru: '⚠️ ГРУЗ НЕ СОХРАНЁН!',
+  },
   'yuk_saqlanmadi_matn': {
-    Til.uz: 'Tarozi ustiga yuk qo\'yildi, lekin saqlanmasdan olib qo\'yildi. Bu holat qayd etildi.',
-    Til.ru: 'Груз был поставлен на весы, но убран без сохранения. Событие зафиксировано.',
+    Til.uz:
+        'Tarozi ustiga yuk qo\'yildi, lekin saqlanmasdan olib qo\'yildi. Bu holat qayd etildi.',
+    Til.ru:
+        'Груз был поставлен на весы, но убран без сохранения. Событие зафиксировано.',
   },
   'tushundim': {Til.uz: 'Tushundim', Til.ru: 'Понятно'},
 
@@ -47,12 +72,21 @@ const Map<String, Map<Til, String>> _matnlar = {
   'statistika': {Til.uz: 'Statistika', Til.ru: 'Статистика'},
   'partiyalar': {Til.uz: 'Partiyalar', Til.ru: 'Партии'},
 
-  'bugungi_statistika': {Til.uz: 'Bugungi statistika', Til.ru: 'Статистика за сегодня'},
+  'bugungi_statistika': {
+    Til.uz: 'Bugungi statistika',
+    Til.ru: 'Статистика за сегодня',
+  },
   'ochiq_partiyalar': {Til.uz: 'Ochiq partiyalar', Til.ru: 'Открытые партии'},
-  'shubhali_holatlar': {Til.uz: 'Tasdiqlanmagan shubhali holatlar', Til.ru: 'Неподтверждённые тревоги'},
+  'shubhali_holatlar': {
+    Til.uz: 'Tasdiqlanmagan shubhali holatlar',
+    Til.ru: 'Неподтверждённые тревоги',
+  },
   'agent_holati': {Til.uz: 'Stansiya agenti', Til.ru: 'Станционный агент'},
   'ulangan': {Til.uz: 'Ulangan', Til.ru: 'Подключён'},
-  'ulanmagan': {Til.uz: 'Ulanmagan / noma\'lum', Til.ru: 'Не подключён / неизвестно'},
+  'ulanmagan': {
+    Til.uz: 'Ulanmagan / noma\'lum',
+    Til.ru: 'Не подключён / неизвестно',
+  },
 
   'sana': {Til.uz: 'Sana', Til.ru: 'Дата'},
   'mahsulot': {Til.uz: 'Mahsulot', Til.ru: 'Продукт'},
@@ -79,10 +113,19 @@ const Map<String, Map<Til, String>> _matnlar = {
 
   // Partiya "Sotildi" formasi
   'sort': {Til.uz: 'Sort', Til.ru: 'Сорт'},
-  'urama_bilan_vazn': {Til.uz: 'Urama bilan vazn (kg)', Til.ru: 'Вес с упаковкой (кг)'},
+  'urama_bilan_vazn': {
+    Til.uz: 'Urama bilan vazn (kg)',
+    Til.ru: 'Вес с упаковкой (кг)',
+  },
   'urama_vazni': {Til.uz: 'Urama vazni (kg)', Til.ru: 'Вес упаковки (кг)'},
-  'sof_vazn': {Til.uz: 'Sof vazn / netto (kg)', Til.ru: 'Чистый вес / нетто (кг)'},
-  'kondicion_vazni': {Til.uz: 'Kondicion vazni (kg)', Til.ru: 'Кондиционный вес (кг)'},
+  'sof_vazn': {
+    Til.uz: 'Sof vazn / netto (kg)',
+    Til.ru: 'Чистый вес / нетто (кг)',
+  },
+  'kondicion_vazni': {
+    Til.uz: 'Kondicion vazni (kg)',
+    Til.ru: 'Кондиционный вес (кг)',
+  },
   'bekor': {Til.uz: 'Bekor', Til.ru: 'Отмена'},
 
   // Hujjatlar jadvali
@@ -96,7 +139,10 @@ const Map<String, Map<Til, String>> _matnlar = {
   'vaqt': {Til.uz: 'Vaqt', Til.ru: 'Время'},
 
   // Shubhali holatlar bo'limi
-  'shubhali_holatlar_royxati': {Til.uz: 'Shubhali holatlar', Til.ru: 'Подозрительные события'},
+  'shubhali_holatlar_royxati': {
+    Til.uz: 'Shubhali holatlar',
+    Til.ru: 'Подозрительные события',
+  },
   'korib_chiqildi': {Til.uz: 'Ko\'rib chiqildi', Til.ru: 'Рассмотрено'},
   'yangi': {Til.uz: 'Yangi', Til.ru: 'Новое'},
   'korib_chiqqan': {Til.uz: 'Ko\'rib chiqqan', Til.ru: 'Рассмотрел'},
@@ -107,14 +153,28 @@ const Map<String, Map<Til, String>> _matnlar = {
   // Moliyaviy bo'lim kirish ekrani
   'moliyaviy': {Til.uz: 'Moliyaviy', Til.ru: 'Финансы'},
   'moliyaviy_parol': {Til.uz: 'Moliyaviy parol', Til.ru: 'Финансовый пароль'},
-  'moliyaviy_parol_tasdiqlash': {Til.uz: 'Parolni tasdiqlang', Til.ru: 'Подтвердите пароль'},
-  'moliyaviy_parol_ornatish': {Til.uz: 'Parolni o\'rnatish', Til.ru: 'Установить пароль'},
-  'moliyaviy_birinchi_marta_matni': {
-    Til.uz: 'Moliyaviy bo\'lim uchun hali parol o\'rnatilmagan. Yangi parol yarating.',
-    Til.ru: 'Пароль для финансового раздела ещё не установлен. Придумайте новый пароль.',
+  'moliyaviy_parol_tasdiqlash': {
+    Til.uz: 'Parolni tasdiqlang',
+    Til.ru: 'Подтвердите пароль',
   },
-  'parollar_mos_emas': {Til.uz: 'Parollar mos emas', Til.ru: 'Пароли не совпадают'},
-  'moliyaviy_parol_notogri': {Til.uz: 'Moliyaviy parol noto\'g\'ri', Til.ru: 'Неверный финансовый пароль'},
+  'moliyaviy_parol_ornatish': {
+    Til.uz: 'Parolni o\'rnatish',
+    Til.ru: 'Установить пароль',
+  },
+  'moliyaviy_birinchi_marta_matni': {
+    Til.uz:
+        'Moliyaviy bo\'lim uchun hali parol o\'rnatilmagan. Yangi parol yarating.',
+    Til.ru:
+        'Пароль для финансового раздела ещё не установлен. Придумайте новый пароль.',
+  },
+  'parollar_mos_emas': {
+    Til.uz: 'Parollar mos emas',
+    Til.ru: 'Пароли не совпадают',
+  },
+  'moliyaviy_parol_notogri': {
+    Til.uz: 'Moliyaviy parol noto\'g\'ri',
+    Til.ru: 'Неверный финансовый пароль',
+  },
   'moliyaviy_sessiya_tugadi': {
     Til.uz: 'Moliyaviy sessiya muddati tugadi, qaytadan kiring',
     Til.ru: 'Срок финансовой сессии истёк, войдите снова',
@@ -138,24 +198,46 @@ const Map<String, Map<Til, String>> _matnlar = {
 
   // Sozlamalar ekrani
   'sozlamalar': {Til.uz: 'Sozlamalar', Til.ru: 'Настройки'},
-  'sozlama_saqlandi': {Til.uz: 'Sozlama saqlandi', Til.ru: 'Настройка сохранена'},
-  'boshqa_sozlamalar': {Til.uz: 'Boshqa sozlamalar', Til.ru: 'Другие настройки'},
+  'sozlama_saqlandi': {
+    Til.uz: 'Sozlama saqlandi',
+    Til.ru: 'Настройка сохранена',
+  },
+  'boshqa_sozlamalar': {
+    Til.uz: 'Boshqa sozlamalar',
+    Til.ru: 'Другие настройки',
+  },
   'parolni_korsatish': {Til.uz: 'Ko\'rsatish', Til.ru: 'Показать'},
   'parolni_yashirish': {Til.uz: 'Yashirish', Til.ru: 'Скрыть'},
-  'telegram_xatolik_bolimi': {Til.uz: 'Xatolik xabarnomalari (Telegram)', Til.ru: 'Уведомления об ошибках (Telegram)'},
+  'telegram_xatolik_bolimi': {
+    Til.uz: 'Xatolik xabarnomalari (Telegram)',
+    Til.ru: 'Уведомления об ошибках (Telegram)',
+  },
   'telegram_xatolik_tavsif': {
-    Til.uz: 'Texnik xatoliklar (masalan "yuk saqlanmadi") shu Telegram botga yuboriladi',
-    Til.ru: 'Технические ошибки (например «груз не сохранён») отправляются в этот Telegram-бот',
+    Til.uz:
+        'Texnik xatoliklar (masalan "yuk saqlanmadi") shu Telegram botga yuboriladi',
+    Til.ru:
+        'Технические ошибки (например «груз не сохранён») отправляются в этот Telegram-бот',
   },
   'telegram_xatolik_bot_token': {Til.uz: 'Bot tokeni', Til.ru: 'Токен бота'},
   'telegram_xatolik_chat_id': {Til.uz: 'Chat ID', Til.ru: 'ID чата'},
-  'telegram_statistika_bolimi': {Til.uz: 'Statistika xabarnomalari (Telegram)', Til.ru: 'Уведомления статистики (Telegram)'},
+  'telegram_statistika_bolimi': {
+    Til.uz: 'Statistika xabarnomalari (Telegram)',
+    Til.ru: 'Уведомления статистики (Telegram)',
+  },
   'telegram_statistika_tavsif': {
-    Til.uz: 'Kunlik/smena statistik hisobotlari shu Telegram guruhiga yuboriladi',
-    Til.ru: 'Ежедневные/сменные статистические отчёты отправляются в эту Telegram-группу',
+    Til.uz:
+        'Kunlik/smena statistik hisobotlari shu Telegram guruhiga yuboriladi',
+    Til.ru:
+        'Ежедневные/сменные статистические отчёты отправляются в эту Telegram-группу',
   },
   'telegram_statistika_bot_token': {Til.uz: 'Bot tokeni', Til.ru: 'Токен бота'},
   'telegram_statistika_chat_id': {Til.uz: 'Chat ID', Til.ru: 'ID чата'},
+
+  // Partiya sort/og'irlik to'ldirish (Tayyor mahsulotlar bo'limi)
+  'sort_ogirlik_toldirish': {
+    Til.uz: 'Sort/og\'irlik to\'ldirish',
+    Til.ru: 'Заполнить сорт/вес',
+  },
 };
 
 class Lokalizatsiya {

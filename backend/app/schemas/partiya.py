@@ -10,6 +10,18 @@ class PartiyaOchish(BaseModel):
     partiya_raqami: int
 
 
+class PartiyaOlchov(BaseModel):
+    """Faqat sort/og'irlik o'lchovlari — Tayyor mahsulotlar bo'limi ham
+    to'ldira oladi. Xaridor/dogovor/narx kabi shartnoma maydonlari bu yerda
+    yo'q — ularni faqat Admin PartiyaSotish orqali kiritadi."""
+
+    sort: str | None = None
+    urama_bilan_vazn: float
+    urama_vazni: float
+    sof_vazn: float
+    kondicion_vazni: float | None = None
+
+
 class PartiyaSotish(BaseModel):
     sotuv_sanasi: date
     xaridor: str

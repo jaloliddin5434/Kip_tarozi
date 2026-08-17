@@ -31,38 +31,79 @@ class _AdminShellState extends State<AdminShell> {
       if (!tayyorMahsulotRoli) const DashboardEkrani(),
       const HujjatlarEkrani(),
       if (!tayyorMahsulotRoli) const StatistikaEkrani(),
-      if (!tayyorMahsulotRoli) const PartiyalarEkrani(),
+      const PartiyalarEkrani(),
       if (!tayyorMahsulotRoli) const ShubhaliHolatlarEkrani(),
       if (adminRoli) const MoliyaviyKirishEkrani(),
       if (adminRoli) const SozlamalarEkrani(),
     ];
     final yorliqlar = [
-      if (!tayyorMahsulotRoli) NavigationRailDestination(icon: const Icon(Icons.dashboard), label: Text(lok.t('dashboard'))),
-      NavigationRailDestination(icon: const Icon(Icons.description), label: Text(lok.t('hujjatlar'))),
-      if (!tayyorMahsulotRoli) NavigationRailDestination(icon: const Icon(Icons.bar_chart), label: Text(lok.t('statistika'))),
-      if (!tayyorMahsulotRoli) NavigationRailDestination(icon: const Icon(Icons.folder), label: Text(lok.t('partiyalar'))),
       if (!tayyorMahsulotRoli)
-        NavigationRailDestination(icon: const Icon(Icons.warning_amber_rounded), label: Text(lok.t('shubhali_holatlar_royxati'))),
-      if (adminRoli) NavigationRailDestination(icon: const Icon(Icons.lock), label: Text(lok.t('moliyaviy'))),
-      if (adminRoli) NavigationRailDestination(icon: const Icon(Icons.settings), label: Text(lok.t('sozlamalar'))),
+        NavigationRailDestination(
+          icon: const Icon(Icons.dashboard),
+          label: Text(lok.t('dashboard')),
+        ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.description),
+        label: Text(lok.t('hujjatlar')),
+      ),
+      if (!tayyorMahsulotRoli)
+        NavigationRailDestination(
+          icon: const Icon(Icons.bar_chart),
+          label: Text(lok.t('statistika')),
+        ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.folder),
+        label: Text(lok.t('partiyalar')),
+      ),
+      if (!tayyorMahsulotRoli)
+        NavigationRailDestination(
+          icon: const Icon(Icons.warning_amber_rounded),
+          label: Text(lok.t('shubhali_holatlar_royxati')),
+        ),
+      if (adminRoli)
+        NavigationRailDestination(
+          icon: const Icon(Icons.lock),
+          label: Text(lok.t('moliyaviy')),
+        ),
+      if (adminRoli)
+        NavigationRailDestination(
+          icon: const Icon(Icons.settings),
+          label: Text(lok.t('sozlamalar')),
+        ),
     ];
 
     if (_tanlanganIndeks >= sahifalar.length) _tanlanganIndeks = 0;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Kip Tarozi — Admin (${holat.foydalanuvchi?.ism ?? ""})', overflow: TextOverflow.ellipsis),
+        title: Text(
+          'Kip Tarozi — Admin (${holat.foydalanuvchi?.ism ?? ""})',
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
-          const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Center(child: SoatWidget())),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Center(child: SoatWidget()),
+          ),
           IconButton(
-            icon: Icon(holat.temaRejimi == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode),
+            icon: Icon(
+              holat.temaRejimi == ThemeMode.dark
+                  ? Icons.light_mode
+                  : Icons.dark_mode,
+            ),
             onPressed: () => holat.temaniAlmashtirish(),
           ),
           TextButton(
             onPressed: () => holat.tilniAlmashtirish(),
-            child: Text(holat.til.name.toUpperCase(), style: const TextStyle(color: Colors.white)),
+            child: Text(
+              holat.til.name.toUpperCase(),
+              style: const TextStyle(color: Colors.white),
+            ),
           ),
-          IconButton(icon: const Icon(Icons.logout), onPressed: () => holat.chiqish()),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => holat.chiqish(),
+          ),
           const SizedBox(width: 8),
         ],
       ),
