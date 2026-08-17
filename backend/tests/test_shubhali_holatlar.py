@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 
-from app.models.foydalanuvchi import Smena
+from app.core.security import parolni_hash
+from app.models.foydalanuvchi import Foydalanuvchi, Rol, Smena
 from app.models.shubhali_holat import ShubhaliHolat, ShubhaliHolatStatusi
 
 
@@ -92,3 +93,84 @@ def test_sahifalash(client, db, admin_headers):
     birinchi_idlar = {item["id"] for item in birinchi_sahifa.json()["items"]}
     ikkinchi_idlar = {item["id"] for item in ikkinchi_sahifa.json()["items"]}
     assert birinchi_idlar.isdisjoint(ikkinchi_idlar)
+
+
+def test_statistika_faqat_admin(client, operator_headers):
+    javob = client.get("/api/v1/shubhali-holatlar/statistika", headers=operator_headers)
+    assert javob.status_code == 403
+
+
+def test_statistika_guruhlash(client, db, admin_headers, operator):
+    ikkinchi_operator = Foydalanuvchi(
+        ism="Smena B", login="smena_b", parol_hash=parolni_hash("parolB"), rol=Rol.operator, smena=Smena.B
+    )
+    db.add(ikkinchi_operator)
+    db.commit()
+    db.refresh(ikkinchi_operator)
+
+    # tasdiqlangan hodisalar — statistikaga kirishi kerak
+    db.add(
+        ShubhaliHolat(
+            vaqt=datetime.now(timezone.utc),
+            smena=Smena.A,
+            ogirlik=5.0,
+            operator_id=operator.id,
+            holati=ShubhaliHolatStatusi.korib_chiqildi,
+        )
+    )
+    db.add(
+        ShubhaliHolat(
+            vaqt=datetime.now(timezone.utc),
+            smena=Smena.A,
+            ogirlik=6.0,
+            operator_id=operator.id,
+            holati=ShubhaliHolatStatusi.korib_chiqildi,
+        )
+    )
+    db.add(
+        ShubhaliHolat(
+            vaqt=datetime.now(timezone.utc),
+            smena=Smena.B,
+            ogirlik=4.0,
+            operator_id=ikkinchi_operator.id,
+            holati=ShubhaliHolatStatusi.korib_chiqildi,
+        )
+    )
+    # hali tasdiqlanmagan — statistikaga kirmasligi kerak
+    db.add(ShubhaliHolat(vaqt=datetime.now(timezone.utc), smena=Smena.C, ogirlik=3.0, operator_id=operator.id))
+    db.commit()
+
+    javob = client.get("/api/v1/shubhali-holatlar/statistika", headers=admin_headers)
+    assert javob.status_code == 200
+    natija = javob.json()
+
+    assert natija["smena_boyicha"] == {"A": 2, "B": 1, "C": 0, "D": 0}
+
+    operator_boyicha = natija["operator_boyicha"]
+    assert len(operator_boyicha) == 2
+    assert operator_boyicha[0]["ism"] == operator.ism
+    assert operator_boyicha[0]["soni"] == 2
+    assert operator_boyicha[1]["ism"] == ikkinchi_operator.ism
+    assert operator_boyicha[1]["soni"] == 1
+
+
+def test_statistika_sana_filtri(client, db, admin_headers, operator):
+    db.add(
+        ShubhaliHolat(
+            vaqt=datetime.now(timezone.utc),
+            smena=Smena.A,
+            ogirlik=5.0,
+            operator_id=operator.id,
+            holati=ShubhaliHolatStatusi.korib_chiqildi,
+        )
+    )
+    db.commit()
+
+    ertaga = date.today().replace(day=min(date.today().day + 1, 28))
+    javob = client.get(
+        "/api/v1/shubhali-holatlar/statistika", params={"sana_dan": ertaga.isoformat()}, headers=admin_headers
+    )
+    assert javob.status_code == 200
+    natija = javob.json()
+    assert natija["smena_boyicha"] == {"A": 0, "B": 0, "C": 0, "D": 0}
+    assert natija["operator_boyicha"] == []

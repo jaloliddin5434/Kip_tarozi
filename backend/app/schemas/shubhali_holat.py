@@ -24,3 +24,14 @@ class ShubhaliHolatRoyxatJavob(ShubhaliHolatJavob):
     korib_chiqqan_ism: str | None = None
     operator_ism: str | None = None
     tasdiqlangan: bool
+
+
+class ShubhaliOperatorSoni(BaseModel):
+    operator_id: int
+    ism: str
+    soni: int
+
+
+class ShubhaliHolatStatistika(BaseModel):
+    smena_boyicha: dict[str, int]
+    operator_boyicha: list[ShubhaliOperatorSoni]

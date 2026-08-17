@@ -9,7 +9,12 @@ from app.core.database import get_db
 from app.models.foydalanuvchi import Foydalanuvchi, Rol, Smena
 from app.models.shubhali_holat import ShubhaliHolat, ShubhaliHolatStatusi
 from app.schemas.sahifalash import Sahifalangan
-from app.schemas.shubhali_holat import ShubhaliHolatJavob, ShubhaliHolatRoyxatJavob
+from app.schemas.shubhali_holat import (
+    ShubhaliHolatJavob,
+    ShubhaliHolatRoyxatJavob,
+    ShubhaliHolatStatistika,
+    ShubhaliOperatorSoni,
+)
 from app.services.storage.rasm import rasm_saqla
 from app.services.telegram import xatolik_xabari
 
@@ -89,7 +94,9 @@ def royxat(
     jami = db.scalar(select(func.count()).select_from(sorov.subquery())) or 0
 
     sahifalangan_sorov = (
-        sorov.order_by(ShubhaliHolat.vaqt.desc()).offset((sahifa - 1) * sahifa_hajmi).limit(sahifa_hajmi)
+        sorov.order_by(ShubhaliHolat.vaqt.desc(), ShubhaliHolat.id.desc())
+        .offset((sahifa - 1) * sahifa_hajmi)
+        .limit(sahifa_hajmi)
     )
     natijalar = db.execute(sahifalangan_sorov).all()
 
@@ -111,6 +118,47 @@ def royxat(
         for hodisa, korib_chiqqan_ism, operator_ism in natijalar
     ]
     return Sahifalangan(items=items, jami=jami, sahifa=sahifa, sahifa_hajmi=sahifa_hajmi)
+
+
+@router.get("/statistika", response_model=ShubhaliHolatStatistika)
+def statistika(
+    sana_dan: date | None = Query(None),
+    sana_gacha: date | None = Query(None),
+    db: Session = Depends(get_db),
+    _: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.admin)),
+) -> ShubhaliHolatStatistika:
+    """Qaysi smenada/operatorda 'yuk saqlanmadi' hodisasi ko'proq uchrayotganini
+    ko'rsatadi. Faqat operator 'Tushundim' bosib tasdiqlagan (haqiqatan yuz bergan)
+    hodisalar hisoblanadi — hali ko'rib chiqilmagan (kutilayotgan) holatlar
+    statistikaga kirmaydi."""
+    shartlar = [ShubhaliHolat.holati == ShubhaliHolatStatusi.korib_chiqildi]
+    if sana_dan is not None:
+        shartlar.append(func.date(ShubhaliHolat.vaqt) >= sana_dan)
+    if sana_gacha is not None:
+        shartlar.append(func.date(ShubhaliHolat.vaqt) <= sana_gacha)
+
+    smena_soni = {smena.value: 0 for smena in Smena}
+    smena_qatorlari = db.execute(
+        select(ShubhaliHolat.smena, func.count(ShubhaliHolat.id)).where(*shartlar).group_by(ShubhaliHolat.smena)
+    ).all()
+    for smena, soni in smena_qatorlari:
+        if smena is not None:
+            smena_soni[smena.value] = soni
+
+    operator_qatorlari = db.execute(
+        select(Foydalanuvchi.id, Foydalanuvchi.ism, func.count(ShubhaliHolat.id))
+        .join(Foydalanuvchi, ShubhaliHolat.operator_id == Foydalanuvchi.id)
+        .where(*shartlar)
+        .group_by(Foydalanuvchi.id, Foydalanuvchi.ism)
+        .order_by(func.count(ShubhaliHolat.id).desc())
+    ).all()
+
+    return ShubhaliHolatStatistika(
+        smena_boyicha=smena_soni,
+        operator_boyicha=[
+            ShubhaliOperatorSoni(operator_id=op_id, ism=ism, soni=soni) for op_id, ism, soni in operator_qatorlari
+        ],
+    )
 
 
 @router.get("/bloklovchi", response_model=ShubhaliHolatJavob | None)
