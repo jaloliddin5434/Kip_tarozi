@@ -91,6 +91,8 @@ const Map<String, Map<Til, String>> _matnlar = {
   'holati': {Til.uz: 'Holati', Til.ru: 'Статус'},
   'filtr': {Til.uz: 'Filtr', Til.ru: 'Фильтр'},
   'tozalash': {Til.uz: 'Tozalash', Til.ru: 'Очистить'},
+  'qidiruv': {Til.uz: 'Qidiruv', Til.ru: 'Поиск'},
+  'qidiruv_maslahat': {Til.uz: 'Operator yoki partiya', Til.ru: 'Оператор или партия'},
   'jami': {Til.uz: 'Jami', Til.ru: 'Итого'},
 
   'davr_kunlik': {Til.uz: 'Kunlik', Til.ru: 'Дневной'},

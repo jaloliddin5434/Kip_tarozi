@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
@@ -22,6 +24,8 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
 
   final _mahsulotKontrolleri = TextEditingController();
   final _kipRaqamiKontrolleri = TextEditingController();
+  final _qidiruvKontrolleri = TextEditingController();
+  Timer? _qidiruvTaymer;
   String? _smenaFiltri;
   String? _holatiFiltri;
   DateTime? _sanaDan;
@@ -35,6 +39,21 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
     _sanaDan = bugun;
     _sanaGacha = bugun;
     _yuklash();
+  }
+
+  @override
+  void dispose() {
+    _qidiruvTaymer?.cancel();
+    _qidiruvKontrolleri.dispose();
+    super.dispose();
+  }
+
+  void _qidiruvOzgardi(String qiymat) {
+    _qidiruvTaymer?.cancel();
+    _qidiruvTaymer = Timer(const Duration(milliseconds: 500), () {
+      _joriySahifa = 1;
+      _yuklash();
+    });
   }
 
   bool get _bugunTanlanganmi {
@@ -55,6 +74,7 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
       final query = <String, dynamic>{'sahifa': _joriySahifa, 'sahifa_hajmi': 30};
       if (_mahsulotKontrolleri.text.trim().isNotEmpty) query['mahsulot_kodi'] = _mahsulotKontrolleri.text.trim();
       if (_kipRaqamiKontrolleri.text.trim().isNotEmpty) query['kip_raqami'] = int.tryParse(_kipRaqamiKontrolleri.text.trim());
+      if (_qidiruvKontrolleri.text.trim().isNotEmpty) query['qidiruv'] = _qidiruvKontrolleri.text.trim();
       if (_smenaFiltri != null) query['smena'] = _smenaFiltri;
       if (_holatiFiltri != null) query['holati'] = _holatiFiltri;
       if (_sanaDan != null) query['sana_dan'] = _sanaDan!.toIso8601String().substring(0, 10);
@@ -126,6 +146,7 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
   void _filtrniTozalash() {
     _mahsulotKontrolleri.clear();
     _kipRaqamiKontrolleri.clear();
+    _qidiruvKontrolleri.clear();
     _smenaFiltri = null;
     _holatiFiltri = null;
     _sanaDan = null;
@@ -148,6 +169,20 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
             runSpacing: 12,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              SizedBox(
+                width: 220,
+                child: TextField(
+                  controller: _qidiruvKontrolleri,
+                  onChanged: _qidiruvOzgardi,
+                  decoration: InputDecoration(
+                    labelText: lok.t('qidiruv'),
+                    hintText: lok.t('qidiruv_maslahat'),
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ),
               SizedBox(
                 width: 160,
                 child: TextField(

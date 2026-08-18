@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime, timezone
 
-from app.models.foydalanuvchi import Smena
+from app.core.security import parolni_hash
+from app.models.foydalanuvchi import Foydalanuvchi, Rol, Smena
 from app.models.kip import Kip, KipHolati
 from app.models.partiya import Partiya, PartiyaHolati
 
@@ -61,3 +62,48 @@ def test_kiplar_royxati_holati_filtri_ishlaydi(client, db, admin_headers, operat
 def test_kiplar_royxati_notogri_holati_400(client, admin_headers):
     javob = client.get("/api/v1/hujjatlar/kiplar", params={"holati": "notogri"}, headers=admin_headers)
     assert javob.status_code == 422
+
+
+def test_kiplar_royxati_qidiruv_operator_ismi_boyicha(client, db, admin_headers, operator, mahsulot_tola):
+    boshqa_operator = Foydalanuvchi(
+        ism="Dilnoza Yusupova",
+        login="dilnoza_qidiruv",
+        parol_hash=parolni_hash("parolD"),
+        rol=Rol.operator,
+        smena=Smena.B,
+    )
+    db.add(boshqa_operator)
+    db.commit()
+    db.refresh(boshqa_operator)
+
+    partiya = _partiya_yarat(db, mahsulot_tola.id, 810)
+    _kip_yarat(db, partiya.id, 1, 100.0, Smena.A, operator.id)
+    _kip_yarat(db, partiya.id, 2, 105.0, Smena.B, boshqa_operator.id)
+
+    javob = client.get("/api/v1/hujjatlar/kiplar", params={"qidiruv": "dilnoza"}, headers=admin_headers).json()
+    assert javob["jami"] == 1
+    assert javob["items"][0]["operator_ism"] == "Dilnoza Yusupova"
+
+    javob_katta = client.get("/api/v1/hujjatlar/kiplar", params={"qidiruv": "DILNOZA"}, headers=admin_headers).json()
+    assert javob_katta["jami"] == 1
+
+
+def test_kiplar_royxati_qidiruv_partiya_raqami_boyicha(client, db, admin_headers, operator, mahsulot_tola):
+    partiya_maxsus = _partiya_yarat(db, mahsulot_tola.id, 8123)
+    partiya_oddiy = _partiya_yarat(db, mahsulot_tola.id, 555)
+    _kip_yarat(db, partiya_maxsus.id, 1, 100.0, Smena.A, operator.id)
+    _kip_yarat(db, partiya_oddiy.id, 1, 105.0, Smena.A, operator.id)
+
+    javob = client.get("/api/v1/hujjatlar/kiplar", params={"qidiruv": "812"}, headers=admin_headers).json()
+    assert javob["jami"] == 1
+    assert javob["items"][0]["partiya_raqami"] == 8123
+
+
+def test_kiplar_royxati_qidiruv_mos_kelmasa_bosh_royxat(client, db, admin_headers, operator, mahsulot_tola):
+    partiya = _partiya_yarat(db, mahsulot_tola.id, 820)
+    _kip_yarat(db, partiya.id, 1, 100.0, Smena.A, operator.id)
+
+    javob = client.get(
+        "/api/v1/hujjatlar/kiplar", params={"qidiruv": "mavjud_emas_qidiruv"}, headers=admin_headers
+    ).json()
+    assert javob["jami"] == 0

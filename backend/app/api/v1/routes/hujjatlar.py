@@ -1,7 +1,7 @@
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import rollarga_ruxsat
@@ -26,6 +26,7 @@ def kiplar_royxati(
     partiya_raqami: int | None = Query(None),
     kip_raqami: int | None = Query(None),
     holati: KipHolati | None = Query(None),
+    qidiruv: str | None = Query(None),
     sahifa: int = Query(1, ge=1),
     sahifa_hajmi: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -51,6 +52,11 @@ def kiplar_royxati(
         sorov = sorov.where(Kip.kip_raqami == kip_raqami)
     if holati is not None:
         sorov = sorov.where(Kip.holati == holati)
+    if qidiruv is not None and qidiruv.strip():
+        andoza = f"%{qidiruv.strip()}%"
+        sorov = sorov.where(
+            or_(Foydalanuvchi.ism.ilike(andoza), cast(Partiya.partiya_raqami, String).ilike(andoza))
+        )
 
     jami = db.scalar(select(func.count()).select_from(sorov.subquery())) or 0
 
