@@ -4,6 +4,7 @@ from app.api.v1.routes import (
     agent,
     auth,
     dashboard,
+    hisobotlar,
     hujjatlar,
     kiplar,
     mahsulotlar,
@@ -26,3 +27,4 @@ api_router.include_router(dashboard.router)
 api_router.include_router(sozlamalar.router)
 api_router.include_router(agent.router)
 api_router.include_router(moliyaviy.router)
+api_router.include_router(hisobotlar.router)
