@@ -8,6 +8,7 @@ import '../../models/statistika.dart';
 import '../../services/statistika_pdf.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../widgets/kalendar_vidjeti.dart';
 
 const _mahsulotKodlari = ['tola', 'lint', 'pux', 'ulyuk'];
 
@@ -28,7 +29,6 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
   bool _yuklanmoqda = true;
   String? _xato;
 
-  DateTime _kalendarOy = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime? _tanlanganKun;
   DavrJamlanmasi? _kunlikJamlanma;
   bool _kunYuklanmoqda = false;
@@ -92,8 +92,6 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
 
   String _sanaFormat(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-
-  bool _birXilKunmi(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
 
   MahsulotJamlanmasi? get _tanlanganMahsulot {
     final j = _jamlanma;
@@ -260,7 +258,7 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
           const SizedBox(height: 12),
           LayoutBuilder(
             builder: (context, constraints) {
-              final kalendar = _kalendarVidjeti(lok);
+              final kalendar = KalendarVidjeti(tanlanganKun: _tanlanganKun, onKunTanlash: _kunTanlash);
               final tafsilot = _kunTafsiloti(lok);
               if (constraints.maxWidth > 640) {
                 return Row(
@@ -279,93 +277,6 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
             },
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _kalendarVidjeti(Lokalizatsiya lok) {
-    final oyBoshi = DateTime(_kalendarOy.year, _kalendarOy.month, 1);
-    final oyOxiri = DateTime(_kalendarOy.year, _kalendarOy.month + 1, 0);
-    final boshlanishOffset = oyBoshi.weekday - 1;
-    final kunlarSoni = oyOxiri.day;
-    final qatorSoni = ((boshlanishOffset + kunlarSoni) / 7).ceil();
-    final bugun = DateTime.now();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left),
-                tooltip: lok.t('oldingi_oy'),
-                onPressed: () => setState(() => _kalendarOy = DateTime(_kalendarOy.year, _kalendarOy.month - 1)),
-              ),
-              Text(
-                '${lok.t("oy_${_kalendarOy.month}")} ${_kalendarOy.year}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right),
-                tooltip: lok.t('keyingi_oy'),
-                onPressed: () => setState(() => _kalendarOy = DateTime(_kalendarOy.year, _kalendarOy.month + 1)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              for (var h = 1; h <= 7; h++)
-                Expanded(
-                  child: Center(
-                    child: Text(lok.t('hafta_$h'), style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          for (var q = 0; q < qatorSoni; q++)
-            Row(children: [for (var d = 0; d < 7; d++) _kunKatakchasi(q * 7 + d, boshlanishOffset, kunlarSoni, bugun)]),
-        ],
-      ),
-    );
-  }
-
-  Widget _kunKatakchasi(int index, int offset, int kunlarSoni, DateTime bugun) {
-    final kunRaqami = index - offset + 1;
-    if (kunRaqami < 1 || kunRaqami > kunlarSoni) {
-      return const Expanded(child: SizedBox(height: 36));
-    }
-    final kun = DateTime(_kalendarOy.year, _kalendarOy.month, kunRaqami);
-    final bugunmi = _birXilKunmi(kun, bugun);
-    final tanlanganmi = _tanlanganKun != null && _birXilKunmi(kun, _tanlanganKun!);
-
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.all(2),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(6),
-          onTap: () => _kunTanlash(kun),
-          child: Container(
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: tanlanganmi ? kipTaroziYashil : null,
-              border: bugunmi && !tanlanganmi ? Border.all(color: kipTaroziYashil) : null,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              '$kunRaqami',
-              style: TextStyle(
-                color: tanlanganmi ? Colors.white : null,
-                fontWeight: bugunmi ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }

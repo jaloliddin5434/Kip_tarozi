@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/hujjat.dart';
 import '../../services/hujjat_pdf.dart';
 import '../../state/app_state.dart';
+import '../../widgets/kalendar_vidjeti.dart';
 import '../../widgets/kip_batafsil_dialog.dart';
 
 class HujjatlarEkrani extends StatefulWidget {
@@ -100,6 +101,26 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
     _yuklash();
   }
 
+  /// Kalendarda faqat "sana_dan" va "sana_gacha" bitta xil kunga o'rnatilgan
+  /// bo'lsagina tegishli kun belgilanadi — aks holda (diapazon yoki filtr
+  /// tozalangan) kalendarda hech qanday kun tanlangan ko'rinmaydi.
+  DateTime? get _kalendarTanlanganKun {
+    final dan = _sanaDan;
+    final gacha = _sanaGacha;
+    if (dan == null || gacha == null) return null;
+    if (dan.year == gacha.year && dan.month == gacha.month && dan.day == gacha.day) return dan;
+    return null;
+  }
+
+  void _kalendarKunTanlash(DateTime kun) {
+    setState(() {
+      _sanaDan = kun;
+      _sanaGacha = kun;
+      _joriySahifa = 1;
+    });
+    _yuklash();
+  }
+
   void _filtrniTozalash() {
     _mahsulotKontrolleri.clear();
     _kipRaqamiKontrolleri.clear();
@@ -166,6 +187,11 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
               ElevatedButton(onPressed: () { _joriySahifa = 1; _yuklash(); }, child: Text(lok.t('filtr'))),
               OutlinedButton(onPressed: _filtrniTozalash, child: Text(lok.t('tozalash'))),
             ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: 340,
+            child: KalendarVidjeti(tanlanganKun: _kalendarTanlanganKun, onKunTanlash: _kalendarKunTanlash),
           ),
           const SizedBox(height: 16),
           if (_yuklanmoqda) const Expanded(child: Center(child: CircularProgressIndicator())),
