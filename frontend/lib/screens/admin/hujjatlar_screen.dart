@@ -23,6 +23,7 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
   final _mahsulotKontrolleri = TextEditingController();
   final _kipRaqamiKontrolleri = TextEditingController();
   String? _smenaFiltri;
+  String? _holatiFiltri;
   DateTime? _sanaDan;
   DateTime? _sanaGacha;
 
@@ -55,6 +56,7 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
       if (_mahsulotKontrolleri.text.trim().isNotEmpty) query['mahsulot_kodi'] = _mahsulotKontrolleri.text.trim();
       if (_kipRaqamiKontrolleri.text.trim().isNotEmpty) query['kip_raqami'] = int.tryParse(_kipRaqamiKontrolleri.text.trim());
       if (_smenaFiltri != null) query['smena'] = _smenaFiltri;
+      if (_holatiFiltri != null) query['holati'] = _holatiFiltri;
       if (_sanaDan != null) query['sana_dan'] = _sanaDan!.toIso8601String().substring(0, 10);
       if (_sanaGacha != null) query['sana_gacha'] = _sanaGacha!.toIso8601String().substring(0, 10);
 
@@ -125,6 +127,7 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
     _mahsulotKontrolleri.clear();
     _kipRaqamiKontrolleri.clear();
     _smenaFiltri = null;
+    _holatiFiltri = null;
     _sanaDan = null;
     _sanaGacha = null;
     _joriySahifa = 1;
@@ -184,6 +187,30 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
                 selected: _bugunTanlanganmi,
                 onSelected: (_) => _bugunTanlash(),
               ),
+              ChoiceChip(
+                label: Text(lok.t('faqat_tahrirlangan')),
+                selected: _holatiFiltri == 'tahrirlangan',
+                selectedColor: Colors.orange.withValues(alpha: 0.25),
+                onSelected: (tanlandi) {
+                  setState(() {
+                    _holatiFiltri = tanlandi ? 'tahrirlangan' : null;
+                    _joriySahifa = 1;
+                  });
+                  _yuklash();
+                },
+              ),
+              ChoiceChip(
+                label: Text(lok.t('faqat_bekor_qilingan')),
+                selected: _holatiFiltri == 'bekor_qilingan',
+                selectedColor: Colors.red.withValues(alpha: 0.20),
+                onSelected: (tanlandi) {
+                  setState(() {
+                    _holatiFiltri = tanlandi ? 'bekor_qilingan' : null;
+                    _joriySahifa = 1;
+                  });
+                  _yuklash();
+                },
+              ),
               ElevatedButton(onPressed: () { _joriySahifa = 1; _yuklash(); }, child: Text(lok.t('filtr'))),
               OutlinedButton(onPressed: _filtrniTozalash, child: Text(lok.t('tozalash'))),
             ],
@@ -200,6 +227,28 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
         ],
       ),
     );
+  }
+
+  Color? _qatorRangi(String holati) {
+    switch (holati) {
+      case 'bekor_qilingan':
+        return Colors.red.withValues(alpha: 0.08);
+      case 'tahrirlangan':
+        return Colors.orange.withValues(alpha: 0.10);
+      default:
+        return null;
+    }
+  }
+
+  Color _holatiMatnRangi(String holati) {
+    switch (holati) {
+      case 'bekor_qilingan':
+        return Colors.red.shade700;
+      case 'tahrirlangan':
+        return Colors.orange.shade800;
+      default:
+        return Colors.green.shade700;
+    }
   }
 
   Widget _jadval(dynamic lok) {
@@ -226,6 +275,7 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
                 rows: sahifa.items
                     .map(
                       (k) => DataRow(
+                        color: WidgetStateProperty.all(_qatorRangi(k.holati)),
                         onSelectChanged: (_) => kipBatafsilDialogniKorsat(context: context, kipId: k.id),
                         cells: [
                           DataCell(Text('${k.vaqt.toLocal()}'.substring(0, 16))),
@@ -236,7 +286,10 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
                           DataCell(Text(k.smena)),
                           DataCell(Text(k.operatorIsm)),
                           DataCell(
-                            Text(k.holati, style: TextStyle(color: k.holati == 'aktiv' ? Colors.green : Colors.orange)),
+                            Text(
+                              k.holati,
+                              style: TextStyle(color: _holatiMatnRangi(k.holati), fontWeight: FontWeight.w600),
+                            ),
                           ),
                           DataCell(
                             IconButton(

@@ -230,6 +230,8 @@ const Map<String, Map<Til, String>> _matnlar = {
   'holati_aktiv': {Til.uz: 'Aktiv', Til.ru: 'Активен'},
   'holati_bekor_qilingan': {Til.uz: 'Bekor qilingan', Til.ru: 'Отменён'},
   'holati_tahrirlangan': {Til.uz: 'Tahrirlangan', Til.ru: 'Изменён'},
+  'faqat_tahrirlangan': {Til.uz: 'Faqat tahrirlangan', Til.ru: 'Только изменённые'},
+  'faqat_bekor_qilingan': {Til.uz: 'Faqat bekor qilingan', Til.ru: 'Только отменённые'},
 
   // Sozlamalar ekrani
   'sozlamalar': {Til.uz: 'Sozlamalar', Til.ru: 'Настройки'},

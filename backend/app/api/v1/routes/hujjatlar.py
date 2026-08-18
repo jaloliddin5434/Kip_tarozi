@@ -8,7 +8,7 @@ from app.api.deps import rollarga_ruxsat
 from app.core.database import get_db
 from app.models.audit_log import AuditLog
 from app.models.foydalanuvchi import Foydalanuvchi, Rol, Smena
-from app.models.kip import Kip
+from app.models.kip import Kip, KipHolati
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya
 from app.schemas.hujjat import AuditLogJavob, HujjatKipJavob
@@ -25,6 +25,7 @@ def kiplar_royxati(
     mahsulot_kodi: str | None = Query(None),
     partiya_raqami: int | None = Query(None),
     kip_raqami: int | None = Query(None),
+    holati: KipHolati | None = Query(None),
     sahifa: int = Query(1, ge=1),
     sahifa_hajmi: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -48,6 +49,8 @@ def kiplar_royxati(
         sorov = sorov.where(Partiya.partiya_raqami == partiya_raqami)
     if kip_raqami is not None:
         sorov = sorov.where(Kip.kip_raqami == kip_raqami)
+    if holati is not None:
+        sorov = sorov.where(Kip.holati == holati)
 
     jami = db.scalar(select(func.count()).select_from(sorov.subquery())) or 0
 
