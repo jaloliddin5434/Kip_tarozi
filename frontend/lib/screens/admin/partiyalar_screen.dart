@@ -1,9 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../api/api_exception.dart';
 import '../../models/hujjat.dart';
 import '../../models/partiya.dart';
 import '../../state/app_state.dart';
+import '../../theme.dart';
+
+/// Partiyaning "to'lgan" deb hisoblanadigan nishon (target) kip soni —
+/// Tola uchun 220, qolgan mahsulotlar uchun 210.
+const _nishonSoni = {'tola': 220, 'lint': 210, 'pux': 210, 'ulyuk': 210};
+
+int _nishon(String mahsulotKodi) => _nishonSoni[mahsulotKodi] ?? 210;
 
 class PartiyalarEkrani extends StatefulWidget {
   const PartiyalarEkrani({super.key});
@@ -18,10 +27,25 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
   String? _xato;
   String? _holatiFiltri;
 
+  final _qidiruvKontrolleri = TextEditingController();
+  Timer? _qidiruvTaymer;
+
   @override
   void initState() {
     super.initState();
     _yuklash();
+  }
+
+  @override
+  void dispose() {
+    _qidiruvTaymer?.cancel();
+    _qidiruvKontrolleri.dispose();
+    super.dispose();
+  }
+
+  void _qidiruvOzgardi(String qiymat) {
+    _qidiruvTaymer?.cancel();
+    _qidiruvTaymer = Timer(const Duration(milliseconds: 500), _yuklash);
   }
 
   Future<void> _yuklash() async {
@@ -32,6 +56,8 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
     try {
       final query = <String, dynamic>{'sahifa': 1, 'sahifa_hajmi': 100};
       if (_holatiFiltri != null) query['holati'] = _holatiFiltri;
+      final qidiruv = _qidiruvKontrolleri.text.trim();
+      if (qidiruv.isNotEmpty) query['qidiruv'] = qidiruv;
       final javob = await context.read<AppState>().api.get(
         '/partiyalar',
         query: query,
@@ -278,38 +304,32 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Wrap(
-            spacing: 8,
+            spacing: 16,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              ChoiceChip(
-                label: Text(lok.t('ochiq')),
-                selected: _holatiFiltri == 'ochiq',
-                onSelected: (_) {
-                  setState(() => _holatiFiltri = 'ochiq');
-                  _yuklash();
-                },
+              Wrap(
+                spacing: 8,
+                children: [
+                  _filtrTugmasi(lok.t('barchasi'), null),
+                  _filtrTugmasi(lok.t('ochiq'), 'ochiq'),
+                  _filtrTugmasi(lok.t('yopiq'), 'yopiq'),
+                  _filtrTugmasi(lok.t('sotildi'), 'sotilgan'),
+                ],
               ),
-              ChoiceChip(
-                label: Text(lok.t('yopiq')),
-                selected: _holatiFiltri == 'yopiq',
-                onSelected: (_) {
-                  setState(() => _holatiFiltri = 'yopiq');
-                  _yuklash();
-                },
-              ),
-              ChoiceChip(
-                label: Text(lok.t('sotildi')),
-                selected: _holatiFiltri == 'sotilgan',
-                onSelected: (_) {
-                  setState(() => _holatiFiltri = 'sotilgan');
-                  _yuklash();
-                },
-              ),
-              ActionChip(
-                label: Text(lok.t('tozalash')),
-                onPressed: () {
-                  setState(() => _holatiFiltri = null);
-                  _yuklash();
-                },
+              SizedBox(
+                width: 280,
+                child: TextField(
+                  controller: _qidiruvKontrolleri,
+                  onChanged: _qidiruvOzgardi,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    labelText: lok.t('qidiruv'),
+                    hintText: lok.t('partiyalar_qidiruv_maslahat'),
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
               ),
             ],
           ),
@@ -319,59 +339,197 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
           if (_xato != null) Expanded(child: Center(child: Text(_xato!))),
           if (!_yuklanmoqda && _xato == null && _sahifa != null)
             Expanded(
-              child: ListView(
-                children: _sahifa!.items
-                    .map((p) => _partiyaKartasi(p, lok, adminRoli))
-                    .toList(),
-              ),
+              child: _sahifa!.items.isEmpty
+                  ? Center(
+                      child: Text(
+                        lok.t('partiyalar_topilmadi'),
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    )
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        return GridView.builder(
+                          gridDelegate:
+                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 360,
+                            mainAxisExtent: 186,
+                            mainAxisSpacing: 14,
+                            crossAxisSpacing: 14,
+                          ),
+                          itemCount: _sahifa!.items.length,
+                          itemBuilder: (context, i) =>
+                              _partiyaKartasi(_sahifa!.items[i], lok, adminRoli),
+                        );
+                      },
+                    ),
             ),
         ],
       ),
     );
   }
 
+  Widget _filtrTugmasi(String matn, String? qiymat) {
+    final tanlanganmi = _holatiFiltri == qiymat;
+    return SizedBox(
+      width: 104,
+      height: 36,
+      child: ChoiceChip(
+        label: Center(child: Text(matn, overflow: TextOverflow.ellipsis)),
+        selected: tanlanganmi,
+        showCheckmark: false,
+        labelStyle: TextStyle(
+          color: tanlanganmi ? Colors.white : null,
+          fontWeight: FontWeight.w600,
+        ),
+        selectedColor: kipTaroziYashil,
+        onSelected: (_) {
+          setState(() => _holatiFiltri = qiymat);
+          _yuklash();
+        },
+      ),
+    );
+  }
+
+  Color _holatRangi(String holati) {
+    switch (holati) {
+      case 'ochiq':
+        return kipTaroziYashil;
+      case 'sotilgan':
+        return Colors.red.shade600;
+      default:
+        return Colors.grey.shade500;
+    }
+  }
+
+  String _sana(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+
   Widget _partiyaKartasi(Partiya p, dynamic lok, bool adminRoli) {
+    final rang = _holatRangi(p.holati);
+    final holatMatni = p.holati == 'ochiq'
+        ? lok.t('ochiq')
+        : p.holati == 'yopiq'
+        ? lok.t('yopiq')
+        : lok.t('sotildi');
     final sotilganmi = p.holati == 'sotilgan';
-    final rang = sotilganmi ? Colors.red : Colors.green;
+    final nishon = _nishon(p.mahsulotKodi);
+    final progress = (p.kipSoni / nishon).clamp(0.0, 1.0);
+
+    Widget? amalTugmasi;
+    if (!adminRoli) {
+      if (p.holati == 'yopiq') {
+        amalTugmasi = OutlinedButton(
+          onPressed: () => _olchovFormasiniOchish(p),
+          style: OutlinedButton.styleFrom(minimumSize: const Size(0, 32)),
+          child: Text(lok.t('sort_ogirlik_toldirish'), style: const TextStyle(fontSize: 12)),
+        );
+      }
+    } else if (p.holati == 'ochiq') {
+      amalTugmasi = OutlinedButton(
+        onPressed: () => _yopish(p),
+        style: OutlinedButton.styleFrom(minimumSize: const Size(0, 32)),
+        child: Text(lok.t('yopish'), style: const TextStyle(fontSize: 12)),
+      );
+    } else if (p.holati == 'yopiq') {
+      amalTugmasi = FilledButton(
+        onPressed: () => _sotishFormasiniOchish(p),
+        style: FilledButton.styleFrom(minimumSize: const Size(0, 32)),
+        child: Text(lok.t('sotish'), style: const TextStyle(fontSize: 12)),
+      );
+    }
+
     return Card(
-      color: rang.withValues(alpha: 0.06),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: rang,
+      clipBehavior: Clip.antiAlias,
+      margin: EdgeInsets.zero,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(width: 6, color: rang),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${p.mahsulotNomi} — #${p.partiyaRaqami}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: rang.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            holatMatni,
+                            style: TextStyle(color: rang, fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    if (sotilganmi) ...[
+                      _malumotQatori(Icons.person_outline, p.xaridor?.isNotEmpty == true ? p.xaridor! : '—'),
+                      const SizedBox(height: 4),
+                      _malumotQatori(Icons.description_outlined, p.nakladnoyRaqami ?? '—'),
+                      const SizedBox(height: 4),
+                      _malumotQatori(
+                        Icons.event_outlined,
+                        p.sotuvSanasi != null ? _sana(p.sotuvSanasi!) : '—',
+                      ),
+                    ] else ...[
+                      Text(
+                        '${p.kipSoni} / $nishon ${lok.t("soni")}',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 7,
+                          backgroundColor: Colors.grey.shade200,
+                          color: rang,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      _malumotQatori(Icons.event_outlined, _sana(p.yaratilganVaqt)),
+                    ],
+                    const Spacer(),
+                    if (amalTugmasi != null)
+                      Align(alignment: Alignment.centerRight, child: amalTugmasi),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _malumotQatori(IconData ikonka, String matn) {
+    return Row(
+      children: [
+        Icon(ikonka, size: 14, color: Colors.grey.shade500),
+        const SizedBox(width: 6),
+        Expanded(
           child: Text(
-            '#${p.partiyaRaqami}',
-            style: const TextStyle(fontSize: 11, color: Colors.white),
+            matn,
+            style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
-        title: Text('${p.mahsulotNomi} — Partiya #${p.partiyaRaqami}'),
-        subtitle: Text(
-          '${p.kipSoni} ${lok.t("soni")} · ${p.jamiKg.toStringAsFixed(1)} kg · ${lok.t(p.holati == "ochiq"
-              ? "ochiq"
-              : p.holati == "yopiq"
-              ? "yopiq"
-              : "sotildi")}'
-          '${p.sort != null ? " · ${lok.t('sort')}: ${p.sort}" : ""}'
-          '${p.xaridor != null ? " · ${p.xaridor}" : ""}${p.nakladnoyRaqami != null ? " · ${p.nakladnoyRaqami}" : ""}',
-        ),
-        trailing: !adminRoli
-            ? (p.holati == 'yopiq'
-                  ? OutlinedButton(
-                      onPressed: () => _olchovFormasiniOchish(p),
-                      child: Text(lok.t('sort_ogirlik_toldirish')),
-                    )
-                  : null)
-            : p.holati == 'ochiq'
-            ? OutlinedButton(
-                onPressed: () => _yopish(p),
-                child: Text(lok.t('yopish')),
-              )
-            : p.holati == 'yopiq'
-            ? FilledButton(
-                onPressed: () => _sotishFormasiniOchish(p),
-                child: Text(lok.t('sotish')),
-              )
-            : null,
-      ),
+      ],
     );
   }
 }

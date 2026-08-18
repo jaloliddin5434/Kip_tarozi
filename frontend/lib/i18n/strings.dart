@@ -312,6 +312,17 @@ const Map<String, Map<Til, String>> _matnlar = {
     Til.uz: 'Bu mahsulot bo\'yicha hali tortishlar yo\'q',
     Til.ru: 'По этому продукту пока нет взвешиваний',
   },
+
+  // Partiyalar ekrani — kartalar ko'rinishi
+  'barchasi': {Til.uz: 'Barchasi', Til.ru: 'Все'},
+  'yaratilgan_sana': {Til.uz: 'Yaratilgan sana', Til.ru: 'Дата создания'},
+  'sotilgan_sana': {Til.uz: 'Sotilgan sana', Til.ru: 'Дата продажи'},
+  'nakladnoy': {Til.uz: 'Nakladnoy', Til.ru: 'Накладная'},
+  'partiyalar_qidiruv_maslahat': {
+    Til.uz: 'Mahsulot, partiya raqami yoki xaridor',
+    Til.ru: 'Продукт, номер партии или покупатель',
+  },
+  'partiyalar_topilmadi': {Til.uz: 'Partiyalar topilmadi', Til.ru: 'Партии не найдены'},
 };
 
 class Lokalizatsiya {

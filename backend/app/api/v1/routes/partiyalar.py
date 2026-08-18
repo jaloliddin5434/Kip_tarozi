@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import rollarga_ruxsat
@@ -87,6 +87,7 @@ def ochish_yoki_tanlash(
 def royxat(
     mahsulot_kodi: str | None = Query(None),
     holati: PartiyaHolati | None = Query(None),
+    qidiruv: str | None = Query(None),
     sahifa: int = Query(1, ge=1),
     sahifa_hajmi: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -97,6 +98,15 @@ def royxat(
         sorov = sorov.where(Mahsulot.kod == mahsulot_kodi)
     if holati is not None:
         sorov = sorov.where(Partiya.holati == holati)
+    if qidiruv is not None and qidiruv.strip():
+        andoza = f"%{qidiruv.strip()}%"
+        sorov = sorov.where(
+            or_(
+                Mahsulot.nomi.ilike(andoza),
+                cast(Partiya.partiya_raqami, String).ilike(andoza),
+                Partiya.xaridor.ilike(andoza),
+            )
+        )
 
     jami = db.scalar(select(func.count()).select_from(sorov.subquery())) or 0
 

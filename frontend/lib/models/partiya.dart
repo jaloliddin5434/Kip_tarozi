@@ -9,6 +9,7 @@ class Partiya {
   final DateTime? yopilganVaqt;
   final int kipSoni;
   final double jamiKg;
+  final DateTime? sotuvSanasi;
   final String? xaridor;
   final String? nakladnoyRaqami;
   final String? sort;
@@ -28,6 +29,7 @@ class Partiya {
     this.yopilganVaqt,
     required this.kipSoni,
     required this.jamiKg,
+    this.sotuvSanasi,
     this.xaridor,
     this.nakladnoyRaqami,
     this.sort,
@@ -50,6 +52,7 @@ class Partiya {
         : DateTime.parse(j['yopilgan_vaqt']),
     kipSoni: j['kip_soni'],
     jamiKg: (j['jami_kg'] as num).toDouble(),
+    sotuvSanasi: j['sotuv_sanasi'] == null ? null : DateTime.parse(j['sotuv_sanasi']),
     xaridor: j['xaridor'],
     nakladnoyRaqami: j['nakladnoy_raqami'],
     sort: j['sort'],
