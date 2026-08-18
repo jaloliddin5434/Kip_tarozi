@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'api_exception.dart';
 
@@ -27,12 +28,7 @@ class ApiClient {
     return Uri.parse('$bazaUrl$yol').replace(queryParameters: tozaQuery);
   }
 
-  dynamic _javobniQayta(http.Response javob) {
-    if (javob.statusCode >= 200 && javob.statusCode < 300) {
-      if (javob.body.isEmpty) return null;
-      return jsonDecode(utf8.decode(javob.bodyBytes));
-    }
-
+  Never _xatoTashla(http.Response javob) {
     dynamic tana;
     try {
       tana = jsonDecode(utf8.decode(javob.bodyBytes));
@@ -55,9 +51,28 @@ class ApiClient {
     throw ApiException(javob.statusCode, xabar, tafsilot: detail);
   }
 
+  dynamic _javobniQayta(http.Response javob) {
+    if (javob.statusCode >= 200 && javob.statusCode < 300) {
+      if (javob.body.isEmpty) return null;
+      return jsonDecode(utf8.decode(javob.bodyBytes));
+    }
+    _xatoTashla(javob);
+  }
+
   Future<dynamic> get(String yol, {Map<String, dynamic>? query, String? tokenOverride}) async {
     final javob = await http.get(_uri(yol, query), headers: _sarlavhalar(tokenOverride));
     return _javobniQayta(javob);
+  }
+
+  /// JSON emas, xom bayt oqimi qaytaradigan endpointlar uchun (masalan
+  /// Excel/PDF fayl yuklab olish). Muvaffaqiyatsiz bo'lsa xuddi [get] kabi
+  /// JSON xato xabarini o'qib [ApiException] otadi.
+  Future<Uint8List> getBaytlar(String yol, {Map<String, dynamic>? query}) async {
+    final javob = await http.get(_uri(yol, query), headers: _sarlavhalar());
+    if (javob.statusCode >= 200 && javob.statusCode < 300) {
+      return javob.bodyBytes;
+    }
+    _xatoTashla(javob);
   }
 
   Future<dynamic> post(String yol, {Map<String, dynamic>? tana}) async {

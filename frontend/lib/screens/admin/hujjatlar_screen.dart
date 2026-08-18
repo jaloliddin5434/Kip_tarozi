@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
+import '../../api/api_exception.dart';
 import '../../models/hujjat.dart';
+import '../../services/fayl_yuklab_olish.dart';
 import '../../services/hujjat_pdf.dart';
 import '../../state/app_state.dart';
 import '../../widgets/kalendar_vidjeti.dart';
@@ -143,6 +145,97 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
     _yuklash();
   }
 
+  Future<void> _excelHisobotDialogniOchish() async {
+    final holat = context.read<AppState>();
+    final lok = holat.lok;
+    var tanlanganSana = DateTime.now();
+    var tanlanganSmena = 'A';
+    var yuklanmoqda = false;
+    String? xato;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          Future<void> yuklab() async {
+            setDialogState(() {
+              yuklanmoqda = true;
+              xato = null;
+            });
+            try {
+              final sana = tanlanganSana.toIso8601String().substring(0, 10);
+              final baytlar = await holat.api.getBaytlar(
+                '/hisobotlar/smena-excel',
+                query: {'sana': sana, 'smena': tanlanganSmena},
+              );
+              faylniSaqlash(baytlar, 'Smena_${tanlanganSmena}_$sana.xlsx');
+              if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(lok.t('fayl_yuklab_olindi'))));
+              }
+            } on ApiException catch (e) {
+              setDialogState(() => xato = e.xabar);
+            } catch (e) {
+              setDialogState(() => xato = e.toString());
+            } finally {
+              setDialogState(() => yuklanmoqda = false);
+            }
+          }
+
+          return AlertDialog(
+            title: Text(lok.t('excel_hisobot_tanlash')),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.calendar_today, size: 16),
+                  label: Text(tanlanganSana.toIso8601String().substring(0, 10)),
+                  onPressed: () async {
+                    final tanlangan = await showDatePicker(
+                      context: dialogContext,
+                      initialDate: tanlanganSana,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now().add(const Duration(days: 1)),
+                    );
+                    if (tanlangan != null) setDialogState(() => tanlanganSana = tanlangan);
+                  },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: tanlanganSmena,
+                  decoration: InputDecoration(labelText: lok.t('smena'), border: const OutlineInputBorder()),
+                  items: ['A', 'B', 'C', 'D'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                  onChanged: (v) {
+                    if (v != null) setDialogState(() => tanlanganSmena = v);
+                  },
+                ),
+                if (xato != null) ...[
+                  const SizedBox(height: 12),
+                  Text(xato!, style: const TextStyle(color: Colors.red)),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(lok.t('bekor'))),
+              FilledButton.icon(
+                onPressed: yuklanmoqda ? null : yuklab,
+                icon: yuklanmoqda
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.download, size: 18),
+                label: Text(lok.t('yuklab_olish')),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   void _filtrniTozalash() {
     _mahsulotKontrolleri.clear();
     _kipRaqamiKontrolleri.clear();
@@ -248,6 +341,11 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
               ),
               ElevatedButton(onPressed: () { _joriySahifa = 1; _yuklash(); }, child: Text(lok.t('filtr'))),
               OutlinedButton(onPressed: _filtrniTozalash, child: Text(lok.t('tozalash'))),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.download, size: 16),
+                label: Text(lok.t('excel_yuklab_olish')),
+                onPressed: _excelHisobotDialogniOchish,
+              ),
             ],
           ),
           const SizedBox(height: 16),

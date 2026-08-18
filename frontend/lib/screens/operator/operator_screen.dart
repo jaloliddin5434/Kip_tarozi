@@ -8,6 +8,7 @@ import '../../api/api_exception.dart';
 import '../../models/mahsulot.dart';
 import '../../models/partiya.dart';
 import '../../models/smena_holati.dart';
+import '../../services/fayl_yuklab_olish.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/bekor_qilish_hisoblagichi.dart';
@@ -49,6 +50,7 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
 
   bool _partiyaYuklanmoqda = false;
   bool _saqlashYuklanmoqda = false;
+  bool _excelYuklanmoqda = false;
   Map<String, dynamic>? _oxirgiSaqlanganKip;
 
   // Shu sessiya davomida operator ishlatgan partiya raqamlari, mahsulot kodi
@@ -289,6 +291,27 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
       await _ochiqPartiyalarniYangilash();
     } catch (e) {
       _xatoKorsat(e.toString());
+    }
+  }
+
+  Future<void> _excelYuklab() async {
+    final smena = _holat.foydalanuvchi?.smena;
+    if (smena == null) return;
+
+    setState(() => _excelYuklanmoqda = true);
+    try {
+      final sana = DateTime.now().toIso8601String().substring(0, 10);
+      final baytlar = await _holat.api.getBaytlar('/hisobotlar/smena-excel', query: {'sana': sana, 'smena': smena});
+      faylniSaqlash(baytlar, 'Smena_${smena}_$sana.xlsx');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_holat.lok.t('fayl_yuklab_olindi'))));
+      }
+    } on ApiException catch (e) {
+      _xatoKorsat(e.xabar);
+    } catch (e) {
+      _xatoKorsat(e.toString());
+    } finally {
+      if (mounted) setState(() => _excelYuklanmoqda = false);
     }
   }
 
@@ -574,7 +597,19 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
             ],
           ],
           const SizedBox(height: 28),
-          Text(lok.t('smena_holati'), style: const TextStyle(fontWeight: FontWeight.bold)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(lok.t('smena_holati'), style: const TextStyle(fontWeight: FontWeight.bold)),
+              OutlinedButton.icon(
+                onPressed: _excelYuklanmoqda ? null : _excelYuklab,
+                icon: _excelYuklanmoqda
+                    ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.download, size: 18),
+                label: Text(lok.t('excel_yuklab_olish')),
+              ),
+            ],
+          ),
           const SizedBox(height: 10),
           _smenaHolatiKartalari(lok),
         ],

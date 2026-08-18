@@ -93,6 +93,12 @@ const Map<String, Map<Til, String>> _matnlar = {
   'tozalash': {Til.uz: 'Tozalash', Til.ru: 'Очистить'},
   'qidiruv': {Til.uz: 'Qidiruv', Til.ru: 'Поиск'},
   'qidiruv_maslahat': {Til.uz: 'Operator yoki partiya', Til.ru: 'Оператор или партия'},
+
+  // Smena Excel hisoboti
+  'excel_yuklab_olish': {Til.uz: 'Excel yuklab olish', Til.ru: 'Скачать Excel'},
+  'excel_hisobot_tanlash': {Til.uz: 'Excel hisobotni tanlash', Til.ru: 'Выбор отчёта Excel'},
+  'yuklab_olish': {Til.uz: 'Yuklab olish', Til.ru: 'Скачать'},
+  'fayl_yuklab_olindi': {Til.uz: 'Fayl yuklab olindi', Til.ru: 'Файл скачан'},
   'jami': {Til.uz: 'Jami', Til.ru: 'Итого'},
 
   'davr_kunlik': {Til.uz: 'Kunlik', Til.ru: 'Дневной'},
