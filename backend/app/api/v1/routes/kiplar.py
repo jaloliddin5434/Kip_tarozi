@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -15,7 +15,7 @@ from app.models.partiya import Partiya, PartiyaHolati
 from app.models.shubhali_holat import ShubhaliHolat, ShubhaliHolatStatusi
 from app.schemas.hujjat import AuditLogJavob
 from app.schemas.kip import KipBatafsilJavob, KipJavob, KipSinxronNatija, KipTahrirlash, KipYaratish
-from app.schemas.smena import MahsulotBoyichaHolat, SmenaHolati
+from app.schemas.smena import MahsulotBoyichaHolat, SmenaHolati, SmenaKipYozuvi
 
 router = APIRouter(prefix="/kiplar", tags=["kiplar"])
 
@@ -80,6 +80,35 @@ def smena_holati(
         for kod, nomi, soni, jami_kg in qatorlar
     ]
     return SmenaHolati(smena=foydalanuvchi.smena.value, sana=bugun.isoformat(), mahsulotlar=mahsulotlar)
+
+
+@router.get("/smena/royxat", response_model=list[SmenaKipYozuvi])
+def smena_royxati(
+    mahsulot_kodi: str = Query(...),
+    db: Session = Depends(get_db),
+    foydalanuvchi: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.operator)),
+) -> list[SmenaKipYozuvi]:
+    """Operator uchun — bugungi kunda, o'z smenasida, tanlangan mahsulot
+    bo'yicha tortilgan kiplar ro'yxati (mahsulot tugmasi ostidagi tarix
+    panelini to'ldirish uchun). /smena/holati kabi faqat joriy operatorning
+    o'z smenasi va bugungi kuni bilan cheklangan."""
+    bugun = date.today()
+    qatorlar = db.execute(
+        select(Kip)
+        .join(Partiya, Kip.partiya_id == Partiya.id)
+        .join(Mahsulot, Partiya.mahsulot_id == Mahsulot.id)
+        .where(
+            Mahsulot.kod == mahsulot_kodi,
+            Kip.smena == foydalanuvchi.smena,
+            func.date(Kip.vaqt) == bugun,
+        )
+        .order_by(Kip.vaqt.desc(), Kip.id.desc())
+    ).scalars().all()
+
+    return [
+        SmenaKipYozuvi(id=k.id, kip_raqami=k.kip_raqami, ogirlik=float(k.ogirlik), vaqt=k.vaqt, holati=k.holati.value)
+        for k in qatorlar
+    ]
 
 
 @router.post("/sinxron", response_model=list[KipSinxronNatija])

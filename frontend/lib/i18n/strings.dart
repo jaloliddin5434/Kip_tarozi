@@ -232,6 +232,8 @@ const Map<String, Map<Til, String>> _matnlar = {
   'surat': {Til.uz: 'Surat', Til.ru: 'Фото'},
   'surat_yoq': {Til.uz: 'Surat mavjud emas', Til.ru: 'Фото отсутствует'},
   'surat_yuklanmadi': {Til.uz: 'Rasm yuklanmadi', Til.ru: 'Не удалось загрузить фото'},
+  'songgi_kip_surati': {Til.uz: 'So\'nggi tortilgan kip surati', Til.ru: 'Фото последнего кипа'},
+  'hali_kip_saqlanmagan': {Til.uz: 'Hali kip saqlanmagan', Til.ru: 'Кип ещё не сохранён'},
   'yaratildi': {Til.uz: 'Yaratildi', Til.ru: 'Создано'},
   'tahrirlandi': {Til.uz: 'Tahrirlandi', Til.ru: 'Изменено'},
   'ochirildi': {Til.uz: 'O\'chirildi', Til.ru: 'Удалено'},
@@ -305,6 +307,11 @@ const Map<String, Map<Til, String>> _matnlar = {
     Til.ru: 'Недавно использованные',
   },
   'oxirgi_tortishlar': {Til.uz: 'Oxirgi tortishlar', Til.ru: 'Последние взвешивания'},
+  'smena_tarixi': {Til.uz: 'Smena tarixi', Til.ru: 'История смены'},
+  'tarix_yoq': {
+    Til.uz: 'Bu mahsulot bo\'yicha hali tortishlar yo\'q',
+    Til.ru: 'По этому продукту пока нет взвешиваний',
+  },
 };
 
 class Lokalizatsiya {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -53,6 +54,16 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   bool _excelYuklanmoqda = false;
   Map<String, dynamic>? _oxirgiSaqlanganKip;
 
+  // Og'irlik ko'rsatkichining rang-signal holati: tarozida yuk bormi (yashil)
+  // yoki yo'qmi (qizil). Saqlash bosilgandan keyin maydon tozalanadi, lekin
+  // signal yashil bo'lib qolishi kerak — shuning uchun bu holat alohida
+  // saqlanadi, faqat _ogirlikKontrolleri matnidan har safar hisoblanmaydi.
+  bool _yukBor = false;
+  bool _dasturiyTozalash = false;
+
+  bool _smenaRoyxatiYuklanmoqda = false;
+  List<Map<String, dynamic>> _smenaRoyxati = [];
+
   // Shu sessiya davomida operator ishlatgan partiya raqamlari, mahsulot kodi
   // bo'yicha (eng yangisi birinchi) — backend'da alohida saqlanmaydi, faqat
   // qulaylik uchun frontend xotirasida kuzatiladi.
@@ -81,6 +92,13 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   }
 
   void _ogirlikOzgardi() {
+    // Dasturiy tozalash (saqlashdan keyin) signalni qizilga qaytarmasligi
+    // kerak — faqat operatorning o'zi kiritgan/tozalagan holatlarda signal
+    // qayta hisoblanadi.
+    if (!_dasturiyTozalash) {
+      final qiymat = double.tryParse(_ogirlikKontrolleri.text.replaceAll(',', '.'));
+      _yukBor = qiymat != null && qiymat > 0;
+    }
     if (mounted) setState(() {});
   }
 
@@ -135,8 +153,32 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
       _tanlanganPartiya = null;
       _ochiqPartiyalar = [];
       _partiyaRaqamiKontrolleri.clear();
+      _smenaRoyxati = [];
+      _yukBor = false;
     });
-    await _ochiqPartiyalarniYangilash();
+    await Future.wait([_ochiqPartiyalarniYangilash(), _smenaRoyxatiniYangilash()]);
+  }
+
+  /// Tanlangan mahsulot bo'yicha, joriy smenada, bugun tortilgan kiplar
+  /// ro'yxatini yuklaydi — mahsulot tugmasi ostidagi qisqa tarix panelini
+  /// to'ldirish uchun.
+  Future<void> _smenaRoyxatiniYangilash() async {
+    final soralganMahsulot = _tanlanganMahsulot;
+    if (soralganMahsulot == null) return;
+    setState(() => _smenaRoyxatiYuklanmoqda = true);
+    try {
+      final javob = await _holat.api.get('/kiplar/smena/royxat', query: {'mahsulot_kodi': soralganMahsulot.kod});
+      // Operator javob kutilayotganda boshqa mahsulotga o'tib ketgan bo'lishi
+      // mumkin — eskirgan javobni e'tiborsiz qoldiramiz.
+      if (_tanlanganMahsulot?.id != soralganMahsulot.id) return;
+      setState(() => _smenaRoyxati = (javob as List).cast<Map<String, dynamic>>());
+    } catch (e) {
+      _xatoKorsat(e.toString());
+    } finally {
+      if (mounted && _tanlanganMahsulot?.id == soralganMahsulot.id) {
+        setState(() => _smenaRoyxatiYuklanmoqda = false);
+      }
+    }
   }
 
   /// Kip saqlangandan keyin partiya progressini (kip_soni/jami_kg) yangilaydi —
@@ -144,9 +186,14 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   /// aks holda operator har kip saqlagandan keyin partiya raqamini qayta
   /// kiritishga majbur bo'lardi.
   Future<void> _ochiqPartiyalarniYangilash() async {
-    if (_tanlanganMahsulot == null) return;
+    final soralganMahsulot = _tanlanganMahsulot;
+    if (soralganMahsulot == null) return;
     try {
-      final javob = await _holat.api.get('/partiyalar/ochiq', query: {'mahsulot_kodi': _tanlanganMahsulot!.kod});
+      final javob = await _holat.api.get('/partiyalar/ochiq', query: {'mahsulot_kodi': soralganMahsulot.kod});
+      // Operator javob kutilayotganda boshqa mahsulotga o'tib ketgan bo'lishi
+      // mumkin — bunday holda eskirgan javobni e'tiborsiz qoldiramiz, aks
+      // holda ro'yxat boshqa mahsulotning partiyalari bilan aralashib qoladi.
+      if (_tanlanganMahsulot?.id != soralganMahsulot.id) return;
       final yangilangan = (javob as List).map((e) => Partiya.fromJson(e)).toList();
       setState(() {
         _ochiqPartiyalar = yangilangan;
@@ -235,6 +282,9 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
     try {
       final javob = await _holat.api.post('/kiplar', tana: tana);
       if (!mounted) return;
+      _dasturiyTozalash = true;
+      _ogirlikKontrolleri.clear();
+      _dasturiyTozalash = false;
       setState(() {
         _oxirgiSaqlanganKip = javob;
         _oxirgiTortishlar.insert(
@@ -242,12 +292,12 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
           _TortishYozuvi(mahsulotNomi: _tanlanganMahsulot!.nomi, ogirlik: ogirlik, vaqt: DateTime.now()),
         );
         if (_oxirgiTortishlar.length > 2) _oxirgiTortishlar.removeRange(2, _oxirgiTortishlar.length);
-        _ogirlikKontrolleri.clear();
       });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_holat.lok.t('kip_saqlandi'))));
       _ogirlikFokusi.requestFocus();
       await _smenaHolatiniYangilash();
       await _ochiqPartiyalarniYangilash();
+      await _smenaRoyxatiniYangilash();
     } on ApiException catch (e) {
       if (e.statusCode == 409 && e.tafsilot is Map && e.tafsilot['avvalgi_kip_id'] != null) {
         _dublikatOgohlantirishKorsat();
@@ -289,6 +339,7 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
       setState(() => _oxirgiSaqlanganKip = null);
       await _smenaHolatiniYangilash();
       await _ochiqPartiyalarniYangilash();
+      await _smenaRoyxatiniYangilash();
     } catch (e) {
       _xatoKorsat(e.toString());
     }
@@ -396,10 +447,10 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   Widget _ulanishIkonkasi(IconData ikonka, String nomi, dynamic lok) {
     final ulanganmi = _qurilmaUlanganmi();
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 5),
       child: Tooltip(
         message: '$nomi: ${ulanganmi ? lok.t("ulangan") : lok.t("ulanmagan")}',
-        child: Icon(ikonka, size: 20, color: ulanganmi ? Colors.greenAccent.shade400 : Colors.red.shade300),
+        child: Icon(ikonka, size: 28, color: ulanganmi ? Colors.greenAccent : Colors.redAccent.shade100),
       ),
     );
   }
@@ -409,61 +460,78 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   // ---------------------------------------------------------------------
 
   Widget _chapPanel(dynamic lok) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(lok.t('mahsulot'), style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
+          Text(lok.t('mahsulot'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 6),
           _mahsulotGridi(lok),
-          const SizedBox(height: 20),
-          if (_tanlanganMahsulot != null) ...[
-            TextField(
-              controller: _partiyaRaqamiKontrolleri,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: InputDecoration(labelText: lok.t('partiya_raqami'), border: const OutlineInputBorder()),
-              onSubmitted: (_) => _partiyaniOchish(),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _partiyaYuklanmoqda ? null : _partiyaniOchish,
-                child: _partiyaYuklanmoqda
-                    ? const SizedBox(
-                        height: 16,
-                        width: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : Text(lok.t('partiya_ochish')),
-              ),
-            ),
-            _songiPartiyalarQismi(lok),
-            if (_ochiqPartiyalar.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text(lok.t('ochiq_partiyalar'), style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _ochiqPartiyalar
-                    .map(
-                      (p) => ActionChip(
-                        label: Text('#${p.partiyaRaqami} (${p.kipSoni}/${_nishon(p.mahsulotKodi)})'),
-                        backgroundColor: _tanlanganPartiya?.id == p.id ? kipTaroziYashil.withValues(alpha: 0.2) : null,
-                        onPressed: () => _partiyaniTanlash(p),
+          if (_tanlanganMahsulot != null) _smenaTarixiRoyxati(lok),
+          if (_tanlanganMahsulot != null)
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.only(top: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _partiyaRaqamiKontrolleri,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        labelText: lok.t('partiya_raqami'),
+                        isDense: true,
+                        border: const OutlineInputBorder(),
                       ),
-                    )
-                    .toList(),
+                      onSubmitted: (_) => _partiyaniOchish(),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 38,
+                      child: ElevatedButton(
+                        onPressed: _partiyaYuklanmoqda ? null : _partiyaniOchish,
+                        child: _partiyaYuklanmoqda
+                            ? const SizedBox(
+                                height: 16,
+                                width: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : Text(lok.t('partiya_ochish')),
+                      ),
+                    ),
+                    _songiPartiyalarQismi(lok),
+                    if (_ochiqPartiyalar.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(lok.t('ochiq_partiyalar'), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _ochiqPartiyalar
+                            .map(
+                              (p) => ActionChip(
+                                label: Text('#${p.partiyaRaqami} (${p.kipSoni}/${_nishon(p.mahsulotKodi)})'),
+                                backgroundColor:
+                                    _tanlanganPartiya?.id == p.id ? kipTaroziYashil.withValues(alpha: 0.2) : null,
+                                onPressed: () => _partiyaniTanlash(p),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ],
+                    if (_tanlanganPartiya != null) ...[
+                      const SizedBox(height: 12),
+                      _partiyaProgressPaneli(lok),
+                    ],
+                  ],
+                ),
               ),
-            ],
-            if (_tanlanganPartiya != null) ...[
-              const SizedBox(height: 20),
-              _partiyaProgressPaneli(lok),
-            ],
-          ],
+            )
+          else
+            const Spacer(),
         ],
       ),
     );
@@ -474,10 +542,94 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 2.4,
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
+      childAspectRatio: 2.6,
       children: _mahsulotlar.map((m) => _mahsulotTugmasi(m)).toList(),
+    );
+  }
+
+  /// Tanlangan mahsulot tugmasi ostidagi qisqa smena-tarixi paneli — shu
+  /// smenada, bugun, shu mahsulot bo'yicha tortilgan kiplar ro'yxati.
+  Widget _smenaTarixiRoyxati(dynamic lok) {
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.history, size: 14, color: Colors.grey.shade600),
+              const SizedBox(width: 6),
+              Text(
+                lok.t('smena_tarixi'),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
+              ),
+              const Spacer(),
+              if (_smenaRoyxatiYuklanmoqda)
+                const SizedBox(height: 12, width: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 120),
+            child: _smenaRoyxati.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      lok.t('tarix_yoq'),
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    ),
+                  )
+                : ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: _smenaRoyxati.length,
+                    separatorBuilder: (_, _) => Divider(height: 1, color: Colors.grey.shade200),
+                    itemBuilder: (context, i) {
+                      final y = _smenaRoyxati[i];
+                      final bekorMi = y['holati'] != 'aktiv';
+                      final chiziq = bekorMi ? TextDecoration.lineThrough : null;
+                      final rangi = bekorMi ? Colors.grey.shade400 : null;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 34,
+                              child: Text(
+                                '#${y['kip_raqami']}',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, decoration: chiziq, color: rangi),
+                              ),
+                            ),
+                            SizedBox(
+                              width: 54,
+                              child: Text(
+                                _vaqtQisqa(DateTime.parse(y['vaqt'] as String).toLocal()),
+                                style: TextStyle(fontSize: 11, color: rangi ?? Colors.grey),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                '${(y['ogirlik'] as num).toStringAsFixed(1)} kg',
+                                textAlign: TextAlign.right,
+                                style: TextStyle(fontSize: 12, decoration: chiziq, color: rangi),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -556,35 +708,31 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   // ---------------------------------------------------------------------
 
   Widget _ongPanel(dynamic lok) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_tanlanganPartiya == null)
-            const Padding(padding: EdgeInsets.symmetric(vertical: 40), child: Center(child: Text('—')))
-          else ...[
-            _barqarorlikKorsatkichi(lok),
-            const SizedBox(height: 16),
-            _ogirlikKorsatkichi(lok),
-            const SizedBox(height: 20),
+          if (_tanlanganPartiya != null) ...[
+            _ogirlikBirlashganKorsatkichi(lok),
+            const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
-              height: 64,
+              height: 46,
               child: ElevatedButton.icon(
                 onPressed: _saqlashYuklanmoqda ? null : () => _saqlash(),
                 icon: _saqlashYuklanmoqda
                     ? const SizedBox(
-                        height: 20,
-                        width: 20,
+                        height: 18,
+                        width: 18,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
-                    : const Icon(Icons.save, size: 26),
-                label: Text(lok.t('saqlash'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    : const Icon(Icons.save, size: 20),
+                label: Text(lok.t('saqlash'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
             if (_oxirgiSaqlanganKip != null) ...[
-              const SizedBox(height: 20),
+              const SizedBox(height: 8),
               Center(
                 child: BekorQilishHisoblagichi(
                   key: ValueKey(_oxirgiSaqlanganKip!['id']),
@@ -595,73 +743,202 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
                 ),
               ),
             ],
-          ],
-          const SizedBox(height: 28),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(lok.t('smena_holati'), style: const TextStyle(fontWeight: FontWeight.bold)),
-              OutlinedButton.icon(
-                onPressed: _excelYuklanmoqda ? null : _excelYuklab,
-                icon: _excelYuklanmoqda
-                    ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.download, size: 18),
-                label: Text(lok.t('excel_yuklab_olish')),
-              ),
-            ],
+            const SizedBox(height: 12),
+          ] else
+            const SizedBox(height: 6),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final surat = _suratPaneli(lok);
+                final smena = _smenaBolimi(lok);
+                if (constraints.maxWidth > 640) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 45, child: surat),
+                      const SizedBox(width: 16),
+                      Expanded(flex: 55, child: SingleChildScrollView(child: smena)),
+                    ],
+                  );
+                }
+                return SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [surat, const SizedBox(height: 16), smena],
+                  ),
+                );
+              },
+            ),
           ),
-          const SizedBox(height: 10),
-          _smenaHolatiKartalari(lok),
         ],
       ),
     );
   }
 
-  Widget _barqarorlikKorsatkichi(dynamic lok) {
-    final qiymat = double.tryParse(_ogirlikKontrolleri.text.replaceAll(',', '.'));
-    final barqarormi = qiymat != null && qiymat > 0;
-    return Row(
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(color: barqarormi ? Colors.green : Colors.orange, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          barqarormi ? lok.t('barqaror') : lok.t('kutilmoqda'),
-          style: TextStyle(
-            color: barqarormi ? Colors.green.shade700 : Colors.orange.shade700,
-            fontWeight: FontWeight.bold,
+  /// Og'irlik ko'rsatkichi + rang-signal — bittalashtirilgan: tarozi 0 kg
+  /// bo'lsa QIZIL ("Kutilmoqda"), yuk qo'yilib >0 bo'lsa YASHIL ("Barqaror")
+  /// va shu holat Saqlash bosilgandan keyin ham (maydon tozalangan bo'lsa
+  /// ham) yashil bo'lib qoladi — kip olib tashlanib qayta 0 ga tushgandagina
+  /// yana qizilga qaytadi. Bu avvalgi alohida "Kutilmoqda/Barqaror"
+  /// bannerini ham o'zida mujassam etadi, ular bir-biriga zid emas.
+  Widget _ogirlikBirlashganKorsatkichi(dynamic lok) {
+    final MaterialColor rang = _yukBor ? Colors.green : Colors.red;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      decoration: BoxDecoration(
+        color: rang.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: rang, width: 2.5),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(_yukBor ? Icons.check_circle : Icons.hourglass_top, color: rang.shade700, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                _yukBor ? lok.t('barqaror') : lok.t('kutilmoqda'),
+                style: TextStyle(color: rang.shade700, fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ],
           ),
-        ),
-      ],
+          TextField(
+            controller: _ogirlikKontrolleri,
+            focusNode: _ogirlikFokusi,
+            textAlign: TextAlign.center,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: TextStyle(fontSize: 58, fontWeight: FontWeight.bold, color: rang.shade700),
+            decoration: InputDecoration(
+              hintText: '0.0',
+              suffixText: ' kg',
+              suffixStyle: const TextStyle(fontSize: 20, color: Colors.grey),
+              border: InputBorder.none,
+              isCollapsed: true,
+            ),
+            onSubmitted: (_) => _saqlashYuklanmoqda ? null : _saqlash(),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _ogirlikKorsatkichi(dynamic lok) {
+  // ---------------------------------------------------------------------
+  // So'nggi tortilgan kip surati — "Smena joriy holati" yonida
+  // ---------------------------------------------------------------------
+
+  Widget _suratPaneli(dynamic lok) {
+    final suratYoli = _oxirgiSaqlanganKip?['surat_yoli'] as String?;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const boshliqBalandligi = 26.0;
+        final maxBalandlik =
+            constraints.maxHeight.isFinite ? constraints.maxHeight - boshliqBalandligi : constraints.maxWidth;
+        final andoza = math.min(constraints.maxWidth, maxBalandlik).clamp(80.0, 480.0);
+
+        Widget ichki;
+        if (_oxirgiSaqlanganKip == null) {
+          ichki = _suratPlaceholder(Icons.photo_camera_outlined, lok.t('hali_kip_saqlanmagan'), andoza);
+        } else if (suratYoli == null || suratYoli.isEmpty) {
+          ichki = _suratPlaceholder(Icons.image_not_supported_outlined, lok.t('surat_yoq'), andoza);
+        } else {
+          ichki = ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.network(
+              suratYoli,
+              key: ValueKey(suratYoli),
+              width: andoza,
+              height: andoza,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return Container(
+                  width: andoza,
+                  height: andoza,
+                  color: Colors.grey.shade100,
+                  alignment: Alignment.center,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    value: progress.expectedTotalBytes != null
+                        ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                        : null,
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) =>
+                  _suratPlaceholder(Icons.broken_image_outlined, lok.t('surat_yuklanmadi'), andoza),
+            ),
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(lok.t('songgi_kip_surati'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 6),
+            Center(child: SizedBox(width: andoza, height: andoza, child: ichki)),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _suratPlaceholder(IconData ikonka, String matn, double andoza) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      width: andoza,
+      height: andoza,
+      alignment: Alignment.center,
       decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(16),
       ),
-      child: TextField(
-        controller: _ogirlikKontrolleri,
-        focusNode: _ogirlikFokusi,
-        textAlign: TextAlign.center,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        style: const TextStyle(fontSize: 64, fontWeight: FontWeight.bold, color: kipTaroziYashil),
-        decoration: InputDecoration(
-          hintText: '0.0',
-          suffixText: ' kg',
-          suffixStyle: const TextStyle(fontSize: 26, color: Colors.grey),
-          border: InputBorder.none,
-          isCollapsed: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(ikonka, color: Colors.grey.shade400, size: 36),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(matn, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // Smena joriy holati
+  // ---------------------------------------------------------------------
+
+  Widget _smenaBolimi(dynamic lok) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 10,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(lok.t('smena_holati'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            SizedBox(
+              height: 30,
+              child: OutlinedButton.icon(
+                onPressed: _excelYuklanmoqda ? null : _excelYuklab,
+                icon: _excelYuklanmoqda
+                    ? const SizedBox(height: 12, width: 12, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.download, size: 15),
+                label: Text(lok.t('excel_yuklab_olish'), style: const TextStyle(fontSize: 12)),
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10)),
+              ),
+            ),
+          ],
         ),
-        onSubmitted: (_) => _saqlashYuklanmoqda ? null : _saqlash(),
-      ),
+        const SizedBox(height: 8),
+        _smenaHolatiKartalari(lok),
+      ],
     );
   }
 
@@ -670,23 +947,24 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 4,
+      crossAxisCount: 2,
       mainAxisSpacing: 8,
       crossAxisSpacing: 8,
-      childAspectRatio: 1.1,
+      childAspectRatio: 1.5,
       children: _mahsulotlar.map((m) {
         final h = _mahsulotHolati(m.kod);
         return Card(
+          margin: EdgeInsets.zero,
           color: kipTaroziYashil.withValues(alpha: 0.05),
           child: Padding(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(m.nomi, style: const TextStyle(fontSize: 12, color: Colors.grey), overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 6),
-                Text('${h?.soni ?? 0}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                Text('${(h?.jamiKg ?? 0).toStringAsFixed(1)} kg', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                Text(m.nomi, style: const TextStyle(fontSize: 11, color: Colors.grey), overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 4),
+                Text('${h?.soni ?? 0}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                Text('${(h?.jamiKg ?? 0).toStringAsFixed(1)} kg', style: const TextStyle(fontSize: 10, color: Colors.grey)),
               ],
             ),
           ),

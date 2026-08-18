@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -12,3 +14,11 @@ class SmenaHolati(BaseModel):
     smena: str
     sana: str
     mahsulotlar: list[MahsulotBoyichaHolat]
+
+
+class SmenaKipYozuvi(BaseModel):
+    id: int
+    kip_raqami: int
+    ogirlik: float
+    vaqt: datetime
+    holati: str
