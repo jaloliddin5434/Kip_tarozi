@@ -286,57 +286,61 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
     }
   }
 
+  // Ustun kengliklari — sarlavha va ma'lumot qatorlari bir xil tekislanishi
+  // uchun ikkalasida ham xuddi shu kengliklar ishlatiladi.
+  static const _ustunKengliklari = <double>[150, 90, 80, 60, 70, 90, 160, 140, 100];
+
   Widget _jadval(dynamic lok) {
     final sahifa = _sahifa!;
+    final jadvalKengligi = _ustunKengliklari.fold<double>(0, (a, b) => a + b);
+    final ustunNomlari = [
+      lok.t('sana'),
+      lok.t('mahsulot'),
+      lok.t('partiya'),
+      lok.t('kip_qisqa'),
+      lok.t('kg'),
+      lok.t('smena'),
+      lok.t('operator'),
+      lok.t('holati'),
+      lok.t('chop_etish'),
+    ];
+
     return Column(
       children: [
         Expanded(
           child: SingleChildScrollView(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                showCheckboxColumn: false,
-                columns: [
-                  DataColumn(label: Text(lok.t('sana'))),
-                  DataColumn(label: Text(lok.t('mahsulot'))),
-                  DataColumn(label: Text(lok.t('partiya'))),
-                  DataColumn(label: Text(lok.t('kip_qisqa'))),
-                  DataColumn(label: Text(lok.t('kg'))),
-                  DataColumn(label: Text(lok.t('smena'))),
-                  DataColumn(label: Text(lok.t('operator'))),
-                  DataColumn(label: Text(lok.t('holati'))),
-                  DataColumn(label: Text(lok.t('chop_etish'))),
-                ],
-                rows: sahifa.items
-                    .map(
-                      (k) => DataRow(
-                        color: WidgetStateProperty.all(_qatorRangi(k.holati)),
-                        onSelectChanged: (_) => kipBatafsilDialogniKorsat(context: context, kipId: k.id),
-                        cells: [
-                          DataCell(Text('${k.vaqt.toLocal()}'.substring(0, 16))),
-                          DataCell(Text(k.mahsulotNomi)),
-                          DataCell(Text('#${k.partiyaRaqami}')),
-                          DataCell(Text('${k.kipRaqami}')),
-                          DataCell(Text(k.ogirlik.toStringAsFixed(1))),
-                          DataCell(Text(k.smena)),
-                          DataCell(Text(k.operatorIsm)),
-                          DataCell(
-                            Text(
-                              k.holati,
-                              style: TextStyle(color: _holatiMatnRangi(k.holati), fontWeight: FontWeight.w600),
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: jadvalKengligi,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Sarlavha qatori — vertikal aylantirishdan tashqarida, doim ko'rinib turadi.
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: Colors.grey.shade400)),
+                    ),
+                    child: Row(
+                      children: [
+                        for (var i = 0; i < ustunNomlari.length; i++)
+                          SizedBox(
+                            width: _ustunKengliklari[i],
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              child: Text(ustunNomlari[i], style: const TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           ),
-                          DataCell(
-                            IconButton(
-                              icon: const Icon(Icons.print, size: 20),
-                              tooltip: lok.t('chop_etish'),
-                              onPressed: () => _chopEtish(k, lok),
-                            ),
-                          ),
-                        ],
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: sahifa.items.map((k) => _malumotQatori(k, lok)).toList(),
                       ),
-                    )
-                    .toList(),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -356,6 +360,53 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _malumotQatori(HujjatKip k, dynamic lok) {
+    return InkWell(
+      onTap: () => kipBatafsilDialogniKorsat(context: context, kipId: k.id),
+      child: Container(
+        color: _qatorRangi(k.holati),
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.grey.shade200))),
+        child: Row(
+          children: [
+            _hujayra(0, Text('${k.vaqt.toLocal()}'.substring(0, 16))),
+            _hujayra(1, Text(k.mahsulotNomi, overflow: TextOverflow.ellipsis)),
+            _hujayra(2, Text('#${k.partiyaRaqami}')),
+            _hujayra(3, Text('${k.kipRaqami}')),
+            _hujayra(4, Text(k.ogirlik.toStringAsFixed(1))),
+            _hujayra(5, Text(k.smena)),
+            _hujayra(6, Text(k.operatorIsm, overflow: TextOverflow.ellipsis)),
+            _hujayra(
+              7,
+              Text(
+                k.holati,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: _holatiMatnRangi(k.holati), fontWeight: FontWeight.w600),
+              ),
+            ),
+            _hujayra(
+              8,
+              IconButton(
+                icon: const Icon(Icons.print, size: 20),
+                tooltip: lok.t('chop_etish'),
+                onPressed: () => _chopEtish(k, lok),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _hujayra(int ustunIndex, Widget bola) {
+    return SizedBox(
+      width: _ustunKengliklari[ustunIndex],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Align(alignment: Alignment.centerLeft, child: bola),
+      ),
     );
   }
 }
