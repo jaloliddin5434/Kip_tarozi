@@ -1,10 +1,13 @@
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse
 from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import rollarga_ruxsat
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.foydalanuvchi import Foydalanuvchi, Rol
 from app.models.kip import Kip, KipHolati
@@ -146,14 +149,38 @@ def sotish(
     partiya.sotuv_narxi = malumot.sotuv_narxi
     partiya.holati = PartiyaHolati.sotilgan
 
+    mahsulot = db.get(Mahsulot, partiya.mahsulot_id)
+    kip_soni = db.scalar(
+        select(func.count(Kip.id)).where(Kip.partiya_id == partiya.id, Kip.holati == KipHolati.aktiv)
+    ) or 0
+
     partiya.nakladnoy_raqami = nakladnoy_raqami_yarat(partiya)
-    partiya.nakladnoy_pdf_yoli = nakladnoy_pdf_yarat(partiya)
+    partiya.nakladnoy_pdf_yoli = nakladnoy_pdf_yarat(partiya, mahsulot.nomi, kip_soni)
 
     db.commit()
     db.refresh(partiya)
 
-    mahsulot = db.get(Mahsulot, partiya.mahsulot_id)
     return _javobga_ayirib(db, partiya, mahsulot)
+
+
+@router.get("/{partiya_id}/nakladnoy")
+def nakladnoy_yuklab_olish(
+    partiya_id: int,
+    db: Session = Depends(get_db),
+    _: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.admin, Rol.tayyor_mahsulotlar)),
+) -> FileResponse:
+    partiya = db.get(Partiya, partiya_id)
+    if partiya is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Partiya topilmadi")
+    if not partiya.nakladnoy_pdf_yoli:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bu partiya uchun nakladnoy hali yaratilmagan")
+
+    fayl_yoli = Path(settings.STORAGE_PATH) / partiya.nakladnoy_pdf_yoli
+    if not fayl_yoli.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nakladnoy fayli serverda topilmadi")
+
+    fayl_nomi = f"{partiya.nakladnoy_raqami or 'nakladnoy'}.pdf"
+    return FileResponse(fayl_yoli, media_type="application/pdf", filename=fayl_nomi)
 
 
 @router.patch("/{partiya_id}/olchov-toldirish", response_model=PartiyaJavob)

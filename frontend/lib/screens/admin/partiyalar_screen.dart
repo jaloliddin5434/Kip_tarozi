@@ -27,6 +27,7 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
   bool _yuklanmoqda = true;
   String? _xato;
   String? _holatiFiltri;
+  String? _mahsulotKodiFiltri;
 
   final _qidiruvKontrolleri = TextEditingController();
   Timer? _qidiruvTaymer;
@@ -57,6 +58,9 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
     try {
       final query = <String, dynamic>{'sahifa': 1, 'sahifa_hajmi': 100};
       if (_holatiFiltri != null) query['holati'] = _holatiFiltri;
+      if (_mahsulotKodiFiltri != null) {
+        query['mahsulot_kodi'] = _mahsulotKodiFiltri;
+      }
       final qidiruv = _qidiruvKontrolleri.text.trim();
       if (qidiruv.isNotEmpty) query['qidiruv'] = qidiruv;
       final javob = await context.read<AppState>().api.get(
@@ -349,6 +353,15 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
               ),
             ],
           ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            children: [
+              _mahsulotTugmasi(lok.t('barchasi'), null),
+              for (final kod in _nishonSoni.keys)
+                _mahsulotTugmasi(lok.t(kod), kod),
+            ],
+          ),
           const SizedBox(height: 16),
           if (_yuklanmoqda)
             const Expanded(child: Center(child: CircularProgressIndicator())),
@@ -406,6 +419,32 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
           _yuklash();
         },
       ),
+    );
+  }
+
+  Widget _mahsulotTugmasi(String matn, String? qiymat) {
+    final tanlanganmi = _mahsulotKodiFiltri == qiymat;
+    void tanlash() {
+      setState(() => _mahsulotKodiFiltri = qiymat);
+      _yuklash();
+    }
+
+    return SizedBox(
+      width: 110,
+      height: 40,
+      child: tanlanganmi
+          ? ElevatedButton(
+              onPressed: tanlash,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kipTaroziYashil,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(matn, overflow: TextOverflow.ellipsis),
+            )
+          : OutlinedButton(
+              onPressed: tanlash,
+              child: Text(matn, overflow: TextOverflow.ellipsis),
+            ),
     );
   }
 

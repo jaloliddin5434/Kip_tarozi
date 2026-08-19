@@ -380,6 +380,10 @@ const Map<String, Map<Til, String>> _matnlar = {
     Til.ru: 'Кипы этой партии',
   },
   'kiplar_topilmadi': {Til.uz: 'Kiplar topilmadi', Til.ru: 'Кипы не найдены'},
+  'nakladnoy_yuklab_olish': {
+    Til.uz: 'Nakladnoy PDF\'ni yuklab olish',
+    Til.ru: 'Скачать PDF накладной',
+  },
 };
 
 class Lokalizatsiya {

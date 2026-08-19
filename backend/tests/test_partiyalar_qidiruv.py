@@ -50,3 +50,37 @@ def test_qidiruv_bosh_qator_hech_narsani_filtrlamaydi(client, db, admin_headers,
     javob = client.get("/api/v1/partiyalar", params={"qidiruv": "   "}, headers=admin_headers).json()
     raqamlar = {item["partiya_raqami"] for item in javob["items"]}
     assert 606 in raqamlar
+
+
+def test_mahsulot_kodi_boyicha_filtr(client, db, admin_headers, mahsulot_tola):
+    lint = Mahsulot(kod="lint_mk", nomi="Lint")
+    db.add(lint)
+    db.commit()
+
+    _partiya_yarat(db, mahsulot_tola.id, 610)
+    _partiya_yarat(db, lint.id, 611)
+
+    javob = client.get(
+        "/api/v1/partiyalar", params={"mahsulot_kodi": mahsulot_tola.kod}, headers=admin_headers
+    ).json()
+    raqamlar = {item["partiya_raqami"] for item in javob["items"]}
+    assert 610 in raqamlar
+    assert 611 not in raqamlar
+
+
+def test_mahsulot_kodi_va_holati_birga_qollaniladi(client, db, admin_headers, mahsulot_tola):
+    lint = Mahsulot(kod="lint_mk2", nomi="Lint")
+    db.add(lint)
+    db.commit()
+
+    _partiya_yarat(db, mahsulot_tola.id, 612, holati=PartiyaHolati.ochiq)
+    _partiya_yarat(db, mahsulot_tola.id, 613, holati=PartiyaHolati.yopiq)
+    _partiya_yarat(db, lint.id, 614, holati=PartiyaHolati.ochiq)
+
+    javob = client.get(
+        "/api/v1/partiyalar",
+        params={"mahsulot_kodi": mahsulot_tola.kod, "holati": "ochiq"},
+        headers=admin_headers,
+    ).json()
+    raqamlar = {item["partiya_raqami"] for item in javob["items"]}
+    assert raqamlar == {612}

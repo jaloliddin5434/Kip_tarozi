@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../api/api_exception.dart';
 import '../i18n/strings.dart';
 import '../models/hujjat.dart';
 import '../models/partiya.dart';
+import '../services/fayl_yuklab_olish.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 
@@ -55,6 +57,7 @@ class _PartiyaBatafsilIchki extends StatefulWidget {
 class _PartiyaBatafsilIchkiState extends State<_PartiyaBatafsilIchki> {
   late Future<List<HujjatKip>> _kiplarNatija;
   bool _amalBajarilmoqda = false;
+  bool _nakladnoyYuklanmoqda = false;
 
   @override
   void initState() {
@@ -82,6 +85,34 @@ class _PartiyaBatafsilIchkiState extends State<_PartiyaBatafsilIchki> {
       await amal();
     } finally {
       if (mounted) Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _nakladnoyniYuklab() async {
+    final holat = context.read<AppState>();
+    final lok = holat.lok;
+    setState(() => _nakladnoyYuklanmoqda = true);
+    try {
+      final baytlar = await holat.api.getBaytlar(
+        '/partiyalar/${widget.partiya.id}/nakladnoy',
+      );
+      faylniSaqlash(baytlar, '${widget.partiya.nakladnoyRaqami}.pdf');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(lok.t('fayl_yuklab_olindi'))));
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.xabar),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _nakladnoyYuklanmoqda = false);
     }
   }
 
@@ -241,6 +272,23 @@ class _PartiyaBatafsilIchkiState extends State<_PartiyaBatafsilIchki> {
   }
 
   Widget? _amalTugmasi(Lokalizatsiya lok) {
+    final p = widget.partiya;
+
+    if (p.holati == 'sotilgan') {
+      if (p.nakladnoyRaqami == null) return null;
+      return OutlinedButton.icon(
+        onPressed: _nakladnoyYuklanmoqda ? null : _nakladnoyniYuklab,
+        icon: _nakladnoyYuklanmoqda
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.picture_as_pdf_outlined, size: 18),
+        label: Text(lok.t('nakladnoy_yuklab_olish')),
+      );
+    }
+
     if (_amalBajarilmoqda) {
       return const SizedBox(
         width: 20,
@@ -248,7 +296,6 @@ class _PartiyaBatafsilIchkiState extends State<_PartiyaBatafsilIchki> {
         child: CircularProgressIndicator(strokeWidth: 2),
       );
     }
-    final p = widget.partiya;
     if (!widget.adminRoli) {
       if (p.holati == 'yopiq' && widget.onOlchovToldirish != null) {
         return OutlinedButton(
