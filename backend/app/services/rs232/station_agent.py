@@ -147,6 +147,9 @@ async def kip_saqlash(req: Request) -> JSONResponse:
     if not mijoz_id:
         return JSONResponse({"detail": "mijoz_id majburiy"}, status_code=400)
 
+    if settings.STANSIYA_ID is not None:
+        payload.setdefault("stansiya_id", settings.STANSIYA_ID)
+
     if anti_ogirlik.holat == AntiOgirlikHolati.bloklangan:
         return JSONResponse(
             {"detail": "Tasdiqlanmagan 'yuk saqlanmadi' ogohlantirishi bor — avval uni tasdiqlang"},

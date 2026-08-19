@@ -1,8 +1,45 @@
 from datetime import date, datetime, timezone
 
+from app.core.config import settings
 from app.core.security import parolni_hash
 from app.models.foydalanuvchi import Foydalanuvchi, Rol, Smena
 from app.models.shubhali_holat import ShubhaliHolat, ShubhaliHolatStatusi
+
+
+def test_stansiya_id_saqlanadi(client, stansiya):
+    """Stansiya Agenti 'yuk saqlanmadi' hodisasini ro'yxatga olishda
+    stansiya_id'ni ham yuboradi — shu qiymat to'g'ri saqlanishi kerak
+    (ko'p-stansiyali arxitekturaga tayyorgarlik)."""
+    javob = client.post(
+        "/api/v1/shubhali-holatlar",
+        data={
+            "ogirlik": 5.5,
+            "vaqt": datetime.now(timezone.utc).isoformat(),
+            "smena": "A",
+            "stansiya_id": stansiya.id,
+        },
+        headers={"X-Agent-Key": settings.AGENT_API_KEY},
+    )
+
+    assert javob.status_code == 201
+    assert javob.json()["stansiya_id"] == stansiya.id
+
+
+def test_stansiya_id_bermasa_null_saqlanadi(client):
+    """stansiya_id ixtiyoriy — berilmasa xatosiz NULL sifatida saqlanadi
+    (masalan agentda hali STANSIYA_ID sozlanmagan holatlar uchun)."""
+    javob = client.post(
+        "/api/v1/shubhali-holatlar",
+        data={
+            "ogirlik": 4.0,
+            "vaqt": datetime.now(timezone.utc).isoformat(),
+            "smena": "B",
+        },
+        headers={"X-Agent-Key": settings.AGENT_API_KEY},
+    )
+
+    assert javob.status_code == 201
+    assert javob.json()["stansiya_id"] is None
 
 
 def test_royxat_faqat_admin(client, operator_headers):
