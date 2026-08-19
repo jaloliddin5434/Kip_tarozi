@@ -11,6 +11,12 @@
     To'liq yo'riqnoma: docs\BACKUP.md
 #>
 
+param(
+    # Ixtiyoriy: berilsa, backend\.env dagi DATABASE_URL o'rniga shu qiymat
+    # ishlatiladi (masalan boshqa skriptdan sinov bazasi uchun chaqirilganda).
+    [string]$DatabaseUrl
+)
+
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -83,15 +89,19 @@ function Remove-OldBackups {
 try {
     Write-Log "Backup boshlandi."
 
-    if (-not (Test-Path $EnvFile)) {
-        throw "backend\.env topilmadi: $EnvFile"
-    }
+    if ($DatabaseUrl) {
+        $databaseUrl = $DatabaseUrl
+    } else {
+        if (-not (Test-Path $EnvFile)) {
+            throw "backend\.env topilmadi: $EnvFile"
+        }
 
-    $databaseUrl = (Get-Content $EnvFile) | Where-Object { $_ -match '^\s*DATABASE_URL\s*=' } | Select-Object -First 1
-    if (-not $databaseUrl) {
-        throw "backend\.env ichida DATABASE_URL topilmadi."
+        $databaseUrl = (Get-Content $EnvFile) | Where-Object { $_ -match '^\s*DATABASE_URL\s*=' } | Select-Object -First 1
+        if (-not $databaseUrl) {
+            throw "backend\.env ichida DATABASE_URL topilmadi."
+        }
+        $databaseUrl = ($databaseUrl -split '=', 2)[1].Trim()
     }
-    $databaseUrl = ($databaseUrl -split '=', 2)[1].Trim()
 
     # postgresql(+driver)://user[:pass]@host[:port]/dbname
     $pattern = '^postgresql(\+\w+)?://(?<user>[^:@/]+)(:(?<pass>[^@]*))?@(?<host>[^:/]+)(:(?<port>\d+))?/(?<db>[^?\s]+)'
