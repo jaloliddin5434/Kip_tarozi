@@ -386,12 +386,13 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
 
   // Ustun kengliklari — sarlavha va ma'lumot qatorlari bir xil tekislanishi
   // uchun ikkalasida ham xuddi shu kengliklar ishlatiladi.
-  static const _ustunKengliklari = <double>[150, 90, 80, 60, 70, 90, 160, 140, 100];
+  static const _ustunKengliklari = <double>[72, 150, 90, 80, 60, 70, 90, 160, 140, 100];
 
   Widget _jadval(dynamic lok) {
     final sahifa = _sahifa!;
     final jadvalKengligi = _ustunKengliklari.fold<double>(0, (a, b) => a + b);
     final ustunNomlari = [
+      lok.t('surat'),
       lok.t('sana'),
       lok.t('mahsulot'),
       lok.t('partiya'),
@@ -469,15 +470,16 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
         decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.grey.shade200))),
         child: Row(
           children: [
-            _hujayra(0, Text('${k.vaqt.toLocal()}'.substring(0, 16))),
-            _hujayra(1, Text(k.mahsulotNomi, overflow: TextOverflow.ellipsis)),
-            _hujayra(2, Text('#${k.partiyaRaqami}')),
-            _hujayra(3, Text('${k.kipRaqami}')),
-            _hujayra(4, Text(k.ogirlik.toStringAsFixed(1))),
-            _hujayra(5, Text(k.smena)),
-            _hujayra(6, Text(k.operatorIsm, overflow: TextOverflow.ellipsis)),
+            _hujayra(0, _suratThumbnail(k, lok)),
+            _hujayra(1, Text('${k.vaqt.toLocal()}'.substring(0, 16))),
+            _hujayra(2, Text(k.mahsulotNomi, overflow: TextOverflow.ellipsis)),
+            _hujayra(3, Text('#${k.partiyaRaqami}')),
+            _hujayra(4, Text('${k.kipRaqami}')),
+            _hujayra(5, Text(k.ogirlik.toStringAsFixed(1))),
+            _hujayra(6, Text(k.smena)),
+            _hujayra(7, Text(k.operatorIsm, overflow: TextOverflow.ellipsis)),
             _hujayra(
-              7,
+              8,
               Text(
                 k.holati,
                 overflow: TextOverflow.ellipsis,
@@ -485,7 +487,7 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
               ),
             ),
             _hujayra(
-              8,
+              9,
               IconButton(
                 icon: const Icon(Icons.print, size: 20),
                 tooltip: lok.t('chop_etish'),
@@ -493,6 +495,61 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _suratThumbnail(HujjatKip k, dynamic lok) {
+    final suratYoli = k.suratYoli;
+    if (suratYoli == null || suratYoli.isEmpty) {
+      return Tooltip(
+        message: lok.t('surat_yoq'),
+        child: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Icon(Icons.videocam_off_outlined, color: Colors.grey.shade400, size: 18),
+        ),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: Image.network(
+        suratYoli,
+        key: ValueKey(suratYoli),
+        width: 40,
+        height: 40,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return Container(
+            width: 40,
+            height: 40,
+            color: Colors.grey.shade100,
+            alignment: Alignment.center,
+            child: const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) => Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Icon(Icons.broken_image_outlined, color: Colors.grey.shade400, size: 18),
         ),
       ),
     );
