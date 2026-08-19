@@ -72,7 +72,10 @@ const Map<String, Map<Til, String>> _matnlar = {
   'statistika': {Til.uz: 'Statistika', Til.ru: 'Статистика'},
   'partiyalar': {Til.uz: 'Partiyalar', Til.ru: 'Партии'},
 
-  'davr_statistikasi': {Til.uz: 'Davr statistikasi', Til.ru: 'Статистика за период'},
+  'davr_statistikasi': {
+    Til.uz: 'Davr statistikasi',
+    Til.ru: 'Статистика за период',
+  },
   'ochiq_partiyalar': {Til.uz: 'Ochiq partiyalar', Til.ru: 'Открытые партии'},
   'shubhali_holatlar': {
     Til.uz: 'Tasdiqlanmagan shubhali holatlar',
@@ -92,11 +95,17 @@ const Map<String, Map<Til, String>> _matnlar = {
   'filtr': {Til.uz: 'Filtr', Til.ru: 'Фильтр'},
   'tozalash': {Til.uz: 'Tozalash', Til.ru: 'Очистить'},
   'qidiruv': {Til.uz: 'Qidiruv', Til.ru: 'Поиск'},
-  'qidiruv_maslahat': {Til.uz: 'Operator yoki partiya', Til.ru: 'Оператор или партия'},
+  'qidiruv_maslahat': {
+    Til.uz: 'Operator yoki partiya',
+    Til.ru: 'Оператор или партия',
+  },
 
   // Smena Excel hisoboti
   'excel_yuklab_olish': {Til.uz: 'Excel yuklab olish', Til.ru: 'Скачать Excel'},
-  'excel_hisobot_tanlash': {Til.uz: 'Excel hisobotni tanlash', Til.ru: 'Выбор отчёта Excel'},
+  'excel_hisobot_tanlash': {
+    Til.uz: 'Excel hisobotni tanlash',
+    Til.ru: 'Выбор отчёта Excel',
+  },
   'yuklab_olish': {Til.uz: 'Yuklab olish', Til.ru: 'Скачать'},
   'fayl_yuklab_olindi': {Til.uz: 'Fayl yuklab olindi', Til.ru: 'Файл скачан'},
   'jami': {Til.uz: 'Jami', Til.ru: 'Итого'},
@@ -109,16 +118,28 @@ const Map<String, Map<Til, String>> _matnlar = {
   // Statistika ekrani
   'davr': {Til.uz: 'Davr', Til.ru: 'Период'},
   'ortacha_ogirlik': {Til.uz: 'O\'rtacha og\'irlik', Til.ru: 'Средний вес'},
-  'smenalar_taqqoslash': {Til.uz: 'Smenalar taqqoslash', Til.ru: 'Сравнение смен'},
+  'smenalar_taqqoslash': {
+    Til.uz: 'Smenalar taqqoslash',
+    Til.ru: 'Сравнение смен',
+  },
   'pdf_eksport': {Til.uz: 'PDF eksport', Til.ru: 'Экспорт в PDF'},
-  'statistika_hujjati': {Til.uz: 'Statistika hisoboti', Til.ru: 'Отчёт по статистике'},
-  'malumot_yoq': {Til.uz: 'Bu davr uchun ma\'lumot yo\'q', Til.ru: 'За этот период данных нет'},
+  'statistika_hujjati': {
+    Til.uz: 'Statistika hisoboti',
+    Til.ru: 'Отчёт по статистике',
+  },
+  'malumot_yoq': {
+    Til.uz: 'Bu davr uchun ma\'lumot yo\'q',
+    Til.ru: 'За этот период данных нет',
+  },
 
   // Statistika — kalendar
   'kunlar_boyicha': {Til.uz: 'Kunlar bo\'yicha', Til.ru: 'По дням'},
   'oldingi_oy': {Til.uz: 'Oldingi oy', Til.ru: 'Предыдущий месяц'},
   'keyingi_oy': {Til.uz: 'Keyingi oy', Til.ru: 'Следующий месяц'},
-  'kun_tanlang': {Til.uz: 'Tafsilotlarni ko\'rish uchun kalendardan bir kunni tanlang', Til.ru: 'Выберите день в календаре, чтобы увидеть детали'},
+  'kun_tanlang': {
+    Til.uz: 'Tafsilotlarni ko\'rish uchun kalendardan bir kunni tanlang',
+    Til.ru: 'Выберите день в календаре, чтобы увидеть детали',
+  },
   'oy_1': {Til.uz: 'Yanvar', Til.ru: 'Январь'},
   'oy_2': {Til.uz: 'Fevral', Til.ru: 'Февраль'},
   'oy_3': {Til.uz: 'Mart', Til.ru: 'Март'},
@@ -227,21 +248,39 @@ const Map<String, Map<Til, String>> _matnlar = {
   'kip_batafsil': {Til.uz: 'Kip haqida', Til.ru: 'О кипе'},
   'audit_tarixi': {Til.uz: 'O\'zgarishlar tarixi', Til.ru: 'История изменений'},
   'tahrirlash': {Til.uz: 'Tahrirlash', Til.ru: 'Редактировать'},
-  'maydonlar_toldirilmagan': {Til.uz: 'Barcha maydonlarni to\'ldiring', Til.ru: 'Заполните все поля'},
+  'maydonlar_toldirilmagan': {
+    Til.uz: 'Barcha maydonlarni to\'ldiring',
+    Til.ru: 'Заполните все поля',
+  },
   'sabab': {Til.uz: 'Sabab', Til.ru: 'Причина'},
   'surat': {Til.uz: 'Surat', Til.ru: 'Фото'},
   'surat_yoq': {Til.uz: 'Surat mavjud emas', Til.ru: 'Фото отсутствует'},
-  'surat_yuklanmadi': {Til.uz: 'Rasm yuklanmadi', Til.ru: 'Не удалось загрузить фото'},
-  'songgi_kip_surati': {Til.uz: 'So\'nggi tortilgan kip surati', Til.ru: 'Фото последнего кипа'},
-  'hali_kip_saqlanmagan': {Til.uz: 'Hali kip saqlanmagan', Til.ru: 'Кип ещё не сохранён'},
+  'surat_yuklanmadi': {
+    Til.uz: 'Rasm yuklanmadi',
+    Til.ru: 'Не удалось загрузить фото',
+  },
+  'songgi_kip_surati': {
+    Til.uz: 'So\'nggi tortilgan kip surati',
+    Til.ru: 'Фото последнего кипа',
+  },
+  'hali_kip_saqlanmagan': {
+    Til.uz: 'Hali kip saqlanmagan',
+    Til.ru: 'Кип ещё не сохранён',
+  },
   'yaratildi': {Til.uz: 'Yaratildi', Til.ru: 'Создано'},
   'tahrirlandi': {Til.uz: 'Tahrirlandi', Til.ru: 'Изменено'},
   'ochirildi': {Til.uz: 'O\'chirildi', Til.ru: 'Удалено'},
   'holati_aktiv': {Til.uz: 'Aktiv', Til.ru: 'Активен'},
   'holati_bekor_qilingan': {Til.uz: 'Bekor qilingan', Til.ru: 'Отменён'},
   'holati_tahrirlangan': {Til.uz: 'Tahrirlangan', Til.ru: 'Изменён'},
-  'faqat_tahrirlangan': {Til.uz: 'Faqat tahrirlangan', Til.ru: 'Только изменённые'},
-  'faqat_bekor_qilingan': {Til.uz: 'Faqat bekor qilingan', Til.ru: 'Только отменённые'},
+  'faqat_tahrirlangan': {
+    Til.uz: 'Faqat tahrirlangan',
+    Til.ru: 'Только изменённые',
+  },
+  'faqat_bekor_qilingan': {
+    Til.uz: 'Faqat bekor qilingan',
+    Til.ru: 'Только отменённые',
+  },
 
   // Sozlamalar ekrani
   'sozlamalar': {Til.uz: 'Sozlamalar', Til.ru: 'Настройки'},
@@ -306,7 +345,10 @@ const Map<String, Map<Til, String>> _matnlar = {
     Til.uz: 'So\'nggi ishlatilganlar',
     Til.ru: 'Недавно использованные',
   },
-  'oxirgi_tortishlar': {Til.uz: 'Oxirgi tortishlar', Til.ru: 'Последние взвешивания'},
+  'oxirgi_tortishlar': {
+    Til.uz: 'Oxirgi tortishlar',
+    Til.ru: 'Последние взвешивания',
+  },
   'smena_tarixi': {Til.uz: 'Smena tarixi', Til.ru: 'История смены'},
   'tarix_yoq': {
     Til.uz: 'Bu mahsulot bo\'yicha hali tortishlar yo\'q',
@@ -322,7 +364,22 @@ const Map<String, Map<Til, String>> _matnlar = {
     Til.uz: 'Mahsulot, partiya raqami yoki xaridor',
     Til.ru: 'Продукт, номер партии или покупатель',
   },
-  'partiyalar_topilmadi': {Til.uz: 'Partiyalar topilmadi', Til.ru: 'Партии не найдены'},
+  'partiyalar_topilmadi': {
+    Til.uz: 'Partiyalar topilmadi',
+    Til.ru: 'Партии не найдены',
+  },
+
+  // Partiya batafsil oynasi
+  'partiya_batafsil': {Til.uz: 'Partiya haqida', Til.ru: 'О партии'},
+  'yopilgan_sana': {Til.uz: 'Yopilgan sana', Til.ru: 'Дата закрытия'},
+  'dogovor_raqami': {Til.uz: 'Dogovor raqami', Til.ru: 'Номер договора'},
+  'kip_soni': {Til.uz: 'Kip soni', Til.ru: 'Количество кипов'},
+  'jami_ogirlik': {Til.uz: 'Jami og\'irlik', Til.ru: 'Общий вес'},
+  'partiyadagi_kiplar': {
+    Til.uz: 'Ushbu partiyadagi kiplar',
+    Til.ru: 'Кипы этой партии',
+  },
+  'kiplar_topilmadi': {Til.uz: 'Kiplar topilmadi', Til.ru: 'Кипы не найдены'},
 };
 
 class Lokalizatsiya {

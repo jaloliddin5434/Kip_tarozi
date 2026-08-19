@@ -11,6 +11,7 @@ class Partiya {
   final double jamiKg;
   final DateTime? sotuvSanasi;
   final String? xaridor;
+  final String? dogovorRaqami;
   final String? nakladnoyRaqami;
   final String? sort;
   final double? uramaBilanVazn;
@@ -31,6 +32,7 @@ class Partiya {
     required this.jamiKg,
     this.sotuvSanasi,
     this.xaridor,
+    this.dogovorRaqami,
     this.nakladnoyRaqami,
     this.sort,
     this.uramaBilanVazn,
@@ -52,8 +54,11 @@ class Partiya {
         : DateTime.parse(j['yopilgan_vaqt']),
     kipSoni: j['kip_soni'],
     jamiKg: (j['jami_kg'] as num).toDouble(),
-    sotuvSanasi: j['sotuv_sanasi'] == null ? null : DateTime.parse(j['sotuv_sanasi']),
+    sotuvSanasi: j['sotuv_sanasi'] == null
+        ? null
+        : DateTime.parse(j['sotuv_sanasi']),
     xaridor: j['xaridor'],
+    dogovorRaqami: j['dogovor_raqami'],
     nakladnoyRaqami: j['nakladnoy_raqami'],
     sort: j['sort'],
     uramaBilanVazn: (j['urama_bilan_vazn'] as num?)?.toDouble(),

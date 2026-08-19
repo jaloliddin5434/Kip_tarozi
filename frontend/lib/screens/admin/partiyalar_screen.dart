@@ -7,6 +7,7 @@ import '../../models/hujjat.dart';
 import '../../models/partiya.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../widgets/partiya_batafsil_dialog.dart';
 
 /// Partiyaning "to'lgan" deb hisoblanadigan nishon (target) kip soni —
 /// Tola uchun 220, qolgan mahsulotlar uchun 210.
@@ -292,6 +293,21 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
     if (natija == true) _yuklash();
   }
 
+  void _batafsilniOchish(Partiya p, bool adminRoli) {
+    partiyaBatafsilDialogniKorsat(
+      context: context,
+      partiya: p,
+      adminRoli: adminRoli,
+      onYopish: !adminRoli || p.holati != 'ochiq' ? null : () => _yopish(p),
+      onSotish: !adminRoli || p.holati != 'yopiq'
+          ? null
+          : () => _sotishFormasiniOchish(p),
+      onOlchovToldirish: adminRoli || p.holati != 'yopiq'
+          ? null
+          : () => _olchovFormasiniOchish(p),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final holat = context.watch<AppState>();
@@ -351,14 +367,17 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
                         return GridView.builder(
                           gridDelegate:
                               const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 360,
-                            mainAxisExtent: 186,
-                            mainAxisSpacing: 14,
-                            crossAxisSpacing: 14,
-                          ),
+                                maxCrossAxisExtent: 360,
+                                mainAxisExtent: 186,
+                                mainAxisSpacing: 14,
+                                crossAxisSpacing: 14,
+                              ),
                           itemCount: _sahifa!.items.length,
-                          itemBuilder: (context, i) =>
-                              _partiyaKartasi(_sahifa!.items[i], lok, adminRoli),
+                          itemBuilder: (context, i) => _partiyaKartasi(
+                            _sahifa!.items[i],
+                            lok,
+                            adminRoli,
+                          ),
                         );
                       },
                     ),
@@ -421,7 +440,10 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
         amalTugmasi = OutlinedButton(
           onPressed: () => _olchovFormasiniOchish(p),
           style: OutlinedButton.styleFrom(minimumSize: const Size(0, 32)),
-          child: Text(lok.t('sort_ogirlik_toldirish'), style: const TextStyle(fontSize: 12)),
+          child: Text(
+            lok.t('sort_ogirlik_toldirish'),
+            style: const TextStyle(fontSize: 12),
+          ),
         );
       }
     } else if (p.holati == 'ochiq') {
@@ -441,77 +463,105 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
     return Card(
       clipBehavior: Clip.antiAlias,
       margin: EdgeInsets.zero,
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(width: 6, color: rang),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '${p.mahsulotNomi} — #${p.partiyaRaqami}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                            overflow: TextOverflow.ellipsis,
+      child: InkWell(
+        onTap: () => _batafsilniOchish(p, adminRoli),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(width: 6, color: rang),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${p.mahsulotNomi} — #${p.partiyaRaqami}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: rang.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              holatMatni,
+                              style: TextStyle(
+                                color: rang,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      if (sotilganmi) ...[
+                        _malumotQatori(
+                          Icons.person_outline,
+                          p.xaridor?.isNotEmpty == true ? p.xaridor! : '—',
+                        ),
+                        const SizedBox(height: 4),
+                        _malumotQatori(
+                          Icons.description_outlined,
+                          p.nakladnoyRaqami ?? '—',
+                        ),
+                        const SizedBox(height: 4),
+                        _malumotQatori(
+                          Icons.event_outlined,
+                          p.sotuvSanasi != null ? _sana(p.sotuvSanasi!) : '—',
+                        ),
+                      ] else ...[
+                        Text(
+                          '${p.kipSoni} / $nishon ${lok.t("soni")}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: rang.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(20),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 7,
+                            backgroundColor: Colors.grey.shade200,
+                            color: rang,
                           ),
-                          child: Text(
-                            holatMatni,
-                            style: TextStyle(color: rang, fontSize: 11, fontWeight: FontWeight.w600),
-                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        _malumotQatori(
+                          Icons.event_outlined,
+                          _sana(p.yaratilganVaqt),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 10),
-                    if (sotilganmi) ...[
-                      _malumotQatori(Icons.person_outline, p.xaridor?.isNotEmpty == true ? p.xaridor! : '—'),
-                      const SizedBox(height: 4),
-                      _malumotQatori(Icons.description_outlined, p.nakladnoyRaqami ?? '—'),
-                      const SizedBox(height: 4),
-                      _malumotQatori(
-                        Icons.event_outlined,
-                        p.sotuvSanasi != null ? _sana(p.sotuvSanasi!) : '—',
-                      ),
-                    ] else ...[
-                      Text(
-                        '${p.kipSoni} / $nishon ${lok.t("soni")}',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 7,
-                          backgroundColor: Colors.grey.shade200,
-                          color: rang,
+                      const Spacer(),
+                      if (amalTugmasi != null)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: amalTugmasi,
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      _malumotQatori(Icons.event_outlined, _sana(p.yaratilganVaqt)),
                     ],
-                    const Spacer(),
-                    if (amalTugmasi != null)
-                      Align(alignment: Alignment.centerRight, child: amalTugmasi),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
