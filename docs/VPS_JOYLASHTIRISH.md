@@ -65,7 +65,8 @@ Aniq VPS ma'lumotlari (IP, OS, kirish) berilgach amalga oshiriladi.
 ## 5. Backup
 
 - [ ] Kunlik avtomatik PostgreSQL backup skripti (`pg_dump`) — VPS + tashqi
-      joy (masalan boshqa server yoki bulut xotira)
+      joy (masalan boshqa server yoki bulut xotira). Skript va sozlash
+      yo'riqnomasi: [BACKUP.md](BACKUP.md)
 - [ ] Backup'ni tiklab sinash (restore test) — kamida bir marta qo'lda
       bajarilib, ma'lumotlar to'g'ri tiklanganligi tasdiqlangan
 - [ ] `STORAGE_PATH` (suratlar/hujjatlar) ham backup rejasiga kiritilgan

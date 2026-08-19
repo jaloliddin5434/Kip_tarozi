@@ -7,6 +7,9 @@ venv/
 storage/
 *.db
 .pytest_cache/
+# Backup
+backups/
+scripts/backup_config.ps1
 build/
 .dart_tool/
 .flutter-plugin-dependencies

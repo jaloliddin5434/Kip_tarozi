@@ -1,0 +1,28 @@
+# Kip Tarozi - backup sozlamalari
+#
+# Foydalanish: shu faylni "backup_config.ps1" nomi bilan nusxalang (shu papkada)
+# va o'z sharoitingizga mos qiymatlarni kiriting. "backup_config.ps1" .gitignore'da
+# bo'lgani uchun repoga commit qilinmaydi - har mashinada alohida sozlanadi.
+#
+#   Copy-Item scripts\backup_config.ps1.example scripts\backup_config.ps1
+
+# Backuplar birinchi navbatda shu mahalliy papkaga yoziladi.
+$BackupLocalDir = "C:\Kip_tarozi\backups"
+
+# Tashqi (ikkinchi) nusxa qayerga ko'chirilsin - masalan boshqa disk
+# ("D:\Backups\kip_tarozi"), tarmoq papkasi ("\\SERVER\Backups\kip_tarozi")
+# yoki bulutga sinxronlanadigan papka (masalan OneDrive papkasi ichidagi joy).
+# Hozircha aniq joy tanlanmagan bo'lsa - shu qiymatni bo'sh ("") qoldiring,
+# skript faqat mahalliy backup bilan cheklanadi va bu haqda ogohlantirish beradi.
+$BackupRemoteDir = ""
+
+# Nechchi kundan eski backup fayllar avtomatik o'chirilsin (disk to'lib
+# qolmasligi uchun). Shu muddat $BackupLocalDir'ga, sozlangan bo'lsa
+# $BackupRemoteDir'ga ham qo'llanadi.
+$RetentionDays = 30
+
+# pg_dump.exe/psql.exe qayerdaligini aniq ko'rsatish kerak bo'lsa (masalan
+# bir nechta PostgreSQL versiyasi o'rnatilgan bo'lsa) shu yerga to'liq "bin"
+# papka yo'lini yozing. Bo'sh qoldirilsa, skript PATH'dan va
+# "C:\Program Files\PostgreSQL\*\bin"dan avtomatik qidiradi.
+$PgBinDir = ""
