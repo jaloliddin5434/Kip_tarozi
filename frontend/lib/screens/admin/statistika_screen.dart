@@ -1,4 +1,3 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +10,7 @@ import '../../theme.dart';
 import '../../widgets/kalendar_vidjeti.dart';
 
 const _mahsulotKodlari = ['tola', 'lint', 'pux', 'ulyuk'];
+const _smenaHarflari = ['A', 'B', 'C', 'D'];
 
 class StatistikaEkrani extends StatefulWidget {
   const StatistikaEkrani({super.key});
@@ -142,15 +142,7 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
             },
           ),
           const SizedBox(height: 10),
-          _filtrQatori<String>(
-            qiymatlar: _mahsulotKodlari,
-            tanlangan: _mahsulot,
-            matn: (v) => lok.t(v),
-            onTanlash: (v) {
-              setState(() => _mahsulot = v);
-              _yuklash();
-            },
-          ),
+          _mahsulotFiltrQatori(lok),
           const SizedBox(height: 10),
           _filtrQatori<String?>(
             qiymatlar: const ['A', 'B', 'C', 'D', null],
@@ -206,6 +198,48 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
     );
   }
 
+  /// Mahsulot filtri — davr/smena qatorlaridan farqli, har bir mahsulot
+  /// o'zining brend rangida (operator/dashboard ekranlarida ishlatilgan
+  /// `mahsulotRangi` bilan izchil): tanlangan — to'liq shu rang bilan
+  /// to'ldirilgan, tanlanmagan — shu rang bilan chegaralangan.
+  Widget _mahsulotFiltrQatori(Lokalizatsiya lok) {
+    return Row(
+      children: [
+        for (final kod in _mahsulotKodlari)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: _mahsulotTugmasi(lok.t(kod), kod),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _mahsulotTugmasi(String matn, String kod) {
+    final tanlanganmi = _mahsulot == kod;
+    final rang = mahsulotRangi(kod);
+    void tanlash() {
+      setState(() => _mahsulot = kod);
+      _yuklash();
+    }
+
+    return SizedBox(
+      height: 44,
+      child: tanlanganmi
+          ? ElevatedButton(
+              onPressed: tanlash,
+              style: ElevatedButton.styleFrom(backgroundColor: rang, foregroundColor: Colors.white),
+              child: Text(matn, overflow: TextOverflow.ellipsis),
+            )
+          : OutlinedButton(
+              onPressed: tanlash,
+              style: OutlinedButton.styleFrom(side: BorderSide(color: rang), foregroundColor: rang),
+              child: Text(matn, overflow: TextOverflow.ellipsis),
+            ),
+    );
+  }
+
   Widget _tarkib(Lokalizatsiya lok) {
     final j = _jamlanma!;
     final tanlangan = _tanlanganMahsulot;
@@ -237,7 +271,7 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
             spacing: 16,
             runSpacing: 16,
             children: [
-              _statKartasi(lok.t('jami'), '$soni ${lok.t("soni")}', Icons.inventory_2),
+              _jamiKartasi(lok.t('jami'), '$soni ${lok.t("soni")}', Icons.inventory_2),
               _statKartasi('${lok.t("jami")} (kg)', '${kg.toStringAsFixed(1)} kg', Icons.scale),
               _statKartasi(lok.t('ortacha_ogirlik'), '${ortacha.toStringAsFixed(1)} kg', Icons.balance),
             ],
@@ -245,11 +279,8 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
           const SizedBox(height: 24),
           if (_smena == null) ...[
             Text(lok.t('smenalar_taqqoslash'), style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            if (_smenalar.isEmpty)
-              Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Text(lok.t('malumot_yoq')))
-            else
-              SizedBox(height: 240, child: _smenaGrafigi(_smenalar)),
+            const SizedBox(height: 14),
+            _smenaReytingi(_smenalar, lok),
           ],
           const SizedBox(height: 32),
           const Divider(),
@@ -333,58 +364,157 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
     );
   }
 
-  Widget _smenaGrafigi(List<SmenaJamlanmasi> smenalar) {
-    final maxKg = smenalar.map((s) => s.jamiKg).fold<double>(0, (a, b) => a > b ? a : b);
-    return BarChart(
-      BarChartData(
-        maxY: maxKg == 0 ? 10 : maxKg * 1.2,
-        barGroups: [
-          for (var i = 0; i < smenalar.length; i++)
-            BarChartGroupData(x: i, barRods: [BarChartRodData(toY: smenalar[i].jamiKg, color: kipTaroziYashil, width: 28)]),
+  // ---------------------------------------------------------------------
+  // Smenalar taqqoslash grafigi
+  // ---------------------------------------------------------------------
+
+  /// HAR DOIM 4 ta qator (A/B/C/D) ko'rsatadi, qiymat bo'yicha KAMAYISH
+  /// tartibida saralangan (eng ko'p tortgan smena eng yuqorida). Har bir
+  /// qator: chapda smena nomi, o'ngda qiymat (kg), pastda eng katta
+  /// qiymatga nisbatan proportsional kenglikdagi progress-chiziq.
+  Widget _smenaReytingi(List<SmenaJamlanmasi> xom, Lokalizatsiya lok) {
+    final xarita = {for (final s in xom) s.smena: s};
+    final tugallangan = [
+      for (final harf in _smenaHarflari) xarita[harf] ?? SmenaJamlanmasi(smena: harf, soni: 0, jamiKg: 0),
+    ]..sort((a, b) => b.jamiKg.compareTo(a.jamiKg));
+
+    final maxKg = tugallangan.first.jamiKg;
+
+    return Column(
+      children: [
+        for (var i = 0; i < tugallangan.length; i++) ...[
+          if (i > 0) const SizedBox(height: 16),
+          _smenaReytingQatori(tugallangan[i], maxKg: maxKg, birinchimi: i == 0, lok: lok),
         ],
-        titlesData: FlTitlesData(
-          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 44)),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, meta) {
-                final i = value.toInt();
-                if (i < 0 || i >= smenalar.length) return const SizedBox.shrink();
-                return Padding(padding: const EdgeInsets.only(top: 6), child: Text(smenalar[i].smena));
-              },
-            ),
-          ),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        ),
-        borderData: FlBorderData(show: false),
-        gridData: const FlGridData(show: true, drawVerticalLine: false),
-      ),
+      ],
     );
   }
 
-  Widget _statKartasi(String sarlavha, String qiymat, IconData ikonka) {
-    return SizedBox(
-      width: 220,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
+  Widget _smenaReytingQatori(
+    SmenaJamlanmasi s, {
+    required double maxKg,
+    required bool birinchimi,
+    required Lokalizatsiya lok,
+  }) {
+    final malumotBormi = s.soni > 0;
+    final ulush = malumotBormi && maxKg > 0 ? (s.jamiKg / maxKg).clamp(0.0, 1.0) : 0.0;
+    final eslatilganmi = birinchimi && malumotBormi;
+    final matnRangi = !malumotBormi
+        ? Colors.grey.shade500
+        : eslatilganmi
+            ? kipTaroziYashil
+            : Colors.black87;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '${lok.t("smena")} ${s.smena}',
+              style: TextStyle(fontSize: 14, fontWeight: eslatilganmi ? FontWeight.bold : FontWeight.w500, color: matnRangi),
+            ),
+            Text(
+              '${s.jamiKg.toStringAsFixed(1)} kg',
+              style: TextStyle(fontSize: 14, fontWeight: eslatilganmi ? FontWeight.bold : FontWeight.w500, color: matnRangi),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: 10,
+          child: Stack(
+            // StackFit.expand — aks holda fon (track) Container'i o'lchamsiz
+            // qolib, 0x0 gacha yig'ilib ko'rinmay qolishi mumkin edi.
+            fit: StackFit.expand,
             children: [
-              Icon(ikonka, size: 32, color: kipTaroziYashil),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(sarlavha, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                    Text(qiymat, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  ],
+              Container(
+                decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(6)),
+              ),
+              FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: ulush,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: eslatilganmi
+                        ? const LinearGradient(colors: [Color(0xFF0F6E56), Color(0xFF1D9E75)])
+                        : null,
+                    color: eslatilganmi ? null : (malumotBormi ? kipTaroziYashil.withValues(alpha: 0.55) : null),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
                 ),
               ),
             ],
           ),
         ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // Davr xulosasi kartalari — Dashboard ekranidagi uslub bilan bir xil
+  // ---------------------------------------------------------------------
+
+  Widget _jamiKartasi(String sarlavha, String qiymat, IconData ikonka) {
+    return Container(
+      width: 220,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F6E56), Color(0xFF1D9E75)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(color: kipTaroziYashil.withValues(alpha: 0.28), blurRadius: 16, offset: const Offset(0, 6)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(ikonka, size: 30, color: Colors.white),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(sarlavha, style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.85))),
+                const SizedBox(height: 2),
+                Text(qiymat, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statKartasi(String sarlavha, String qiymat, IconData ikonka) {
+    return Container(
+      width: 220,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.withValues(alpha: 0.05),
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 3))],
+      ),
+      child: Row(
+        children: [
+          Icon(ikonka, size: 30, color: Colors.grey.shade600),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(sarlavha, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                const SizedBox(height: 2),
+                Text(qiymat, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade800)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
