@@ -82,6 +82,7 @@ const Map<String, Map<Til, String>> _matnlar = {
     Til.ru: 'Неподтверждённые тревоги',
   },
   'agent_holati': {Til.uz: 'Stansiya agenti', Til.ru: 'Станционный агент'},
+  'songgi_hodisalar': {Til.uz: 'So\'nggi hodisalar', Til.ru: 'Последние события'},
   'ulangan': {Til.uz: 'Ulangan', Til.ru: 'Подключён'},
   'ulanmagan': {
     Til.uz: 'Ulanmagan / noma\'lum',
