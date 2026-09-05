@@ -96,6 +96,7 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
   Future<void> _sotishFormasiniOchish(Partiya p) async {
     final lok = context.read<AppState>().lok;
     final xaridorKontrolleri = TextEditingController();
+    final dogovorRaqamiKontrolleri = TextEditingController();
     final sofVaznKontrolleri = TextEditingController();
     final uramaBilanKontrolleri = TextEditingController();
     final uramaKontrolleri = TextEditingController();
@@ -113,6 +114,10 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
               TextField(
                 controller: xaridorKontrolleri,
                 decoration: InputDecoration(labelText: lok.t('xaridor')),
+              ),
+              TextField(
+                controller: dogovorRaqamiKontrolleri,
+                decoration: InputDecoration(labelText: lok.t('dogovor_raqami')),
               ),
               TextField(
                 controller: sortKontrolleri,
@@ -169,6 +174,9 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
                       10,
                     ),
                     'xaridor': xaridorKontrolleri.text.trim(),
+                    'dogovor_raqami': dogovorRaqamiKontrolleri.text.trim().isEmpty
+                        ? null
+                        : dogovorRaqamiKontrolleri.text.trim(),
                     'sort': sortKontrolleri.text.trim().isEmpty
                         ? null
                         : sortKontrolleri.text.trim(),
