@@ -8,6 +8,7 @@ import '../../models/hujjat.dart';
 import '../../services/fayl_yuklab_olish.dart';
 import '../../services/hujjat_pdf.dart';
 import '../../state/app_state.dart';
+import '../../theme.dart';
 import '../../widgets/kalendar_vidjeti.dart';
 import '../../widgets/kip_batafsil_dialog.dart';
 
@@ -24,12 +25,13 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
   String? _xato;
   int _joriySahifa = 1;
 
-  final _mahsulotKontrolleri = TextEditingController();
   final _kipRaqamiKontrolleri = TextEditingController();
   final _qidiruvKontrolleri = TextEditingController();
   Timer? _qidiruvTaymer;
+  Timer? _kipRaqamiTaymer;
   String? _smenaFiltri;
   String? _holatiFiltri;
+  String? _mahsulotFiltri;
   DateTime? _sanaDan;
   DateTime? _sanaGacha;
 
@@ -46,13 +48,23 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
   @override
   void dispose() {
     _qidiruvTaymer?.cancel();
+    _kipRaqamiTaymer?.cancel();
     _qidiruvKontrolleri.dispose();
+    _kipRaqamiKontrolleri.dispose();
     super.dispose();
   }
 
   void _qidiruvOzgardi(String qiymat) {
     _qidiruvTaymer?.cancel();
     _qidiruvTaymer = Timer(const Duration(milliseconds: 500), () {
+      _joriySahifa = 1;
+      _yuklash();
+    });
+  }
+
+  void _kipRaqamiOzgardi(String qiymat) {
+    _kipRaqamiTaymer?.cancel();
+    _kipRaqamiTaymer = Timer(const Duration(milliseconds: 500), () {
       _joriySahifa = 1;
       _yuklash();
     });
@@ -74,8 +86,9 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
     });
     try {
       final query = <String, dynamic>{'sahifa': _joriySahifa, 'sahifa_hajmi': 30};
-      if (_mahsulotKontrolleri.text.trim().isNotEmpty) query['mahsulot_kodi'] = _mahsulotKontrolleri.text.trim();
-      if (_kipRaqamiKontrolleri.text.trim().isNotEmpty) query['kip_raqami'] = int.tryParse(_kipRaqamiKontrolleri.text.trim());
+      if (_mahsulotFiltri != null) query['mahsulot_kodi'] = _mahsulotFiltri;
+      final kipRaqami = int.tryParse(_kipRaqamiKontrolleri.text.trim());
+      if (kipRaqami != null) query['kip_raqami'] = kipRaqami;
       if (_qidiruvKontrolleri.text.trim().isNotEmpty) query['qidiruv'] = _qidiruvKontrolleri.text.trim();
       if (_smenaFiltri != null) query['smena'] = _smenaFiltri;
       if (_holatiFiltri != null) query['holati'] = _holatiFiltri;
@@ -236,12 +249,43 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
     );
   }
 
+  /// Mahsulot filtri tugmasi — Statistika/Partiyalar ekranlaridagi
+  /// tanlangan/tanlanmagan tugma uslubi bilan bir xil, lekin har bir
+  /// mahsulot o'zining brend rangida (operator/dashboard ekranlarida
+  /// ishlatilgan `mahsulotRanglari` bilan izchil).
+  Widget _mahsulotTugmasi(String matn, String? kod) {
+    final tanlanganmi = _mahsulotFiltri == kod;
+    final rang = kod == null ? Colors.black87 : mahsulotRangi(kod);
+    void tanlash() {
+      setState(() {
+        _mahsulotFiltri = kod;
+        _joriySahifa = 1;
+      });
+      _yuklash();
+    }
+
+    return SizedBox(
+      height: 36,
+      child: tanlanganmi
+          ? ElevatedButton(
+              onPressed: tanlash,
+              style: ElevatedButton.styleFrom(backgroundColor: rang, foregroundColor: Colors.white),
+              child: Text(matn, overflow: TextOverflow.ellipsis),
+            )
+          : OutlinedButton(
+              onPressed: tanlash,
+              style: OutlinedButton.styleFrom(side: BorderSide(color: rang), foregroundColor: rang),
+              child: Text(matn, overflow: TextOverflow.ellipsis),
+            ),
+    );
+  }
+
   void _filtrniTozalash() {
-    _mahsulotKontrolleri.clear();
     _kipRaqamiKontrolleri.clear();
     _qidiruvKontrolleri.clear();
     _smenaFiltri = null;
     _holatiFiltri = null;
+    _mahsulotFiltri = null;
     _sanaDan = null;
     _sanaGacha = null;
     _joriySahifa = 1;
@@ -277,16 +321,10 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
                 ),
               ),
               SizedBox(
-                width: 160,
-                child: TextField(
-                  controller: _mahsulotKontrolleri,
-                  decoration: InputDecoration(labelText: lok.t('mahsulot'), border: const OutlineInputBorder(), isDense: true),
-                ),
-              ),
-              SizedBox(
                 width: 140,
                 child: TextField(
                   controller: _kipRaqamiKontrolleri,
+                  onChanged: _kipRaqamiOzgardi,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(labelText: lok.t('kip_qisqa'), border: const OutlineInputBorder(), isDense: true),
                 ),
@@ -346,6 +384,15 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
                 label: Text(lok.t('excel_yuklab_olish')),
                 onPressed: _excelHisobotDialogniOchish,
               ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _mahsulotTugmasi(lok.t('barchasi'), null),
+              for (final kod in mahsulotRanglari.keys) _mahsulotTugmasi(lok.t(kod), kod),
             ],
           ),
           const SizedBox(height: 16),
