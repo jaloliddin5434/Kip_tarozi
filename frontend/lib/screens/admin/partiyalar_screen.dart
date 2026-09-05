@@ -430,8 +430,13 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
     );
   }
 
+  /// Mahsulot filtri — har bir mahsulot o'zining brend rangida (Statistika/
+  /// Hujjatlar/Dashboard/Operator ekranlarida ishlatilgan `mahsulotRangi`
+  /// bilan izchil): tanlangan — to'liq shu rang bilan to'ldirilgan,
+  /// tanlanmagan — shu rang bilan chegaralangan. "Barchasi" — neytral yashil.
   Widget _mahsulotTugmasi(String matn, String? qiymat) {
     final tanlanganmi = _mahsulotKodiFiltri == qiymat;
+    final rang = qiymat == null ? kipTaroziYashil : mahsulotRangi(qiymat);
     void tanlash() {
       setState(() => _mahsulotKodiFiltri = qiymat);
       _yuklash();
@@ -443,14 +448,12 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
       child: tanlanganmi
           ? ElevatedButton(
               onPressed: tanlash,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kipTaroziYashil,
-                foregroundColor: Colors.white,
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: rang, foregroundColor: Colors.white),
               child: Text(matn, overflow: TextOverflow.ellipsis),
             )
           : OutlinedButton(
               onPressed: tanlash,
+              style: OutlinedButton.styleFrom(side: BorderSide(color: rang), foregroundColor: rang),
               child: Text(matn, overflow: TextOverflow.ellipsis),
             ),
     );
@@ -510,6 +513,14 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
     return Card(
       clipBehavior: Clip.antiAlias,
       margin: EdgeInsets.zero,
+      // Dashboard ekranidagi kabi yengil soya — mavjud global CardTheme
+      // (elevation:0) ni bu kartada mahalliy ravishda ustiga yozadi,
+      // boshqa ekranlarga/global temaga taʼsir qilmaydi. surfaceTintColor
+      // o'chirilgan — aks holda Material3 elevation fon rangini xiralashtirib
+      // yashil rangga bo'yab yuborishi mumkin edi.
+      elevation: 3,
+      shadowColor: Colors.black.withValues(alpha: 0.18),
+      surfaceTintColor: Colors.transparent,
       child: InkWell(
         onTap: () => _batafsilniOchish(p, adminRoli),
         child: IntrinsicHeight(
@@ -543,15 +554,16 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: rang.withValues(alpha: 0.12),
+                              color: rang.withValues(alpha: 0.16),
                               borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: rang.withValues(alpha: 0.45)),
                             ),
                             child: Text(
                               holatMatni,
                               style: TextStyle(
                                 color: rang,
                                 fontSize: 11,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
