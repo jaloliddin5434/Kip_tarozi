@@ -15,6 +15,16 @@ import '../../theme.dart';
 const _mahsulotKodlari = ['tola', 'lint', 'pux', 'ulyuk'];
 const _smenaHarflari = ['A', 'B', 'C', 'D'];
 
+/// Smenaning o'z rangi — "So'nggi hodisalar" bo'limidagi smena-kartalarini
+/// bir-biridan vizual ajratish uchun, mahsulot ranglaridan (yashil/ko'k/
+/// to'q sariq/binafsha) ATAYLAB farqli tanlangan.
+const _smenaRanglari = {
+  'A': Color(0xFF3F51B5), // indigo
+  'B': Color(0xFFD81B60), // pushti
+  'C': Color(0xFF00897B), // to'q moviy-yashil
+  'D': Color(0xFF6D4C41), // jigarrang
+};
+
 class DashboardEkrani extends StatefulWidget {
   const DashboardEkrani({super.key});
 
@@ -43,15 +53,26 @@ class _DashboardEkraniState extends State<DashboardEkrani> {
     final api = context.read<AppState>().api;
     try {
       final javob = await api.get('/dashboard', query: {'davr': _davr});
+      if (!mounted) return;
       setState(() => _dashboard = Dashboard.fromJson(javob));
     } catch (e) {
+      if (!mounted) return;
       setState(() => _xato = e.toString());
     } finally {
       if (mounted) setState(() => _yuklanmoqda = false);
     }
 
     try {
-      final hodisaJavob = await api.get('/hujjatlar/kiplar', query: {'sahifa': 1, 'sahifa_hajmi': 6});
+      // "Kunlik" davrda — bugungi kunda haqiqatan ishlagan har bir smena
+      // uchun mahsulot bo'yicha taqsimotni tuzish uchun, bugungi KUNNING
+      // BARCHA (faqat oxirgi 6 emas) aktiv kiplarini olamiz va mijozda
+      // smena bo'yicha guruhlaymiz — mavjud /hujjatlar/kiplar endpointi
+      // sana_dan/sana_gacha/holati filtrlarini allaqachon qo'llab-quvvatlaydi,
+      // shuning uchun backendga yangi narsa qo'shish shart bo'lmadi.
+      final query = _davr == 'kunlik'
+          ? {'sana_dan': _bugunIso(), 'sana_gacha': _bugunIso(), 'holati': 'aktiv', 'sahifa': 1, 'sahifa_hajmi': 500}
+          : {'sahifa': 1, 'sahifa_hajmi': 6};
+      final hodisaJavob = await api.get('/hujjatlar/kiplar', query: query);
       if (mounted) {
         setState(() {
           _songgiHodisalar = (hodisaJavob['items'] as List).map((e) => HujjatKip.fromJson(e)).toList();
@@ -425,18 +446,46 @@ class _DashboardEkraniState extends State<DashboardEkrani> {
     return '${ikki(l.day)}.${ikki(l.month)} ${ikki(l.hour)}:${ikki(l.minute)}';
   }
 
+  String _bugunIso() => DateTime.now().toIso8601String().substring(0, 10);
+
+  /// {smena: {mahsulot_kodi: soni}} — faqat "Kunlik" davrda ishlatiladi.
+  Map<String, Map<String, int>> _smenaBoyichaMahsulotSoni(List<HujjatKip> yozuvlar) {
+    final natija = <String, Map<String, int>>{};
+    for (final y in yozuvlar) {
+      final mahsulotlar = natija.putIfAbsent(y.smena, () => {});
+      mahsulotlar[y.mahsulotKodi] = (mahsulotlar[y.mahsulotKodi] ?? 0) + 1;
+    }
+    return natija;
+  }
+
+  Widget _malumotYoqPaneli(dynamic lok) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.grey.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Center(child: Text(lok.t('malumot_yoq'), style: TextStyle(color: Colors.grey.shade500))),
+    );
+  }
+
   Widget _songgiHodisalarPaneli(dynamic lok) {
     final royxat = _songgiHodisalar;
-    if (royxat == null || royxat.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.grey.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
-        child: Center(child: Text(lok.t('malumot_yoq'), style: TextStyle(color: Colors.grey.shade500))),
+    if (royxat == null || royxat.isEmpty) return _malumotYoqPaneli(lok);
+
+    if (_davr == 'kunlik') {
+      final guruhlangan = _smenaBoyichaMahsulotSoni(royxat);
+      if (guruhlangan.isEmpty) return _malumotYoqPaneli(lok);
+      return Column(
+        children: [
+          for (final smena in _smenaHarflari)
+            if (guruhlangan[smena] != null) ...[
+              _smenaHodisaKartasi(smena, guruhlangan[smena]!, lok),
+              if (smena != _smenaHarflari.last) const SizedBox(height: 10),
+            ],
+        ],
       );
     }
 
@@ -453,6 +502,48 @@ class _DashboardEkraniState extends State<DashboardEkrani> {
             if (i > 0) Divider(height: 1, color: Colors.grey.shade200),
             _hodisaQatori(lok, royxat[i]),
           ],
+        ],
+      ),
+    );
+  }
+
+  /// "Kunlik" davrdagi bitta smena kartasi — smena o'z rangida (chap chiziq
+  /// + sarlavha), ichida shu smenada bugun tortilgan har bir mahsulot
+  /// nomi+soni, mahsulotning o'z brend rangidagi kichik chip sifatida.
+  Widget _smenaHodisaKartasi(String smena, Map<String, int> mahsulotSoni, dynamic lok) {
+    final rang = _smenaRanglari[smena] ?? Colors.grey;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: rang.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border(left: BorderSide(color: rang, width: 4)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 3))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('${lok.t("smena")} $smena', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: rang)),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final entry in mahsulotSoni.entries)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: mahsulotRangi(entry.key).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${lok.t(entry.key)}: ${entry.value}',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: mahsulotRangi(entry.key)),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );
