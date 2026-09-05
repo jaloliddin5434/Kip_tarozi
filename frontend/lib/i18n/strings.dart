@@ -341,6 +341,7 @@ const Map<String, Map<Til, String>> _matnlar = {
   'tarozi': {Til.uz: 'Tarozi', Til.ru: 'Весы'},
   'barqaror': {Til.uz: 'Barqaror', Til.ru: 'Стабильно'},
   'kutilmoqda': {Til.uz: 'Kutilmoqda...', Til.ru: 'Ожидание...'},
+  'tarozi_bosh': {Til.uz: 'TAROZI BO\'SH', Til.ru: 'ВЕСЫ ПУСТЫ'},
   'song_ishlatilganlar': {
     Til.uz: 'So\'nggi ishlatilganlar',
     Til.ru: 'Недавно использованные',
@@ -353,6 +354,16 @@ const Map<String, Map<Til, String>> _matnlar = {
   'tarix_yoq': {
     Til.uz: 'Bu mahsulot bo\'yicha hali tortishlar yo\'q',
     Til.ru: 'По этому продукту пока нет взвешиваний',
+  },
+  'smena_korsatkichi_bugun': {
+    Til.uz: 'Bugungi smena ko\'rsatkichi',
+    Til.ru: 'Показатель смены за сегодня',
+  },
+  'kuting': {Til.uz: 'Kuting...', Til.ru: 'Подождите...'},
+  'kalendar': {Til.uz: 'Kalendar', Til.ru: 'Календарь'},
+  'kun_natijasi': {
+    Til.uz: 'Kunlik natija',
+    Til.ru: 'Итог за день',
   },
 
   // Partiyalar ekrani — kartalar ko'rinishi

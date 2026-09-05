@@ -1,6 +1,10 @@
+import asyncio
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
+
+import pytest
 
 from app.core.config import settings
 
@@ -88,3 +92,27 @@ def test_nakladnoy_hali_yoq_boisa_404(client, operator_headers, admin_headers, m
 
     javob = client.get(f"/api/v1/partiyalar/{partiya['id']}/nakladnoy", headers=admin_headers)
     assert javob.status_code == 404
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Bu tuzatish faqat Windows'ga xos")
+def test_selector_siyosati_faol_bolsada_pdf_yaratiladi(client, operator_headers, admin_headers, mahsulot_tola):
+    """Real serverda uchragan xatoni takrorlaydi: agar joriy event loop
+    siyosati (Proactor emas) Selector bo'lsa, FastAPI'ning threadpool ishchi
+    oqimida Playwright brauzer subprocessini ishga tushira olmay
+    NotImplementedError otar edi. nakladnoy_pdf_yarat endi shu holatda ham
+    o'zi Proactor'ga o'tkazib, PDF'ni muvaffaqiyatli yaratishi kerak."""
+    eski_siyosat = asyncio.get_event_loop_policy()
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    try:
+        tana = _sotilgan_partiya(client, operator_headers, admin_headers, 904)
+        assert tana["nakladnoy_pdf_yoli"] is not None
+
+        fayl_yoli = Path(settings.STORAGE_PATH) / tana["nakladnoy_pdf_yoli"]
+        try:
+            assert fayl_yoli.is_file()
+            assert fayl_yoli.stat().st_size > 0
+            assert fayl_yoli.read_bytes()[:4] == b"%PDF"
+        finally:
+            fayl_yoli.unlink(missing_ok=True)
+    finally:
+        asyncio.set_event_loop_policy(eski_siyosat)

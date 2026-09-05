@@ -12,8 +12,8 @@ import '../../models/smena_holati.dart';
 import '../../services/fayl_yuklab_olish.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
-import '../../widgets/bekor_qilish_hisoblagichi.dart';
 import '../../widgets/clock_widget.dart';
+import '../../widgets/smena_kalendar_dialogi.dart';
 import '../../widgets/yuk_saqlanmadi_dialog.dart';
 
 const _uuid = Uuid();
@@ -24,12 +24,11 @@ const _nishonSoni = {'tola': 220, 'lint': 210, 'pux': 210, 'ulyuk': 210};
 
 int _nishon(String mahsulotKodi) => _nishonSoni[mahsulotKodi] ?? 210;
 
-class _TortishYozuvi {
-  final String mahsulotNomi;
-  final double ogirlik;
-  final DateTime vaqt;
-  _TortishYozuvi({required this.mahsulotNomi, required this.ogirlik, required this.vaqt});
-}
+/// Og'irlik va surat panellari uchun QAT'IY balandlik — ikkalasi ham aynan
+/// shu balandlikda, "imkon qadar katta" emas. Bu qiymat o'zgarmas konstanta
+/// bo'lib qolishi kerak: oldingi urinishda Expanded/flex bilan "iloji boricha
+/// katta" qilishga harakat qilingan, natijada butun ekran buzilgan edi.
+const _panelBalandligi = 270.0;
 
 class OperatorEkrani extends StatefulWidget {
   const OperatorEkrani({super.key});
@@ -68,10 +67,16 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   // bo'yicha (eng yangisi birinchi) — backend'da alohida saqlanmaydi, faqat
   // qulaylik uchun frontend xotirasida kuzatiladi.
   final Map<String, List<int>> _songiPartiyalar = {};
-  final List<_TortishYozuvi> _oxirgiTortishlar = [];
 
   Timer? _blokTimer;
   bool _blokDialogiKorinmoqda = false;
+
+  // Saqlash bosilgandan keyin 3 soniyalik oddiy kutish — tezkor ketma-ket
+  // xato bosishning oldini oladi. Avvalgi 30s "Bekor qilish" hisoblagichi
+  // butunlay olib tashlandi, backend endpointi (/kiplar/{id}/bekor-qilish)
+  // esa admin panel uchun saqlanib qoldi, faqat shu yerdan chaqirilmaydi.
+  bool _saqlashVaqtinchaNofaol = false;
+  Timer? _saqlashQulfTaymeri;
 
   @override
   void initState() {
@@ -84,6 +89,7 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   @override
   void dispose() {
     _blokTimer?.cancel();
+    _saqlashQulfTaymeri?.cancel();
     _ogirlikKontrolleri.removeListener(_ogirlikOzgardi);
     _partiyaRaqamiKontrolleri.dispose();
     _ogirlikKontrolleri.dispose();
@@ -160,8 +166,8 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   }
 
   /// Tanlangan mahsulot bo'yicha, joriy smenada, bugun tortilgan kiplar
-  /// ro'yxatini yuklaydi — mahsulot tugmasi ostidagi qisqa tarix panelini
-  /// to'ldirish uchun.
+  /// ro'yxatini yuklaydi — o'ng ustundagi "Smena tarixi" panelini to'ldirish
+  /// uchun.
   Future<void> _smenaRoyxatiniYangilash() async {
     final soralganMahsulot = _tanlanganMahsulot;
     if (soralganMahsulot == null) return;
@@ -287,11 +293,11 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
       _dasturiyTozalash = false;
       setState(() {
         _oxirgiSaqlanganKip = javob;
-        _oxirgiTortishlar.insert(
-          0,
-          _TortishYozuvi(mahsulotNomi: _tanlanganMahsulot!.nomi, ogirlik: ogirlik, vaqt: DateTime.now()),
-        );
-        if (_oxirgiTortishlar.length > 2) _oxirgiTortishlar.removeRange(2, _oxirgiTortishlar.length);
+        _saqlashVaqtinchaNofaol = true;
+      });
+      _saqlashQulfTaymeri?.cancel();
+      _saqlashQulfTaymeri = Timer(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _saqlashVaqtinchaNofaol = false);
       });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_holat.lok.t('kip_saqlandi'))));
       _ogirlikFokusi.requestFocus();
@@ -330,19 +336,6 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
         ],
       ),
     );
-  }
-
-  Future<void> _bekorQilish() async {
-    if (_oxirgiSaqlanganKip == null) return;
-    try {
-      await _holat.api.post('/kiplar/${_oxirgiSaqlanganKip!['id']}/bekor-qilish');
-      setState(() => _oxirgiSaqlanganKip = null);
-      await _smenaHolatiniYangilash();
-      await _ochiqPartiyalarniYangilash();
-      await _smenaRoyxatiniYangilash();
-    } catch (e) {
-      _xatoKorsat(e.toString());
-    }
   }
 
   Future<void> _excelYuklab() async {
@@ -426,19 +419,17 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
           const SizedBox(width: 8),
         ],
       ),
-      body: Column(
+      // Uch ustunli qat'iy tuzilish — hech bir element "imkon qadar katta"
+      // bo'lishga harakat qilmaydi, faqat 2- va 3-ustunlardagi asosiy
+      // panellar (og'irlik va surat) QAT'IY _panelBalandligi (270px) balandlikda.
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(flex: 38, child: _chapPanel(lok)),
-                const VerticalDivider(width: 1),
-                Expanded(flex: 62, child: _ongPanel(lok)),
-              ],
-            ),
-          ),
-          _oxirgiTortishlarQatori(lok),
+          Expanded(flex: 26, child: _chapPanel(lok)),
+          const VerticalDivider(width: 1),
+          Expanded(flex: 37, child: _ortaPanel(lok)),
+          const VerticalDivider(width: 1),
+          Expanded(flex: 37, child: _ongPanel(lok)),
         ],
       ),
     );
@@ -455,9 +446,9 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Chap panel: mahsulot tanlash, partiya ochish, joriy partiya progressi
-  // ---------------------------------------------------------------------
+  // =======================================================================
+  // 1-USTUN (chap, ~26%): mahsulot tanlash, partiya ochish, progress, Excel
+  // =======================================================================
 
   Widget _chapPanel(dynamic lok) {
     return Padding(
@@ -465,187 +456,166 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(lok.t('mahsulot'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          const SizedBox(height: 6),
           _mahsulotGridi(lok),
-          if (_tanlanganMahsulot != null) _smenaTarixiRoyxati(lok),
-          if (_tanlanganMahsulot != null)
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(top: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: _partiyaRaqamiKontrolleri,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: InputDecoration(
-                        labelText: lok.t('partiya_raqami'),
-                        isDense: true,
-                        border: const OutlineInputBorder(),
-                      ),
-                      onSubmitted: (_) => _partiyaniOchish(),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 38,
-                      child: ElevatedButton(
-                        onPressed: _partiyaYuklanmoqda ? null : _partiyaniOchish,
-                        child: _partiyaYuklanmoqda
-                            ? const SizedBox(
-                                height: 16,
-                                width: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : Text(lok.t('partiya_ochish')),
-                      ),
-                    ),
-                    _songiPartiyalarQismi(lok),
-                    if (_ochiqPartiyalar.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Text(lok.t('ochiq_partiyalar'), style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _ochiqPartiyalar
-                            .map(
-                              (p) => ActionChip(
-                                label: Text('#${p.partiyaRaqami} (${p.kipSoni}/${_nishon(p.mahsulotKodi)})'),
-                                backgroundColor:
-                                    _tanlanganPartiya?.id == p.id ? kipTaroziYashil.withValues(alpha: 0.2) : null,
-                                onPressed: () => _partiyaniTanlash(p),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ],
-                    if (_tanlanganPartiya != null) ...[
-                      const SizedBox(height: 12),
-                      _partiyaProgressPaneli(lok),
-                    ],
-                  ],
-                ),
-              ),
-            )
-          else
-            const Spacer(),
-        ],
-      ),
-    );
-  }
-
-  Widget _mahsulotGridi(dynamic lok) {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      mainAxisSpacing: 8,
-      crossAxisSpacing: 8,
-      childAspectRatio: 2.6,
-      children: _mahsulotlar.map((m) => _mahsulotTugmasi(m)).toList(),
-    );
-  }
-
-  /// Tanlangan mahsulot tugmasi ostidagi qisqa smena-tarixi paneli — shu
-  /// smenada, bugun, shu mahsulot bo'yicha tortilgan kiplar ro'yxati.
-  Widget _smenaTarixiRoyxati(dynamic lok) {
-    return Container(
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.history, size: 14, color: Colors.grey.shade600),
-              const SizedBox(width: 6),
-              Text(
-                lok.t('smena_tarixi'),
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
-              ),
-              const Spacer(),
-              if (_smenaRoyxatiYuklanmoqda)
-                const SizedBox(height: 12, width: 12, child: CircularProgressIndicator(strokeWidth: 2)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 120),
-            child: _smenaRoyxati.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Text(
-                      lok.t('tarix_yoq'),
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                    ),
-                  )
-                : ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: _smenaRoyxati.length,
-                    separatorBuilder: (_, _) => Divider(height: 1, color: Colors.grey.shade200),
-                    itemBuilder: (context, i) {
-                      final y = _smenaRoyxati[i];
-                      final bekorMi = y['holati'] != 'aktiv';
-                      final chiziq = bekorMi ? TextDecoration.lineThrough : null;
-                      final rangi = bekorMi ? Colors.grey.shade400 : null;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 3),
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: 34,
-                              child: Text(
-                                '#${y['kip_raqami']}',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, decoration: chiziq, color: rangi),
-                              ),
-                            ),
-                            SizedBox(
-                              width: 54,
-                              child: Text(
-                                _vaqtQisqa(DateTime.parse(y['vaqt'] as String).toLocal()),
-                                style: TextStyle(fontSize: 11, color: rangi ?? Colors.grey),
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                '${(y['ogirlik'] as num).toStringAsFixed(1)} kg',
-                                textAlign: TextAlign.right,
-                                style: TextStyle(fontSize: 12, decoration: chiziq, color: rangi),
-                              ),
-                            ),
-                          ],
+          const SizedBox(height: 12),
+          Expanded(
+            child: _tanlanganMahsulot == null
+                ? const SizedBox.shrink()
+                : SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextField(
+                          controller: _partiyaRaqamiKontrolleri,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          decoration: InputDecoration(
+                            labelText: lok.t('partiya_raqami'),
+                            isDense: true,
+                            border: const OutlineInputBorder(),
+                          ),
+                          onSubmitted: (_) => _partiyaniOchish(),
                         ),
-                      );
-                    },
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 38,
+                          child: ElevatedButton(
+                            onPressed: _partiyaYuklanmoqda ? null : _partiyaniOchish,
+                            child: _partiyaYuklanmoqda
+                                ? const SizedBox(
+                                    height: 16,
+                                    width: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : Text(lok.t('partiya_ochish')),
+                          ),
+                        ),
+                        _songiPartiyalarQismi(lok),
+                        if (_ochiqPartiyalar.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(lok.t('ochiq_partiyalar'), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _ochiqPartiyalar
+                                .map(
+                                  (p) => _partiyaChipi(
+                                    matn: '#${p.partiyaRaqami} (${p.kipSoni}/${_nishon(p.mahsulotKodi)})',
+                                    faol: _tanlanganPartiya?.id == p.id,
+                                    onTap: () => _partiyaniTanlash(p),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ],
+                        if (_tanlanganPartiya != null) ...[
+                          const SizedBox(height: 12),
+                          _partiyaProgressPaneli(lok),
+                        ],
+                      ],
+                    ),
                   ),
           ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 40,
+            child: OutlinedButton.icon(
+              onPressed: () => smenaKalendarDialogniKorsat(context),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: kipTaroziYashil),
+                foregroundColor: kipTaroziYashil,
+              ),
+              icon: const Icon(Icons.calendar_month, size: 16),
+              label: Text(lok.t('kalendar'), style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 40,
+            child: OutlinedButton.icon(
+              onPressed: _excelYuklanmoqda ? null : _excelYuklab,
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: kipTaroziYashil),
+                foregroundColor: kipTaroziYashil,
+              ),
+              icon: _excelYuklanmoqda
+                  ? const SizedBox(
+                      height: 14,
+                      width: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: kipTaroziYashil),
+                    )
+                  : const Icon(Icons.download, size: 16),
+              label: Text(lok.t('excel_yuklab_olish'), style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  /// 2x2 mahsulot tugmalari — HAR BIRI QAT'IY 64px balandlikda (kenglikka
+  /// bog'liq aspect-ratio emas), shuning uchun kattaroq shrift/padding
+  /// ekran o'lchamidan qat'iy nazar bir xil ko'rinadi.
+  Widget _mahsulotGridi(dynamic lok) {
+    Widget katak(int i) {
+      if (i >= _mahsulotlar.length) return const Expanded(child: SizedBox.shrink());
+      return Expanded(child: _mahsulotTugmasi(_mahsulotlar[i]));
+    }
+
+    return Column(
+      children: [
+        SizedBox(height: 64, child: Row(children: [katak(0), const SizedBox(width: 8), katak(1)])),
+        const SizedBox(height: 8),
+        SizedBox(height: 64, child: Row(children: [katak(2), const SizedBox(width: 8), katak(3)])),
+      ],
     );
   }
 
   Widget _mahsulotTugmasi(Mahsulot m) {
+    final rang = mahsulotRangi(m.kod);
     final tanlanganmi = _tanlanganMahsulot?.id == m.id;
-    if (tanlanganmi) {
-      return ElevatedButton(
-        onPressed: () => _mahsulotTanlash(m),
-        style: ElevatedButton.styleFrom(backgroundColor: kipTaroziYashil, foregroundColor: Colors.white),
-        child: Text(m.nomi, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      );
-    }
-    return OutlinedButton(
-      onPressed: () => _mahsulotTanlash(m),
-      style: OutlinedButton.styleFrom(side: const BorderSide(color: kipTaroziYashil)),
-      child: Text(m.nomi, style: const TextStyle(fontSize: 16)),
+    return Material(
+      color: tanlanganmi ? rang : Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _mahsulotTanlash(m),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: rang, width: tanlanganmi ? 0 : 1.6),
+          ),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Text(
+            m.nomi,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: tanlanganmi ? Colors.white : rang,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Faol/tanlangan holatda to'q yashil fon + oq matn, aks holda kulrang fon —
+  /// "So'nggi ishlatilganlar" va "Ochiq partiyalar" chiplari shu bitta
+  /// uslubdan foydalanadi.
+  Widget _partiyaChipi({required String matn, required bool faol, required VoidCallback onTap}) {
+    return ActionChip(
+      label: Text(
+        matn,
+        style: TextStyle(color: faol ? Colors.white : Colors.black87, fontWeight: faol ? FontWeight.bold : FontWeight.normal),
+      ),
+      backgroundColor: faol ? kipTaroziYashil : Colors.grey.shade200,
+      side: BorderSide(color: faol ? kipTaroziYashil : Colors.grey.shade300),
+      onPressed: onTap,
     );
   }
 
@@ -663,7 +633,13 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
             spacing: 8,
             runSpacing: 8,
             children: royxat
-                .map((raqam) => ActionChip(label: Text('#$raqam'), onPressed: () => _songiPartiyaTanlandi(raqam)))
+                .map(
+                  (raqam) => _partiyaChipi(
+                    matn: '#$raqam',
+                    faol: _tanlanganPartiya?.partiyaRaqami == raqam,
+                    onTap: () => _songiPartiyaTanlandi(raqam),
+                  ),
+                )
                 .toList(),
           ),
         ],
@@ -671,150 +647,176 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
     );
   }
 
+  /// Yumshoq yashil gradient fonli progress-karta.
   Widget _partiyaProgressPaneli(dynamic lok) {
     final p = _tanlanganPartiya!;
     final nishon = _nishon(p.mahsulotKodi);
     final progress = (p.kipSoni / nishon).clamp(0.0, 1.0);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${lok.t("progress")}: #${p.partiyaRaqami} — ${p.kipSoni}/$nishon',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 10,
-                backgroundColor: Colors.grey.shade200,
-                color: kipTaroziYashil,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text('${p.jamiKg.toStringAsFixed(1)} kg', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------
-  // O'ng panel: barqarorlik, og'irlik ko'rsatkichi, saqlash, smena holati
-  // ---------------------------------------------------------------------
-
-  Widget _ongPanel(dynamic lok) {
-    return Padding(
+    return Container(
       padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFEAF6F1), Color(0xFFF5FAF8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kipTaroziYashil.withValues(alpha: 0.3)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_tanlanganPartiya != null) ...[
-            _ogirlikBirlashganKorsatkichi(lok),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton.icon(
-                onPressed: _saqlashYuklanmoqda ? null : () => _saqlash(),
-                icon: _saqlashYuklanmoqda
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.save, size: 20),
-                label: Text(lok.t('saqlash'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
+          Text(
+            '${lok.t("progress")}: #${p.partiyaRaqami} — ${p.kipSoni}/$nishon',
+            style: const TextStyle(fontWeight: FontWeight.bold, color: kipTaroziYashil),
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 10,
+              backgroundColor: Colors.white,
+              color: kipTaroziYashil,
             ),
-            if (_oxirgiSaqlanganKip != null) ...[
-              const SizedBox(height: 8),
-              Center(
-                child: BekorQilishHisoblagichi(
-                  key: ValueKey(_oxirgiSaqlanganKip!['id']),
-                  muddatSoniya: 30,
-                  matn: lok.t('bekor_qilish'),
-                  onBekorQilish: _bekorQilish,
-                  onMuddatTugadi: () => setState(() => _oxirgiSaqlanganKip = null),
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
-          ] else
-            const SizedBox(height: 6),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final surat = _suratPaneli(lok);
-                final smena = _smenaBolimi(lok);
-                if (constraints.maxWidth > 640) {
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(flex: 45, child: surat),
-                      const SizedBox(width: 16),
-                      Expanded(flex: 55, child: SingleChildScrollView(child: smena)),
-                    ],
-                  );
-                }
-                return SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [surat, const SizedBox(height: 16), smena],
-                  ),
-                );
-              },
-            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${p.jamiKg.toStringAsFixed(1)} kg',
+            style: TextStyle(color: kipTaroziYashil.withValues(alpha: 0.85), fontSize: 12, fontWeight: FontWeight.w600),
           ),
         ],
       ),
     );
   }
 
-  /// Og'irlik ko'rsatkichi + rang-signal — bittalashtirilgan: tarozi 0 kg
-  /// bo'lsa QIZIL ("Kutilmoqda"), yuk qo'yilib >0 bo'lsa YASHIL ("Barqaror")
-  /// va shu holat Saqlash bosilgandan keyin ham (maydon tozalangan bo'lsa
-  /// ham) yashil bo'lib qoladi — kip olib tashlanib qayta 0 ga tushgandagina
-  /// yana qizilga qaytadi. Bu avvalgi alohida "Kutilmoqda/Barqaror"
-  /// bannerini ham o'zida mujassam etadi, ular bir-biriga zid emas.
-  Widget _ogirlikBirlashganKorsatkichi(dynamic lok) {
-    final MaterialColor rang = _yukBor ? Colors.green : Colors.red;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+  // =======================================================================
+  // 2-USTUN (o'rta, ~37%): og'irlik qutisi, Saqlash, smena ko'rsatkichi
+  // =======================================================================
+
+  Widget _ortaPanel(dynamic lok) {
+    final saqlashFaolmi = _tanlanganPartiya != null;
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: _panelBalandligi, width: double.infinity, child: _ogirlikQutisi(lok)),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: saqlashFaolmi ? _saqlashTugmasiFaol(lok) : _saqlashTugmasiNofaol(lok),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            lok.t('smena_korsatkichi_bugun'),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 8),
+          Expanded(child: _smenaKartalariGridi(lok)),
+        ],
+      ),
+    );
+  }
+
+  /// Saqlash bosilgandan keyingi 3 soniyalik oddiy kutish ham, tarmoq
+  /// so'rovi davom etayotgan holat ham xuddi shu "band" ko'rinishni
+  /// ishlatadi — faqat matn farq qiladi ("Kuting..." vs "Saqlash").
+  Widget _saqlashTugmasiFaol(dynamic lok) {
+    final bandmi = _saqlashYuklanmoqda || _saqlashVaqtinchaNofaol;
+    return ElevatedButton.icon(
+      onPressed: bandmi ? null : () => _saqlash(),
+      icon: bandmi
+          ? const SizedBox(
+              height: 18,
+              width: 18,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            )
+          : const Icon(Icons.save, size: 20),
+      label: Text(
+        bandmi ? lok.t('kuting') : lok.t('saqlash'),
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  /// Partiya hali tanlanmaganda ko'rsatiladigan nofaol holat — kulrang
+  /// gradient, bosib bo'lmaydi.
+  Widget _saqlashTugmasiNofaol(dynamic lok) {
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: rang.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: rang, width: 2.5),
+        gradient: LinearGradient(colors: [Colors.grey.shade300, Colors.grey.shade400]),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Center(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.save, size: 20, color: Colors.white70),
+            const SizedBox(width: 8),
+            Text(
+              lok.t('saqlash'),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white70),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Og'irlik ko'rsatkichi + rang-signal — QAT'IY 270px balandlikdagi quti
+  /// (tashqarida SizedBox bilan beriladi). Ichidagi raqam qat'iy 48px —
+  /// bundan katta bo'lmaydi, chunki qutining o'zi allaqachon katta va
+  /// diqqatga sazovor, raqamni yanada kattalashtirish shart emas.
+  ///
+  /// Tarozi 0 kg bo'lsa QIZIL gradient/chegara ("Tarozi bo'sh"), yuk
+  /// qo'yilib >0 bo'lsa YASHIL ("Barqaror") — bu holat Saqlash bosilgandan
+  /// keyin ham (maydon tozalangan bo'lsa ham) yashil bo'lib qoladi, kip olib
+  /// tashlanib qayta 0 ga tushgandagina yana qizilga qaytadi.
+  Widget _ogirlikQutisi(dynamic lok) {
+    final qizilmi = !_yukBor;
+    final gradient = qizilmi
+        ? const [Color(0xFFFDECEC), Color(0xFFFCE0E0)]
+        : const [Color(0xFFEAF6F1), Color(0xFFD9EEE4)];
+    const qizilChegara = Color(0xFFD64545);
+    const qizilMatn = Color(0xFFB33A3A);
+    final chegaraRangi = qizilmi ? qizilChegara : kipTaroziYashil;
+    final matnRangi = qizilmi ? qizilMatn : kipTaroziYashil;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: chegaraRangi, width: 2.5),
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(_yukBor ? Icons.check_circle : Icons.hourglass_top, color: rang.shade700, size: 18),
-              const SizedBox(width: 6),
+              Icon(Icons.circle, size: 10, color: matnRangi),
+              const SizedBox(width: 8),
               Text(
-                _yukBor ? lok.t('barqaror') : lok.t('kutilmoqda'),
-                style: TextStyle(color: rang.shade700, fontWeight: FontWeight.bold, fontSize: 14),
+                qizilmi ? lok.t('tarozi_bosh') : lok.t('barqaror'),
+                style: TextStyle(color: matnRangi, fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1.2),
               ),
             ],
           ),
+          const SizedBox(height: 18),
           TextField(
             controller: _ogirlikKontrolleri,
             focusNode: _ogirlikFokusi,
             textAlign: TextAlign.center,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: TextStyle(fontSize: 58, fontWeight: FontWeight.bold, color: rang.shade700),
+            style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: matnRangi),
             decoration: InputDecoration(
               hintText: '0.0',
+              hintStyle: TextStyle(fontSize: 48, color: matnRangi.withValues(alpha: 0.35)),
               suffixText: ' kg',
-              suffixStyle: const TextStyle(fontSize: 20, color: Colors.grey),
+              suffixStyle: TextStyle(fontSize: 18, color: matnRangi.withValues(alpha: 0.6)),
               border: InputBorder.none,
               isCollapsed: true,
             ),
@@ -825,63 +827,149 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // So'nggi tortilgan kip surati — "Smena joriy holati" yonida
-  // ---------------------------------------------------------------------
+  /// 2x2 mahsulot kartochkalari — qolgan bo'sh joyni to'liq egallaydi
+  /// (Expanded orqali berilgan joyga aniq moslashadi, aspect-ratio taxminiga
+  /// tayanmaydi), har biri o'z brend rangida chegaralangan.
+  Widget _smenaKartalariGridi(dynamic lok) {
+    if (_mahsulotlar.isEmpty) return const SizedBox.shrink();
 
+    Widget katak(int i) {
+      if (i >= _mahsulotlar.length) return const Expanded(child: SizedBox.shrink());
+      final m = _mahsulotlar[i];
+      final h = _mahsulotHolati(m.kod);
+      final rang = mahsulotRangi(m.kod);
+      return Expanded(
+        child: Container(
+          margin: const EdgeInsets.all(4),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: rang.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: rang, width: 1.5),
+          ),
+          // FittedBox — juda past ekranlarda katak balandligi tor bo'lib
+          // qolsa ham (masalan kichik notebook oynasi), matn hech qachon
+          // RenderFlex overflow bermaydi, faqat mutanosib ravishda kichrayadi.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  m.nomi,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: rang),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text('${h?.soni ?? 0}', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: rang)),
+                Text(
+                  '${(h?.jamiKg ?? 0).toStringAsFixed(1)} kg',
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        Expanded(child: Row(children: [katak(0), katak(1)])),
+        Expanded(child: Row(children: [katak(2), katak(3)])),
+      ],
+    );
+  }
+
+  // =======================================================================
+  // 3-USTUN (o'ng, ~37%): so'nggi kip surati, smena tarixi
+  // =======================================================================
+
+  Widget _ongPanel(dynamic lok) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: _panelBalandligi, width: double.infinity, child: _suratPaneli(lok)),
+          const SizedBox(height: 8),
+          Text(
+            lok.t('songgi_kip_surati'),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            _tanlanganMahsulot == null
+                ? lok.t('smena_tarixi')
+                : '${lok.t("smena_tarixi")} — ${_tanlanganMahsulot!.nomi}',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+          const SizedBox(height: 6),
+          Expanded(child: _smenaTarixiPaneli(lok)),
+        ],
+      ),
+    );
+  }
+
+  /// QAT'IY 270px balandlikdagi (tashqarida beriladi) kvadratsimon surat
+  /// paneli — chiziqli (dashed) chegara bilan. Ichidagi kvadrat surat/
+  /// placeholder mavjud bo'lgan joyga (kenglik/balandlikning kichikrog'iga)
+  /// moslashadi, lekin tashqi quti balandligi hech qachon o'zgarmaydi.
   Widget _suratPaneli(dynamic lok) {
     final suratYoli = _oxirgiSaqlanganKip?['surat_yoli'] as String?;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const boshliqBalandligi = 26.0;
-        final maxBalandlik =
-            constraints.maxHeight.isFinite ? constraints.maxHeight - boshliqBalandligi : constraints.maxWidth;
-        final andoza = math.min(constraints.maxWidth, maxBalandlik).clamp(80.0, 480.0);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(color: const Color(0xFFF2F7F5), borderRadius: BorderRadius.circular(16)),
+        ),
+        CustomPaint(painter: _ChiziqliChegaraRasmchisi(rang: Colors.grey.shade400)),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final andoza = math.min(constraints.maxWidth, constraints.maxHeight).clamp(0.0, 400.0);
 
-        Widget ichki;
-        if (_oxirgiSaqlanganKip == null) {
-          ichki = _suratPlaceholder(Icons.photo_camera_outlined, lok.t('hali_kip_saqlanmagan'), andoza);
-        } else if (suratYoli == null || suratYoli.isEmpty) {
-          ichki = _suratPlaceholder(Icons.image_not_supported_outlined, lok.t('surat_yoq'), andoza);
-        } else {
-          ichki = ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.network(
-              suratYoli,
-              key: ValueKey(suratYoli),
-              width: andoza,
-              height: andoza,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return Container(
-                  width: andoza,
-                  height: andoza,
-                  color: Colors.grey.shade100,
-                  alignment: Alignment.center,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    value: progress.expectedTotalBytes != null
-                        ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                        : null,
+              Widget ichki;
+              if (_oxirgiSaqlanganKip == null) {
+                ichki = _suratPlaceholder(Icons.photo_camera_outlined, lok.t('hali_kip_saqlanmagan'), andoza);
+              } else if (suratYoli == null || suratYoli.isEmpty) {
+                ichki = _suratPlaceholder(Icons.image_not_supported_outlined, lok.t('surat_yoq'), andoza);
+              } else {
+                ichki = ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    suratYoli,
+                    key: ValueKey(suratYoli),
+                    width: andoza,
+                    height: andoza,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return Container(
+                        width: andoza,
+                        height: andoza,
+                        color: Colors.grey.shade100,
+                        alignment: Alignment.center,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          value: progress.expectedTotalBytes != null
+                              ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                              : null,
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) =>
+                        _suratPlaceholder(Icons.broken_image_outlined, lok.t('surat_yuklanmadi'), andoza),
                   ),
                 );
-              },
-              errorBuilder: (context, error, stackTrace) =>
-                  _suratPlaceholder(Icons.broken_image_outlined, lok.t('surat_yuklanmadi'), andoza),
-            ),
-          );
-        }
+              }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(lok.t('songgi_kip_surati'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            const SizedBox(height: 6),
-            Center(child: SizedBox(width: andoza, height: andoza, child: ichki)),
-          ],
-        );
-      },
+              return Center(child: SizedBox(width: andoza, height: andoza, child: ichki));
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -891,12 +979,11 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
       height: andoza,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: Colors.white.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(ikonka, color: Colors.grey.shade400, size: 36),
           const SizedBox(height: 8),
@@ -909,103 +996,107 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Smena joriy holati
-  // ---------------------------------------------------------------------
-
-  Widget _smenaBolimi(dynamic lok) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 10,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(lok.t('smena_holati'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            SizedBox(
-              height: 30,
-              child: OutlinedButton.icon(
-                onPressed: _excelYuklanmoqda ? null : _excelYuklab,
-                icon: _excelYuklanmoqda
-                    ? const SizedBox(height: 12, width: 12, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.download, size: 15),
-                label: Text(lok.t('excel_yuklab_olish'), style: const TextStyle(fontSize: 12)),
-                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10)),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        _smenaHolatiKartalari(lok),
-      ],
-    );
-  }
-
-  Widget _smenaHolatiKartalari(dynamic lok) {
-    if (_mahsulotlar.isEmpty) return const Text('—');
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      mainAxisSpacing: 8,
-      crossAxisSpacing: 8,
-      childAspectRatio: 1.5,
-      children: _mahsulotlar.map((m) {
-        final h = _mahsulotHolati(m.kod);
-        return Card(
-          margin: EdgeInsets.zero,
-          color: kipTaroziYashil.withValues(alpha: 0.05),
-          child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(m.nomi, style: const TextStyle(fontSize: 11, color: Colors.grey), overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 4),
-                Text('${h?.soni ?? 0}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                Text('${(h?.jamiKg ?? 0).toStringAsFixed(1)} kg', style: const TextStyle(fontSize: 10, color: Colors.grey)),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  // ---------------------------------------------------------------------
-  // Pastki chiziq: oxirgi 2 ta tortish
-  // ---------------------------------------------------------------------
-
-  Widget _oxirgiTortishlarQatori(dynamic lok) {
-    if (_oxirgiTortishlar.isEmpty) return const SizedBox.shrink();
+  /// Ichki scroll'ga ega smena-tarixi ro'yxati — joriy mahsulot bo'yicha
+  /// bugun tortilgan kiplar, kip raqami+vaqt+rangli og'irlik bilan.
+  Widget _smenaTarixiPaneli(dynamic lok) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.grey.shade300))),
-      child: Row(
-        children: [
-          Text(
-            lok.t('oxirgi_tortishlar'),
-            style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Wrap(
-              spacing: 28,
-              runSpacing: 4,
-              children: _oxirgiTortishlar
-                  .map(
-                    (t) => Text(
-                      '${t.mahsulotNomi} — ${t.ogirlik.toStringAsFixed(1)} kg — ${_vaqtQisqa(t.vaqt)}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300),
       ),
+      child: _smenaRoyxati.isEmpty
+          ? Center(
+              child: _smenaRoyxatiYuklanmoqda
+                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(lok.t('tarix_yoq'), style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+            )
+          : ListView.separated(
+              itemCount: _smenaRoyxati.length,
+              separatorBuilder: (_, _) => Divider(height: 1, color: Colors.grey.shade200),
+              itemBuilder: (context, i) {
+                final y = _smenaRoyxati[i];
+                final bekorMi = y['holati'] != 'aktiv';
+                final chiziq = bekorMi ? TextDecoration.lineThrough : null;
+                final rangi = bekorMi ? Colors.grey.shade400 : null;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 40,
+                        child: Text(
+                          '#${y['kip_raqami']}',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, decoration: chiziq, color: rangi),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 60,
+                        child: Text(
+                          _vaqtQisqa(DateTime.parse(y['vaqt'] as String).toLocal()),
+                          style: TextStyle(fontSize: 11, color: rangi ?? Colors.grey),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          '${(y['ogirlik'] as num).toStringAsFixed(1)} kg',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            decoration: chiziq,
+                            color: rangi ?? kipTaroziYashil,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
     );
   }
+}
+
+/// Surat paneli uchun chiziqli (dashed) burchakli to'rtburchak chegara —
+/// paket qo'shmasdan, oddiy CustomPainter bilan chiziladi.
+class _ChiziqliChegaraRasmchisi extends CustomPainter {
+  final Color rang;
+  const _ChiziqliChegaraRasmchisi({required this.rang});
+
+  static const _chiziqUzunligi = 6.0;
+  static const _bosliqUzunligi = 5.0;
+  static const _chegaraKengligi = 1.6;
+  static const _burchakRadiusi = 16.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = rang
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = _chegaraKengligi;
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        _chegaraKengligi / 2,
+        _chegaraKengligi / 2,
+        size.width - _chegaraKengligi,
+        size.height - _chegaraKengligi,
+      ),
+      const Radius.circular(_burchakRadiusi),
+    );
+    final path = Path()..addRRect(rrect);
+    for (final metric in path.computeMetrics()) {
+      var masofa = 0.0;
+      while (masofa < metric.length) {
+        final keyingi = math.min(masofa + _chiziqUzunligi, metric.length);
+        canvas.drawPath(metric.extractPath(masofa, keyingi), paint);
+        masofa = keyingi + _bosliqUzunligi;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ChiziqliChegaraRasmchisi oldDelegate) => oldDelegate.rang != rang;
 }

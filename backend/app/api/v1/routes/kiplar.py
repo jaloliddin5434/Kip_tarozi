@@ -52,12 +52,7 @@ def _bloklovchi_hodisa(db: Session, smena) -> ShubhaliHolat | None:
     )
 
 
-@router.get("/smena/holati", response_model=SmenaHolati)
-def smena_holati(
-    db: Session = Depends(get_db),
-    foydalanuvchi: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.operator)),
-) -> SmenaHolati:
-    bugun = date.today()
+def _smena_kunlik_jamlanma(db: Session, smena, sana: date) -> SmenaHolati:
     qatorlar = db.execute(
         select(
             Mahsulot.kod,
@@ -68,9 +63,9 @@ def smena_holati(
         .join(Partiya, Partiya.mahsulot_id == Mahsulot.id)
         .join(Kip, Kip.partiya_id == Partiya.id)
         .where(
-            Kip.smena == foydalanuvchi.smena,
+            Kip.smena == smena,
             Kip.holati == KipHolati.aktiv,
-            func.date(Kip.vaqt) == bugun,
+            func.date(Kip.vaqt) == sana,
         )
         .group_by(Mahsulot.kod, Mahsulot.nomi)
     ).all()
@@ -79,7 +74,28 @@ def smena_holati(
         MahsulotBoyichaHolat(mahsulot_kodi=kod, mahsulot_nomi=nomi, soni=soni, jami_kg=float(jami_kg))
         for kod, nomi, soni, jami_kg in qatorlar
     ]
-    return SmenaHolati(smena=foydalanuvchi.smena.value, sana=bugun.isoformat(), mahsulotlar=mahsulotlar)
+    return SmenaHolati(smena=smena.value, sana=sana.isoformat(), mahsulotlar=mahsulotlar)
+
+
+@router.get("/smena/holati", response_model=SmenaHolati)
+def smena_holati(
+    db: Session = Depends(get_db),
+    foydalanuvchi: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.operator)),
+) -> SmenaHolati:
+    return _smena_kunlik_jamlanma(db, foydalanuvchi.smena, date.today())
+
+
+@router.get("/smena/kunlik-jamlanma", response_model=SmenaHolati)
+def smena_kunlik_jamlanma(
+    sana: date = Query(default_factory=date.today),
+    db: Session = Depends(get_db),
+    foydalanuvchi: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.operator)),
+) -> SmenaHolati:
+    """Operator uchun — kalendardan tanlangan IXTIYORIY sana bo'yicha, faqat
+    operatorning o'z smenasidagi kunlik jamlanma (mahsulot bo'yicha soni/kg).
+    /smena/holati'dan farqli, bugungi kun bilan cheklanmaydi — operator
+    ekranidagi kalendar vidjeti shu orqali ishlaydi."""
+    return _smena_kunlik_jamlanma(db, foydalanuvchi.smena, sana)
 
 
 @router.get("/smena/royxat", response_model=list[SmenaKipYozuvi])

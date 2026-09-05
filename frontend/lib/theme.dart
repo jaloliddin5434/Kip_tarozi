@@ -2,6 +2,17 @@ import 'package:flutter/material.dart';
 
 const kipTaroziYashil = Color(0xFF0F6E56);
 
+/// Har bir mahsulotning o'z brend rangi — operator ekrani va unga bog'liq
+/// vidjetlarda (masalan smena-kalendar dialogi) izchil ishlatiladi.
+const mahsulotRanglari = {
+  'tola': kipTaroziYashil,
+  'lint': Color(0xFF3B82C4),
+  'pux': Color(0xFFD98B2B),
+  'ulyuk': Color(0xFF8B5FBF),
+};
+
+Color mahsulotRangi(String kod) => mahsulotRanglari[kod] ?? kipTaroziYashil;
+
 ThemeData yorugRejim() {
   final sxema = ColorScheme.fromSeed(seedColor: kipTaroziYashil, brightness: Brightness.light);
   return ThemeData(

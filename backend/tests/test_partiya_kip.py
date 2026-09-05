@@ -126,6 +126,28 @@ def test_tezkor_bekor_qilish_muddati(client, db, operator_headers, mahsulot_tola
     assert kech_bekor.status_code == 403
 
 
+def test_smena_kunlik_jamlanma(client, operator_headers, mahsulot_tola):
+    partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 42}, headers=operator_headers
+    ).json()
+    client.post("/api/v1/kiplar", json=_kip_yaratish_payload(partiya["id"], 100.0), headers=operator_headers)
+    client.post("/api/v1/kiplar", json=_kip_yaratish_payload(partiya["id"], 50.0), headers=operator_headers)
+
+    bugun = datetime.now(timezone.utc).date().isoformat()
+    javob = client.get(f"/api/v1/kiplar/smena/kunlik-jamlanma?sana={bugun}", headers=operator_headers)
+    assert javob.status_code == 200
+    data = javob.json()
+    tola = next(m for m in data["mahsulotlar"] if m["mahsulot_kodi"] == "tola")
+    assert tola["soni"] == 2
+    assert tola["jami_kg"] == 150.0
+
+    # Boshqa (masalan kechagi) sana uchun shu kunlarda hech narsa yo'q — bo'sh ro'yxat
+    kecha = (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
+    bosh_javob = client.get(f"/api/v1/kiplar/smena/kunlik-jamlanma?sana={kecha}", headers=operator_headers)
+    assert bosh_javob.status_code == 200
+    assert bosh_javob.json()["mahsulotlar"] == []
+
+
 def test_admin_sababli_ochirish(client, operator_headers, admin_headers, mahsulot_tola):
     partiya = client.post(
         "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 7}, headers=operator_headers

@@ -1,4 +1,6 @@
+import asyncio
 import logging
+import sys
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -107,6 +109,13 @@ def nakladnoy_pdf_yarat(partiya: Partiya, mahsulot_nomi: str, kip_soni: int) -> 
     papka = Path(settings.STORAGE_PATH) / "nakladnoy"
     papka.mkdir(parents=True, exist_ok=True)
     yoli = papka / f"{partiya.nakladnoy_raqami}.pdf"
+
+    if sys.platform == "win32":
+        # FastAPI threadpool ishchi oqimida joriy siyosat Selector bo'lib
+        # qolishi mumkin — u subprocess yarata olmaydi, Playwright esa
+        # brauzerni subprocess sifatida ishga tushiradi. Faqat Proactor
+        # qo'llab-quvvatlaydi.
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
     with sync_playwright() as p:
         brauzer = p.chromium.launch()
