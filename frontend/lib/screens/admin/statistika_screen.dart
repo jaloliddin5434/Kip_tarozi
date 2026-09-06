@@ -169,9 +169,10 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
         '/hisobotlar/mavsum-jurnali',
         query: {'mahsulot_kodi': _mahsulot},
       );
-      faylniSaqlash(baytlar, 'Mavsum_Jurnali_${lok.t(_mahsulot)}_${DateTime.now().year}.xlsx');
+      final yol = await faylniSaqlash(baytlar, 'Mavsum_Jurnali_${lok.t(_mahsulot)}_${DateTime.now().year}.xlsx');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(lok.t('fayl_yuklab_olindi'))));
+        final xabar = yol == null ? lok.t('fayl_yuklab_olindi') : '${lok.t('fayl_saqlandi')}: $yol';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(xabar)));
       }
     } on ApiException catch (e) {
       if (mounted) {
@@ -180,8 +181,10 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red.shade700));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${lok.t('fayl_saqlash_xatosi')}: $e'),
+          backgroundColor: Colors.red.shade700,
+        ));
       }
     } finally {
       if (mounted) setState(() => _jurnalYuklanmoqda = false);

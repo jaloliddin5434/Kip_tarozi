@@ -181,15 +181,16 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
                 '/hisobotlar/smena-excel',
                 query: {'sana': sana, 'smena': tanlanganSmena},
               );
-              faylniSaqlash(baytlar, 'Smena_${tanlanganSmena}_$sana.xlsx');
+              final yol = await faylniSaqlash(baytlar, 'Smena_${tanlanganSmena}_$sana.xlsx');
               if (dialogContext.mounted) Navigator.of(dialogContext).pop();
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(lok.t('fayl_yuklab_olindi'))));
+                final xabar = yol == null ? lok.t('fayl_yuklab_olindi') : '${lok.t('fayl_saqlandi')}: $yol';
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(xabar)));
               }
             } on ApiException catch (e) {
               setDialogState(() => xato = e.xabar);
             } catch (e) {
-              setDialogState(() => xato = e.toString());
+              setDialogState(() => xato = '${lok.t('fayl_saqlash_xatosi')}: $e');
             } finally {
               setDialogState(() => yuklanmoqda = false);
             }

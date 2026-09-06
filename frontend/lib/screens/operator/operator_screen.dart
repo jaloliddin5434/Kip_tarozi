@@ -361,14 +361,16 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
     try {
       final sana = DateTime.now().toIso8601String().substring(0, 10);
       final baytlar = await _holat.api.getBaytlar('/hisobotlar/smena-excel', query: {'sana': sana, 'smena': smena});
-      faylniSaqlash(baytlar, 'Smena_${smena}_$sana.xlsx');
+      final yol = await faylniSaqlash(baytlar, 'Smena_${smena}_$sana.xlsx');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_holat.lok.t('fayl_yuklab_olindi'))));
+        final lok = _holat.lok;
+        final xabar = yol == null ? lok.t('fayl_yuklab_olindi') : '${lok.t('fayl_saqlandi')}: $yol';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(xabar)));
       }
     } on ApiException catch (e) {
       _xatoKorsat(e.xabar);
     } catch (e) {
-      _xatoKorsat(e.toString());
+      _xatoKorsat('${_holat.lok.t('fayl_saqlash_xatosi')}: $e');
     } finally {
       if (mounted) setState(() => _excelYuklanmoqda = false);
     }

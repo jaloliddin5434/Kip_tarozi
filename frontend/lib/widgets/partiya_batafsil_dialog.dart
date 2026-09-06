@@ -96,17 +96,25 @@ class _PartiyaBatafsilIchkiState extends State<_PartiyaBatafsilIchki> {
       final baytlar = await holat.api.getBaytlar(
         '/partiyalar/${widget.partiya.id}/nakladnoy',
       );
-      faylniSaqlash(baytlar, '${widget.partiya.nakladnoyRaqami}.pdf');
+      final yol = await faylniSaqlash(baytlar, '${widget.partiya.nakladnoyRaqami}.pdf');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(lok.t('fayl_yuklab_olindi'))));
+        final xabar = yol == null ? lok.t('fayl_yuklab_olindi') : '${lok.t('fayl_saqlandi')}: $yol';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(xabar)));
       }
     } on ApiException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.xabar),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${lok.t('fayl_saqlash_xatosi')}: $e'),
             backgroundColor: Colors.red.shade700,
           ),
         );
