@@ -302,6 +302,7 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 1-qator: asosiy qidiruv / filtrlash maydonlari
           Wrap(
             spacing: 12,
             runSpacing: 12,
@@ -349,6 +350,15 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
                 label: Text(_sanaGacha == null ? lok.t('sana_gacha') : _sanaGacha!.toIso8601String().substring(0, 10)),
                 onPressed: () => _sanaTanlash(boshlanish: false),
               ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // 2-qator: tezkor chiplar va amallar
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
               ChoiceChip(
                 label: Text(lok.t('bugun')),
                 selected: _bugunTanlanganmi,
@@ -388,6 +398,7 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
             ],
           ),
           const SizedBox(height: 10),
+          // 3-qator: mahsulot filtri
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -397,14 +408,29 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
             ],
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            width: 340,
-            child: KalendarVidjeti(tanlanganKun: _kalendarTanlanganKun, onKunTanlash: _kalendarKunTanlash),
+          // Kalendar (chap) va kiplar jadvali (o'ng) — bir xil vertikal
+          // boshlanish nuqtasidan (crossAxisAlignment.start).
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 340,
+                  child: KalendarVidjeti(tanlanganKun: _kalendarTanlanganKun, onKunTanlash: _kalendarKunTanlash),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _yuklanmoqda
+                      ? const Center(child: CircularProgressIndicator())
+                      : _xato != null
+                          ? Center(child: Text(_xato!))
+                          : _sahifa != null
+                              ? _jadval(lok)
+                              : const SizedBox.shrink(),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
-          if (_yuklanmoqda) const Expanded(child: Center(child: CircularProgressIndicator())),
-          if (_xato != null) Expanded(child: Center(child: Text(_xato!))),
-          if (!_yuklanmoqda && _xato == null && _sahifa != null) Expanded(child: _jadval(lok)),
         ],
       ),
     );
