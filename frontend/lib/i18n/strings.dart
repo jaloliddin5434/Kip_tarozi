@@ -2,6 +2,16 @@ enum Til { uz, ru }
 
 const Map<String, Map<Til, String>> _matnlar = {
   'login_sarlavha': {Til.uz: 'Kip Tarozi', Til.ru: 'Kip Tarozi'},
+  'xazorasp_textil': {Til.uz: 'XAZORASP TEXTIL', Til.ru: 'XAZORASP TEXTIL'},
+  'login_salomlashuv_sarlavha': {Til.uz: 'Assalomu alaykum!', Til.ru: 'Здравствуйте!'},
+  'login_salomlashuv_matn': {
+    Til.uz: 'Mehnatingiz unumli bo\'lsin',
+    Til.ru: 'Продуктивной работы!',
+  },
+  'login_shior': {
+    Til.uz: 'Tarozi — halollik va adolat timsoli',
+    Til.ru: 'Весы — символ честности и справедливости',
+  },
   'login_belgi': {Til.uz: 'Login', Til.ru: 'Логин'},
   'parol_belgi': {Til.uz: 'Parol', Til.ru: 'Пароль'},
   'kirish': {Til.uz: 'Kirish', Til.ru: 'Войти'},
