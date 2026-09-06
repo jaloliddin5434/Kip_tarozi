@@ -1,5 +1,6 @@
 import asyncio
 import sys
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -7,6 +8,8 @@ from uuid import uuid4
 import pytest
 
 from app.core.config import settings
+from app.models.partiya import Partiya, PartiyaHolati
+from app.services.hujjatlar.nakladnoy import nakladnoy_pdf_yarat
 
 
 def _sotilgan_partiya(client, operator_headers, admin_headers, partiya_raqami: int) -> dict:
@@ -116,3 +119,83 @@ def test_selector_siyosati_faol_bolsada_pdf_yaratiladi(client, operator_headers,
             fayl_yoli.unlink(missing_ok=True)
     finally:
         asyncio.set_event_loop_policy(eski_siyosat)
+
+
+def test_parallel_sotish_pdf_generatsiyasida_race_condition_bolmaydi():
+    """nakladnoy_pdf_yarat() ichidagi asyncio event loop siyosati JARAYON
+    darajasida umumiy global holat edi — bir nechta savdo bir vaqtda PDF
+    generatsiya qilsa, ular bir-biriga xalaqit berishi mumkin edi. Bu test
+    bir nechta partiyani BIR VAQTDA (haqiqiy parallel thread'lardan) PDF
+    generatsiya qilishga majburlab, hech biri xato bermasligini va har
+    birining o'z, to'g'ri PDF fayli borligini tasdiqlaydi.
+
+    HTTP/DB qatlamidan o'tmasdan, to'g'ridan-to'g'ri nakladnoy_pdf_yarat()ni
+    chaqiradi — conftest.py'dagi `client` fixture barcha so'rovlar uchun
+    BITTA umumiy SQLAlchemy sessiyasini ishlatadi, u o'zi thread-safe emas,
+    shuning uchun haqiqiy parallel HTTP so'rovlari shu (nakladnoy.py'ga
+    aloqasi bo'lmagan) sabab bilan risolat qilinardi."""
+    eski_siyosat_testdan_oldin = asyncio.get_event_loop_policy()
+
+    natijalar: dict[int, str | None] = {}
+    xatolar: list[BaseException] = []
+    natija_qulfi = threading.Lock()
+
+    def ishla(i: int) -> None:
+        partiya = Partiya(
+            id=2000 + i,
+            mahsulot_id=1,
+            partiya_raqami=970 + i,
+            holati=PartiyaHolati.sotilgan,
+            nakladnoy_raqami=f"NK-RACE-TEST-{i}",
+            sotuv_sanasi=None,
+            xaridor=f"Sinov Xaridor {i}",
+            dogovor_raqami=None,
+            sort=None,
+            urama_bilan_vazn=100.0 + i,
+            urama_vazni=5.0,
+            sof_vazn=95.0 + i,
+            kondicion_vazni=94.0 + i,
+        )
+        try:
+            natija = nakladnoy_pdf_yarat(partiya, "Tola", 5)
+        except BaseException as e:  # noqa: BLE001 — testda har qanday xatoni tutib, keyin bitta joyda tasdiqlaymiz
+            with natija_qulfi:
+                xatolar.append(e)
+            return
+        with natija_qulfi:
+            natijalar[i] = natija
+
+    soni = 4
+    threadlar = [threading.Thread(target=ishla, args=(i,)) for i in range(soni)]
+    for t in threadlar:
+        t.start()
+    for t in threadlar:
+        t.join(timeout=60)
+
+    try:
+        assert not xatolar, f"Parallel PDF generatsiyasida xato(lar) yuz berdi: {xatolar}"
+        assert len(natijalar) == soni
+
+        fayllar = []
+        for i in range(soni):
+            yoli = natijalar[i]
+            assert yoli is not None
+            fayl = Path(settings.STORAGE_PATH) / yoli
+            fayllar.append(fayl)
+            assert fayl.is_file(), f"#{i} uchun PDF fayl topilmadi: {fayl}"
+            assert fayl.stat().st_size > 0
+            assert fayl.read_bytes()[:4] == b"%PDF"
+
+        # Har bir chaqiruv o'z, ALOHIDA faylini yaratgan bo'lishi kerak —
+        # birontasi boshqasining ustidan yozib yubormagan.
+        assert len({f.resolve() for f in fayllar}) == soni
+    finally:
+        for i in range(soni):
+            yoli = natijalar.get(i)
+            if yoli:
+                (Path(settings.STORAGE_PATH) / yoli).unlink(missing_ok=True)
+
+    # Global event loop siyosati testdan OLDINGI holatiga qaytgan bo'lishi
+    # kerak — bir nechta parallel chaqiruvdan keyin ham "chala" holatda
+    # qolib ketmasligi kerak.
+    assert asyncio.get_event_loop_policy() is eski_siyosat_testdan_oldin

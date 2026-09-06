@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -11,6 +13,13 @@ from app.models.partiya import Partiya
 logger = logging.getLogger("nakladnoy")
 
 YUK_JONATUVCHI = '"XAZORASP TEXTIL" MCHJ'
+
+# asyncio event loop siyosati JARAYON darajasida umumiy global holat —
+# nakladnoy_pdf_yarat() Windows'da uni vaqtincha o'zgartirishga majbur
+# (pastga qarang). Bir vaqtning o'zida ikkita savdo so'rovi kelsa bir-biriga
+# xalaqit bermasligi uchun, "saqlash -> o'zgartirish -> foydalanish ->
+# tiklash" bosqichi to'liq shu qulf ostida, bo'linmas ravishda bajariladi.
+_pdf_qulfi = threading.Lock()
 
 
 def nakladnoy_raqami_yarat(partiya: Partiya) -> str:
@@ -94,27 +103,17 @@ def _html_qur(partiya: Partiya, mahsulot_nomi: str, kip_soni: int) -> str:
 </html>"""
 
 
-def nakladnoy_pdf_yarat(partiya: Partiya, mahsulot_nomi: str, kip_soni: int) -> str | None:
-    """Partiya sotilganda chaqiriladi (nakladnoy_raqami allaqachon o'rnatilgan
-    bo'lishi kerak). HTML shablonni Playwright orqali PDF'ga aylantirib,
-    STORAGE_PATH/nakladnoy/<nakladnoy_raqami>.pdf'ga yozadi va shu papkaga
-    nisbatan yo'lni qaytaradi (bazaga shu saqlanadi — rasm_saqla bilan bir xil
-    konvensiya)."""
-    if not partiya.nakladnoy_raqami:
-        logger.error("nakladnoy_pdf_yarat: partiya #%s uchun nakladnoy_raqami hali o'rnatilmagan", partiya.id)
-        return None
-
-    html = _html_qur(partiya, mahsulot_nomi, kip_soni)
-
-    papka = Path(settings.STORAGE_PATH) / "nakladnoy"
-    papka.mkdir(parents=True, exist_ok=True)
-    yoli = papka / f"{partiya.nakladnoy_raqami}.pdf"
-
+def _pdf_generatsiya_qil(html: str, yoli: Path) -> None:
+    """`nakladnoy_pdf_yarat` tomonidan, har chaqiruvda yaratiladigan BIR
+    MARTALIK, mustaqil thread ichida ishga tushiriladi — FastAPI'ning umumiy
+    (qayta ishlatiladigan) threadpool ishchi oqimlarida EMAS. Shu tufayli
+    Playwright ichkarida o'rnatgan event loop keyinchalik shu threadpool
+    orqali kelgan, bu so'rovga aloqasi bo'lmagan boshqa so'rovlarga
+    "yopishib" qolmaydi."""
     if sys.platform == "win32":
-        # FastAPI threadpool ishchi oqimida joriy siyosat Selector bo'lib
-        # qolishi mumkin — u subprocess yarata olmaydi, Playwright esa
-        # brauzerni subprocess sifatida ishga tushiradi. Faqat Proactor
-        # qo'llab-quvvatlaydi.
+        # Joriy siyosat Selector bo'lib qolishi mumkin — u subprocess yarata
+        # olmaydi, Playwright esa brauzerni subprocess sifatida ishga
+        # tushiradi. Faqat Proactor qo'llab-quvvatlaydi.
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
     with sync_playwright() as p:
@@ -125,6 +124,36 @@ def nakladnoy_pdf_yarat(partiya: Partiya, mahsulot_nomi: str, kip_soni: int) -> 
             sahifa.pdf(path=str(yoli), format="A4", print_background=True)
         finally:
             brauzer.close()
+
+
+def nakladnoy_pdf_yarat(partiya: Partiya, mahsulot_nomi: str, kip_soni: int) -> str | None:
+    """Partiya sotilganda chaqiriladi (nakladnoy_raqami allaqachon o'rnatilgan
+    bo'lishi kerak). HTML shablonni Playwright orqali PDF'ga aylantirib,
+    STORAGE_PATH/nakladnoy/<nakladnoy_raqami>.pdf'ga yozadi va shu papkaga
+    nisbatan yo'lni qaytaradi (bazaga shu saqlanadi — rasm_saqla bilan bir xil
+    konvensiya).
+
+    Bu chaqiruv hozircha SINXRON (bloklovchi) qoladi — bir vaqtda ikkita
+    savdo bo'lsa, ikkinchisi birinchisi tugaguncha shu funksiya ichida
+    kutadi (_pdf_qulfi orqali serializatsiya qilingan), lekin bu ikkalasi
+    bir-birining event loop siyosatiga xalaqit bermasligini kafolatlaydi."""
+    if not partiya.nakladnoy_raqami:
+        logger.error("nakladnoy_pdf_yarat: partiya #%s uchun nakladnoy_raqami hali o'rnatilmagan", partiya.id)
+        return None
+
+    html = _html_qur(partiya, mahsulot_nomi, kip_soni)
+
+    papka = Path(settings.STORAGE_PATH) / "nakladnoy"
+    papka.mkdir(parents=True, exist_ok=True)
+    yoli = papka / f"{partiya.nakladnoy_raqami}.pdf"
+
+    with _pdf_qulfi:
+        eski_siyosat = asyncio.get_event_loop_policy()
+        try:
+            with ThreadPoolExecutor(max_workers=1) as ishchi:
+                ishchi.submit(_pdf_generatsiya_qil, html, yoli).result()
+        finally:
+            asyncio.set_event_loop_policy(eski_siyosat)
 
     logger.info("Nakladnoy PDF yaratildi: partiya #%s -> %s", partiya.partiya_raqami, yoli)
     return str(yoli.relative_to(settings.STORAGE_PATH)).replace("\\", "/")
