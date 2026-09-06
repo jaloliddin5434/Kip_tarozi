@@ -62,11 +62,13 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
         smenalar = (sJavob as List).map((e) => SmenaJamlanmasi.fromJson(e)).toList();
       }
 
+      if (!mounted) return;
       setState(() {
         _jamlanma = jamlanma;
         _smenalar = smenalar;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _xato = e.toString());
     } finally {
       if (mounted) setState(() => _yuklanmoqda = false);
@@ -82,8 +84,10 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
     try {
       final api = context.read<AppState>().api;
       final javob = await api.get('/statistika/jamlanma', query: {'davr': 'kunlik', 'sana': _sanaFormat(kun)});
+      if (!mounted) return;
       setState(() => _kunlikJamlanma = DavrJamlanmasi.fromJson(javob));
     } catch (e) {
+      if (!mounted) return;
       setState(() => _kunXato = e.toString());
     } finally {
       if (mounted) setState(() => _kunYuklanmoqda = false);

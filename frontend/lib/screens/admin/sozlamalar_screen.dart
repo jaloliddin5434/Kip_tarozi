@@ -88,6 +88,10 @@ class _SozlamalarEkraniState extends State<SozlamalarEkrani> {
     });
     try {
       final javob = await context.read<AppState>().api.get('/sozlamalar') as List;
+      // Javob kelguncha ekran dispose bo'lgan bo'lishi mumkin — bunday holda
+      // pastdagi tsikl allaqachon dispose qilingan TextEditingController'larga
+      // yozishga urinib qolmasligi uchun darhol to'xtaymiz.
+      if (!mounted) return;
       final malumKalitlar = _bolimlar.expand((b) => b.maydonlar).map((m) => m.kalit).toSet();
       _qoshimchaKalitlar.clear();
 
@@ -103,6 +107,7 @@ class _SozlamalarEkraniState extends State<SozlamalarEkrani> {
         _kontrollerlar[kalit]!.text = (item['qiymat'] as String?) ?? '';
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _xato = e.toString());
     } finally {
       if (mounted) setState(() => _yuklanmoqda = false);

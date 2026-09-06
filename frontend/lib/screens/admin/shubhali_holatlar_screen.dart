@@ -49,11 +49,13 @@ class _ShubhaliHolatlarEkraniState extends State<ShubhaliHolatlarEkrani> {
         api.get('/shubhali-holatlar', query: royxatQuery),
         api.get('/shubhali-holatlar/statistika', query: _filtrQuery()),
       ]);
+      if (!mounted) return;
       setState(() {
         _sahifa = Sahifalangan.fromJson(natijalar[0], (e) => ShubhaliHolat.fromJson(e));
         _statistika = ShubhaliHolatStatistika.fromJson(natijalar[1]);
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _xato = e.toString());
     } finally {
       if (mounted) setState(() => _yuklanmoqda = false);
@@ -68,6 +70,7 @@ class _ShubhaliHolatlarEkraniState extends State<ShubhaliHolatlarEkrani> {
       lastDate: DateTime.now().add(const Duration(days: 1)),
     );
     if (tanlangan == null) return;
+    if (!mounted) return;
     setState(() {
       if (boshlanish) {
         _sanaDan = tanlangan;

@@ -25,6 +25,7 @@ class _MoliyaviyKirishEkraniState extends State<MoliyaviyKirishEkrani> {
   }
 
   void _sessiyaniTekshirish() {
+    if (!mounted) return;
     final holat = context.read<AppState>();
     if (holat.moliyaviySessiyaAmalda) {
       _hisobotSahifasigaOtish();
@@ -44,6 +45,7 @@ class _MoliyaviyKirishEkraniState extends State<MoliyaviyKirishEkrani> {
       await holat.moliyaviyKirish(_parolKontrolleri.text);
       if (mounted) _hisobotSahifasigaOtish();
     } on ApiException catch (e) {
+      if (!mounted) return;
       if (e.statusCode == 400) {
         setState(() => _ornatishRejimi = true);
       } else if (e.statusCode == 401) {
@@ -52,6 +54,7 @@ class _MoliyaviyKirishEkraniState extends State<MoliyaviyKirishEkrani> {
         setState(() => _xato = e.xabar);
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _xato = e.toString());
     } finally {
       if (mounted) setState(() => _yuklanmoqda = false);
@@ -73,8 +76,10 @@ class _MoliyaviyKirishEkraniState extends State<MoliyaviyKirishEkrani> {
       await holat.moliyaviyKirish(_parolKontrolleri.text);
       if (mounted) _hisobotSahifasigaOtish();
     } on ApiException catch (e) {
+      if (!mounted) return;
       setState(() => _xato = e.xabar);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _xato = e.toString());
     } finally {
       if (mounted) setState(() => _yuklanmoqda = false);

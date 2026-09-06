@@ -40,6 +40,7 @@ class _MoliyaviyHisobotEkraniState extends State<MoliyaviyHisobotEkrani> {
         holat.moliyaviyGet('/moliyaviy/uzex-narxlar'),
         holat.moliyaviyGet('/moliyaviy/hisobot', query: {'davr': _davr}),
       ]);
+      if (!mounted) return;
       setState(() {
         _narxlar = (natijalar[0] as List).map((e) => UzexNarx.fromJson(e)).toList();
         _hisobot = MoliyaviyHisobot.fromJson(natijalar[1]);
@@ -50,8 +51,10 @@ class _MoliyaviyHisobotEkraniState extends State<MoliyaviyHisobotEkrani> {
         if (mounted) Navigator.of(context).pop();
         return;
       }
+      if (!mounted) return;
       setState(() => _xato = e.xabar);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _xato = e.toString());
     } finally {
       if (mounted) setState(() => _yuklanmoqda = false);
