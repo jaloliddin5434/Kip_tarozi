@@ -68,6 +68,13 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   // qulaylik uchun frontend xotirasida kuzatiladi.
   final Map<String, List<int>> _songiPartiyalar = {};
 
+  // _partiyaniOchish() har chaqirilganda oshiriladigan so'rov hisoblagichi —
+  // operator tez-tez turli partiya raqamlarini kiritib bossa, oldingi
+  // (sekinroq) so'rovning javobi keyingi (tezroq) javobdan KEYIN kelib
+  // qolishi mumkin. Javob qaytganda shu ID hozirgi (eng oxirgi) qiymatga
+  // teng bo'lmasa — bu eskirgan (stale) javob, e'tiborsiz qoldiriladi.
+  int _partiyaOchishSorovId = 0;
+
   Timer? _blokTimer;
   bool _blokDialogiKorinmoqda = false;
 
@@ -226,10 +233,17 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
       return;
     }
 
+    final soralganId = ++_partiyaOchishSorovId;
     setState(() => _partiyaYuklanmoqda = true);
     try {
       final javob = await _holat.api
           .post('/partiyalar', tana: {'mahsulot_kodi': _tanlanganMahsulot!.kod, 'partiya_raqami': raqam});
+      // Operator javob kutilayotganda boshqa partiya raqamini yuborgan
+      // bo'lishi mumkin — bunday holda eskirgan javobni e'tiborsiz
+      // qoldiramiz, aks holda oxirgi so'ralgan partiya o'rniga eski partiya
+      // saqlanib qolib, keyingi tortish NOTO'G'RI partiyaga yozilib qolishi
+      // mumkin edi.
+      if (soralganId != _partiyaOchishSorovId) return;
       final partiya = Partiya.fromJson(javob);
       setState(() {
         _tanlanganPartiya = partiya;
@@ -238,9 +252,10 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
       });
       _ogirlikFokusi.requestFocus();
     } catch (e) {
+      if (soralganId != _partiyaOchishSorovId) return;
       _xatoKorsat(e.toString());
     } finally {
-      if (mounted) setState(() => _partiyaYuklanmoqda = false);
+      if (mounted && soralganId == _partiyaOchishSorovId) setState(() => _partiyaYuklanmoqda = false);
     }
   }
 
