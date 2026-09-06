@@ -147,6 +147,17 @@ const Map<String, Map<Til, String>> _matnlar = {
     Til.ru: 'За этот период данных нет',
   },
 
+  // Statistika — Rekord paneli
+  'rekord': {Til.uz: 'Rekord', Til.ru: 'Рекорд'},
+  'eng_yaxshi_smena': {Til.uz: 'Eng yaxshi smena', Til.ru: 'Лучшая смена'},
+  'eng_yaxshi_operator': {Til.uz: 'Eng yaxshi operator', Til.ru: 'Лучший оператор'},
+  'eng_yuqori_kunlik_yigim': {
+    Til.uz: 'Eng yuqori kunlik yig\'im',
+    Til.ru: 'Максимальный дневной сбор',
+  },
+  'barcha_vaqt_rekordi': {Til.uz: 'Barcha vaqt rekordi', Til.ru: 'Рекорд за всё время'},
+  'rekord_malumot_yoq': {Til.uz: 'Ma\'lumot yo\'q', Til.ru: 'Нет данных'},
+
   // Statistika — kalendar
   'kunlar_boyicha': {Til.uz: 'Kunlar bo\'yicha', Til.ru: 'По дням'},
   'oldingi_oy': {Til.uz: 'Oldingi oy', Til.ru: 'Предыдущий месяц'},

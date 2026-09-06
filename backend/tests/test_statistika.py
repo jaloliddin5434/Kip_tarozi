@@ -117,3 +117,77 @@ def test_smena_boyicha_mavjud_bolmagan_mahsulot_kodi_bosh_royxat(client, admin_h
 def test_statistika_operator_kira_olmaydi(client, operator_headers):
     javob = client.get("/api/v1/statistika/jamlanma", headers=operator_headers)
     assert javob.status_code == 403
+
+
+def _operator_yarat(db, ism, login, smena):
+    from app.core.security import parolni_hash
+    from app.models.foydalanuvchi import Foydalanuvchi, Rol
+
+    foydalanuvchi = Foydalanuvchi(
+        ism=ism, login=login, parol_hash=parolni_hash("parol123"), rol=Rol.operator, smena=smena
+    )
+    db.add(foydalanuvchi)
+    db.commit()
+    db.refresh(foydalanuvchi)
+    return foydalanuvchi
+
+
+def test_rekordlar_eng_yaxshi_smena_va_operator_davr_boyicha(client, db, admin_headers, mahsulot_tola):
+    op_a = _operator_yarat(db, "Operator A", "op_a", Smena.A)
+    op_b = _operator_yarat(db, "Operator B", "op_b", Smena.B)
+    partiya = _partiya_yarat(db, mahsulot_tola.id, 800)
+
+    bugun = date.today()
+    # Smena B — kg bo'yicha eng ko'p (300), lekin atigi 2 ta kip
+    _kip_yarat(db, partiya.id, 1, 150.0, Smena.B, bugun, op_b.id)
+    _kip_yarat(db, partiya.id, 2, 150.0, Smena.B, bugun, op_b.id)
+    # Smena A — kg kamroq (120), lekin 3 ta kip (soni bo'yicha eng ko'p)
+    _kip_yarat(db, partiya.id, 3, 40.0, Smena.A, bugun, op_a.id)
+    _kip_yarat(db, partiya.id, 4, 40.0, Smena.A, bugun, op_a.id)
+    _kip_yarat(db, partiya.id, 5, 40.0, Smena.A, bugun, op_a.id)
+
+    javob = client.get("/api/v1/statistika/rekordlar", params={"davr": "kunlik"}, headers=admin_headers).json()
+
+    assert javob["eng_yaxshi_smena"]["smena"] == "B"
+    assert javob["eng_yaxshi_smena"]["jami_kg"] == 300.0
+    assert javob["eng_yaxshi_operator"]["login"] == "op_a"
+    assert javob["eng_yaxshi_operator"]["soni"] == 3
+
+
+def test_rekordlar_eng_yuqori_kunlik_yigim_barcha_vaqt_boyicha(client, db, admin_headers, operator, mahsulot_tola):
+    partiya = _partiya_yarat(db, mahsulot_tola.id, 801)
+
+    rekord_kun = date.today() - timedelta(days=40)  # har qanday davrdan tashqarida
+    _kip_yarat(db, partiya.id, 1, 500.0, Smena.A, rekord_kun, operator.id)
+    _kip_yarat(db, partiya.id, 2, 400.0, Smena.B, rekord_kun, operator.id)
+    # bugun — kamroq
+    _kip_yarat(db, partiya.id, 3, 100.0, Smena.A, date.today(), operator.id)
+
+    for davr in ("kunlik", "haftalik", "oylik", "mavsum"):
+        javob = client.get("/api/v1/statistika/rekordlar", params={"davr": davr}, headers=admin_headers).json()
+        assert javob["eng_yuqori_kunlik_yigim"]["sana"] == rekord_kun.isoformat()
+        assert javob["eng_yuqori_kunlik_yigim"]["jami_kg"] == 900.0
+
+
+def test_rekordlar_bekor_qilingan_kip_hisobga_olinmaydi(client, db, admin_headers, operator, mahsulot_tola):
+    partiya = _partiya_yarat(db, mahsulot_tola.id, 802)
+    kip = _kip_yarat(db, partiya.id, 1, 999.0, Smena.A, date.today(), operator.id)
+    kip.holati = KipHolati.bekor_qilingan
+    db.commit()
+
+    javob = client.get("/api/v1/statistika/rekordlar", params={"davr": "kunlik"}, headers=admin_headers).json()
+    assert javob["eng_yaxshi_smena"] is None
+    assert javob["eng_yaxshi_operator"] is None
+    assert javob["eng_yuqori_kunlik_yigim"] is None
+
+
+def test_rekordlar_malumot_yoq_bosh_holat(client, admin_headers):
+    javob = client.get("/api/v1/statistika/rekordlar", params={"davr": "mavsum"}, headers=admin_headers).json()
+    assert javob["eng_yaxshi_smena"] is None
+    assert javob["eng_yaxshi_operator"] is None
+    assert javob["eng_yuqori_kunlik_yigim"] is None
+
+
+def test_rekordlar_operator_kira_olmaydi(client, operator_headers):
+    javob = client.get("/api/v1/statistika/rekordlar", params={"davr": "kunlik"}, headers=operator_headers)
+    assert javob.status_code == 403

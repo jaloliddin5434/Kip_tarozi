@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../api/api_exception.dart';
 import '../../i18n/strings.dart';
 import '../../models/dashboard.dart';
+import '../../models/rekordlar.dart';
 import '../../models/statistika.dart';
 import '../../services/fayl_yuklab_olish.dart';
 import '../../services/statistika_pdf.dart';
@@ -38,10 +39,38 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
 
   bool _jurnalYuklanmoqda = false;
 
+  // "Rekord" paneli — ekranning umumiy davr filtridan MUSTAQIL, o'zining
+  // alohida davr tanlovi bilan.
+  String _rekordDavr = 'mavsum';
+  Rekordlar? _rekordlar;
+  bool _rekordYuklanmoqda = true;
+  String? _rekordXato;
+
   @override
   void initState() {
     super.initState();
     _yuklash();
+    _rekordlarniYuklash();
+  }
+
+  Future<void> _rekordlarniYuklash() async {
+    setState(() {
+      _rekordYuklanmoqda = true;
+      _rekordXato = null;
+    });
+    try {
+      final javob = await context.read<AppState>().api.get(
+        '/statistika/rekordlar',
+        query: {'davr': _rekordDavr},
+      );
+      if (!mounted) return;
+      setState(() => _rekordlar = Rekordlar.fromJson(javob));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _rekordXato = e.toString());
+    } finally {
+      if (mounted) setState(() => _rekordYuklanmoqda = false);
+    }
   }
 
   Future<void> _yuklash() async {
@@ -333,23 +362,235 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
           const SizedBox(height: 12),
           LayoutBuilder(
             builder: (context, constraints) {
-              final kalendar = KalendarVidjeti(tanlanganKun: _tanlanganKun, onKunTanlash: _kunTanlash);
+              final kalendar = SizedBox(
+                width: 340,
+                child: KalendarVidjeti(tanlanganKun: _tanlanganKun, onKunTanlash: _kunTanlash),
+              );
+              final rekord = SizedBox(width: 320, child: _rekordPaneli(lok));
               final tafsilot = _kunTafsiloti(lok);
-              if (constraints.maxWidth > 640) {
+
+              if (constraints.maxWidth > 1040) {
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(width: 340, child: kalendar),
+                    kalendar,
+                    const SizedBox(width: 24),
+                    rekord,
                     const SizedBox(width: 24),
                     Expanded(child: tafsilot),
                   ],
                 );
               }
+              if (constraints.maxWidth > 700) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [kalendar, const SizedBox(width: 24), rekord],
+                    ),
+                    const SizedBox(height: 20),
+                    tafsilot,
+                  ],
+                );
+              }
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [kalendar, const SizedBox(height: 16), tafsilot],
+                children: [
+                  kalendar,
+                  const SizedBox(height: 20),
+                  rekord,
+                  const SizedBox(height: 20),
+                  tafsilot,
+                ],
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // "Rekord" paneli — kalendar yonida, ekranning umumiy davr filtridan
+  // mustaqil o'z davr tanlovi bilan.
+  // ---------------------------------------------------------------------
+
+  static const _rekordOltin = Color(0xFFD4AF37);
+  static const _rekordKok = Color(0xFF3B82C4);
+
+  Widget _rekordPaneli(Lokalizatsiya lok) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.withValues(alpha: 0.04),
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.emoji_events, color: _rekordOltin, size: 22),
+              const SizedBox(width: 8),
+              Text(lok.t('rekord'), style: Theme.of(context).textTheme.titleMedium),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              for (final v in const ['kunlik', 'haftalik', 'oylik', 'mavsum'])
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: _rekordDavrTugmasi(lok.t('davr_$v'), v),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_rekordYuklanmoqda)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 28),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_rekordXato != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(_rekordXato!, style: const TextStyle(color: Colors.red)),
+            )
+          else ...[
+            _rekordKartasi(
+              ikonka: Icons.workspace_premium,
+              rang: _rekordOltin,
+              sarlavha: lok.t('eng_yaxshi_smena'),
+              qiymat: _rekordlar?.engYaxshiSmena == null
+                  ? null
+                  : '${lok.t("smena")} ${_rekordlar!.engYaxshiSmena!.smena}',
+              tavsif: _rekordlar?.engYaxshiSmena == null
+                  ? null
+                  : '${_rekordlar!.engYaxshiSmena!.jamiKg.toStringAsFixed(1)} kg',
+              lok: lok,
+            ),
+            const SizedBox(height: 10),
+            _rekordKartasi(
+              ikonka: Icons.star,
+              rang: kipTaroziYashil,
+              sarlavha: lok.t('eng_yaxshi_operator'),
+              qiymat: _rekordlar?.engYaxshiOperator?.ism,
+              tavsif: _rekordlar?.engYaxshiOperator == null
+                  ? null
+                  : '${_rekordlar!.engYaxshiOperator!.soni} ${lok.t("soni")}',
+              lok: lok,
+            ),
+            const SizedBox(height: 10),
+            _rekordKartasi(
+              ikonka: Icons.trending_up,
+              rang: _rekordKok,
+              sarlavha: lok.t('eng_yuqori_kunlik_yigim'),
+              qiymat: _rekordlar?.engYuqoriKunlikYigim == null
+                  ? null
+                  : '${_rekordlar!.engYuqoriKunlikYigim!.jamiKg.toStringAsFixed(1)} kg',
+              tavsif: _rekordlar?.engYuqoriKunlikYigim?.sana,
+              izoh: lok.t('barcha_vaqt_rekordi'),
+              lok: lok,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _rekordDavrTugmasi(String matn, String qiymat) {
+    final tanlanganmi = _rekordDavr == qiymat;
+    void tanlash() {
+      if (_rekordDavr == qiymat) return;
+      setState(() => _rekordDavr = qiymat);
+      _rekordlarniYuklash();
+    }
+
+    return SizedBox(
+      height: 32,
+      child: tanlanganmi
+          ? ElevatedButton(
+              onPressed: tanlash,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kipTaroziYashil,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.zero,
+                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+              child: Text(matn, overflow: TextOverflow.ellipsis),
+            )
+          : OutlinedButton(
+              onPressed: tanlash,
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: kipTaroziYashil),
+                foregroundColor: kipTaroziYashil,
+                padding: EdgeInsets.zero,
+                textStyle: const TextStyle(fontSize: 11),
+              ),
+              child: Text(matn, overflow: TextOverflow.ellipsis),
+            ),
+    );
+  }
+
+  Widget _rekordKartasi({
+    required IconData ikonka,
+    required Color rang,
+    required String sarlavha,
+    required String? qiymat,
+    required String? tavsif,
+    required Lokalizatsiya lok,
+    String? izoh,
+  }) {
+    final malumotBor = qiymat != null;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: rang.withValues(alpha: malumotBor ? 0.14 : 0.06),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(ikonka, color: malumotBor ? rang : Colors.grey.shade400, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(sarlavha, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                const SizedBox(height: 3),
+                if (malumotBor) ...[
+                  Text(
+                    qiymat,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (tavsif != null)
+                    Text(tavsif, style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                ] else
+                  Text(
+                    lok.t('rekord_malumot_yoq'),
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
+                  ),
+                if (izoh != null) ...[
+                  const SizedBox(height: 2),
+                  Text(izoh, style: TextStyle(fontSize: 10, color: Colors.grey.shade400)),
+                ],
+              ],
+            ),
           ),
         ],
       ),
