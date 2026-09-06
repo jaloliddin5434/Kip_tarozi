@@ -72,7 +72,10 @@ class _AdminShellState extends State<AdminShell> {
         ),
     ];
 
-    if (_tanlanganIndeks >= sahifalar.length) _tanlanganIndeks = 0;
+    // Rol o'zgarishi (masalan qayta login) sahifalar sonini qisqartirishi mumkin —
+    // _tanlanganIndeks'ni build() ichida to'g'ridan-to'g'ri o'zgartirish o'rniga,
+    // faqat shu render uchun mahalliy tuzatilgan qiymatdan foydalanamiz.
+    final effektivIndeks = _tanlanganIndeks >= sahifalar.length ? 0 : _tanlanganIndeks;
 
     return Scaffold(
       appBar: AppBar(
@@ -110,13 +113,15 @@ class _AdminShellState extends State<AdminShell> {
       body: Row(
         children: [
           NavigationRail(
-            selectedIndex: _tanlanganIndeks,
+            selectedIndex: effektivIndeks,
             onDestinationSelected: (i) => setState(() => _tanlanganIndeks = i),
             labelType: NavigationRailLabelType.all,
             destinations: yorliqlar,
           ),
           const VerticalDivider(width: 1),
-          Expanded(child: sahifalar[_tanlanganIndeks]),
+          Expanded(
+            child: IndexedStack(index: effektivIndeks, children: sahifalar),
+          ),
         ],
       ),
     );
