@@ -81,6 +81,7 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
   Future<void> _yopish(Partiya p) async {
     try {
       await context.read<AppState>().api.patch('/partiyalar/${p.id}/yopish');
+      _muvaffaqiyatKorsat('Partiya yopildi.');
       _yuklash();
     } catch (e) {
       _xatoKorsat(e.toString());
@@ -88,8 +89,16 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
   }
 
   void _xatoKorsat(String xabar) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(xabar), backgroundColor: Colors.red.shade700),
+    );
+  }
+
+  void _muvaffaqiyatKorsat(String xabar) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(xabar), backgroundColor: kipTaroziYashil),
     );
   }
 
@@ -192,6 +201,8 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
                 if (context.mounted) Navigator.of(context).pop(true);
               } on ApiException catch (e) {
                 _xatoKorsat(e.xabar);
+              } catch (e) {
+                _xatoKorsat(e.toString());
               }
             },
             child: Text(lok.t('sotish')),
@@ -200,7 +211,10 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
       ),
     );
 
-    if (natija == true) _yuklash();
+    if (natija == true) {
+      _yuklash();
+      _muvaffaqiyatKorsat('Partiya muvaffaqiyatli sotildi.');
+    }
   }
 
   Future<void> _olchovFormasiniOchish(Partiya p) async {
@@ -294,6 +308,8 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
                 if (context.mounted) Navigator.of(context).pop(true);
               } on ApiException catch (e) {
                 _xatoKorsat(e.xabar);
+              } catch (e) {
+                _xatoKorsat(e.toString());
               }
             },
             child: Text(lok.t('saqlash')),
@@ -302,7 +318,10 @@ class _PartiyalarEkraniState extends State<PartiyalarEkrani> {
       ),
     );
 
-    if (natija == true) _yuklash();
+    if (natija == true) {
+      _yuklash();
+      _muvaffaqiyatKorsat('O\'lchovlar saqlandi.');
+    }
   }
 
   void _batafsilniOchish(Partiya p, bool adminRoli) {
