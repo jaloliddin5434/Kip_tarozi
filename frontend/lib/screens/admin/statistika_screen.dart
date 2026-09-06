@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
+import '../../api/api_exception.dart';
 import '../../i18n/strings.dart';
 import '../../models/dashboard.dart';
 import '../../models/statistika.dart';
+import '../../services/fayl_yuklab_olish.dart';
 import '../../services/statistika_pdf.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
@@ -33,6 +35,8 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
   DavrJamlanmasi? _kunlikJamlanma;
   bool _kunYuklanmoqda = false;
   String? _kunXato;
+
+  bool _jurnalYuklanmoqda = false;
 
   @override
   void initState() {
@@ -125,6 +129,34 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
       lok: lok,
     );
     await Printing.layoutPdf(onLayout: (format) async => doc.save());
+  }
+
+  /// Tanlangan mahsulot uchun mavsum boshidan bugungacha kunlik qatorlar
+  /// bilan Excel jurnalini yuklab oladi (backend: /hisobotlar/mavsum-jurnali).
+  Future<void> _mavsumJurnaliniYuklab(Lokalizatsiya lok) async {
+    setState(() => _jurnalYuklanmoqda = true);
+    try {
+      final baytlar = await context.read<AppState>().api.getBaytlar(
+        '/hisobotlar/mavsum-jurnali',
+        query: {'mahsulot_kodi': _mahsulot},
+      );
+      faylniSaqlash(baytlar, 'Mavsum_Jurnali_${lok.t(_mahsulot)}_${DateTime.now().year}.xlsx');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(lok.t('fayl_yuklab_olindi'))));
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.xabar), backgroundColor: Colors.red.shade700));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red.shade700));
+      }
+    } finally {
+      if (mounted) setState(() => _jurnalYuklanmoqda = false);
+    }
   }
 
   @override
@@ -267,6 +299,14 @@ class _StatistikaEkraniState extends State<StatistikaEkrani> {
                 icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
                 label: Text(lok.t('pdf_eksport')),
                 onPressed: () => _eksportQil(lok),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                icon: _jurnalYuklanmoqda
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.event_note_outlined, size: 18),
+                label: Text(lok.t('mavsum_jurnali_yuklab')),
+                onPressed: _jurnalYuklanmoqda ? null : () => _mavsumJurnaliniYuklab(lok),
               ),
             ],
           ),

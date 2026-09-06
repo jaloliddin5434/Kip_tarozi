@@ -119,6 +119,10 @@ const Map<String, Map<Til, String>> _matnlar = {
   },
   'yuklab_olish': {Til.uz: 'Yuklab olish', Til.ru: 'Скачать'},
   'fayl_yuklab_olindi': {Til.uz: 'Fayl yuklab olindi', Til.ru: 'Файл скачан'},
+  'mavsum_jurnali_yuklab': {
+    Til.uz: 'Mavsum jurnalini yuklab olish',
+    Til.ru: 'Скачать журнал сезона',
+  },
   'jami': {Til.uz: 'Jami', Til.ru: 'Итого'},
 
   'davr_kunlik': {Til.uz: 'Kunlik', Til.ru: 'Дневной'},
