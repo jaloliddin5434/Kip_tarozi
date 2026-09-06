@@ -1,6 +1,24 @@
 from datetime import date
 
+import httpx
+import pytest
+
 from app.models.partiya import Partiya, PartiyaHolati
+from app.services import uzex
+
+
+@pytest.fixture(autouse=True)
+def _uzex_tarmoqsiz(monkeypatch):
+    """Bu fayl testlari UZEX'ga real so'rov yubormasin — keshni tozalab,
+    httpx.get'ni bloklaymiz (natijada endpoint zaxira qiymatlarni qaytaradi)."""
+    uzex.keshni_tozalash()
+
+    def _bloklangan(*args, **kwargs):
+        raise httpx.ConnectError("test: UZEX tarmog'i bloklangan")
+
+    monkeypatch.setattr(uzex.httpx, "get", _bloklangan)
+    yield
+    uzex.keshni_tozalash()
 
 
 def test_parol_ornatilmagan_bolsa_kirish_rad_etiladi(client, admin_headers):

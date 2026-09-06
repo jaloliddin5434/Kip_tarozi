@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -14,18 +14,11 @@ from app.models.partiya import Partiya, PartiyaHolati
 from app.models.sozlama import Sozlama
 from app.schemas.moliyaviy import MoliyaviyHisobot, MoliyaviyKirish, MoliyaviyMahsulotHisoboti, MoliyaviyToken, UzexNarxJavob
 from app.services.davr import davr_oraligi
+from app.services.uzex import uzex_narxlari
 
 router = APIRouter(prefix="/moliyaviy", tags=["moliyaviy"])
 
 MOLIYAVIY_PAROL_KALITI = "moliyaviy_parol_hash"
-
-# STUB — haqiqiy UZEX integratsiyasi alohida so'ralganda qo'shiladi (sayt strukturasi o'rganilishi kerak)
-_UZEX_STUB = (
-    ("tola", "Tola", 18_500.0),
-    ("lint", "Lint", 12_000.0),
-    ("pux", "Pux", 6_500.0),
-    ("ulyuk", "Ulyuk", 4_000.0),
-)
 
 
 @router.post("/parolni-ornatish")
@@ -73,10 +66,14 @@ def kirish(
 
 @router.get("/uzex-narxlar", response_model=list[UzexNarxJavob])
 def uzex_narxlar(_: Foydalanuvchi = Depends(joriy_moliyaviy_foydalanuvchi)) -> list[UzexNarxJavob]:
-    hozir = datetime.now(timezone.utc)
+    """UZEX (uzex.uz) dan paxta tolasi va yon mahsulotlari uchun joriy narxlar
+    (so'm/kg). Natija 1 soat keshlanadi; UZEX bilan aloqa uzilsa, oxirgi
+    muvaffaqiyatli qiymatlarga (yoki zaxira qiymatlarga) qaytiladi.
+    `yangilangan_vaqt` — haqiqiy oxirgi muvaffaqiyatli olingan vaqt."""
+    narxlar, yangilangan_vaqt = uzex_narxlari()
     return [
-        UzexNarxJavob(mahsulot_kodi=kod, mahsulot_nomi=nomi, narx_som=narx, yangilangan_vaqt=hozir)
-        for kod, nomi, narx in _UZEX_STUB
+        UzexNarxJavob(mahsulot_kodi=kod, mahsulot_nomi=nomi, narx_som=narx, yangilangan_vaqt=yangilangan_vaqt)
+        for kod, nomi, narx in narxlar
     ]
 
 
