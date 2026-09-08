@@ -49,6 +49,10 @@ const Map<String, Map<Til, String>> _matnlar = {
     Til.uz: 'Internet yo\'q — lokal saqlandi, tiklangach yuboriladi',
     Til.ru: 'Нет интернета — сохранено локально, отправится после восстановления',
   },
+  'offline_lokal_saqlandi_surat': {
+    Til.uz: 'Internet yo\'q — kip va surat lokal saqlandi, tiklangach yuboriladi',
+    Til.ru: 'Нет интернета — кип и фото сохранены локально, отправятся после восстановления',
+  },
   'navbat_indikator': {Til.uz: 'yuborilmagan', Til.ru: 'не отправлено'},
   'navbat_tooltip': {
     Til.uz: 'Internet yo\'q — yozuvlar navbatda, aloqa tiklangach avtomatik yuboriladi',

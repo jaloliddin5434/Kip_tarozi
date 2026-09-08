@@ -26,14 +26,21 @@ class OgirlikOquvchi:
         self._toxtatilsin = False
 
     def ulan(self) -> None:
-        self._port = serial.Serial(
-            port=settings.RS232_PORT,
-            baudrate=settings.RS232_BAUDRATE,
-            bytesize=settings.RS232_BYTESIZE,
-            parity=settings.RS232_PARITY,
-            stopbits=settings.RS232_STOPBITS,
-            timeout=settings.RS232_TIMEOUT,
-        )
+        """Seriya portini ochadi. Port topilmasa yoki band bo'lsa —
+        RS232OqishXatosi ko'taradi (raw serial.SerialException EMAS), shunda
+        watchdog buni oddiy "ulanmagan" holati sifatida qabul qiladi va Agent
+        (kamera va boshqa funksiyalar bilan) ishlashda davom etadi."""
+        try:
+            self._port = serial.Serial(
+                port=settings.RS232_PORT,
+                baudrate=settings.RS232_BAUDRATE,
+                bytesize=settings.RS232_BYTESIZE,
+                parity=settings.RS232_PARITY,
+                stopbits=settings.RS232_STOPBITS,
+                timeout=settings.RS232_TIMEOUT,
+            )
+        except (serial.SerialException, OSError) as exc:
+            raise RS232OqishXatosi(f"RS232 portini ({settings.RS232_PORT}) ochib bo'lmadi: {exc}") from exc
         logger.info("RS232 portga ulandi: %s", settings.RS232_PORT)
 
     def uz(self) -> None:

@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,7 @@ from app.schemas.kip import KipBatafsilJavob, KipJavob, KipSinxronNatija, KipTah
 from app.schemas.smena import MahsulotBoyichaHolat, SmenaHolati, SmenaKipYozuvi
 from app.services import kamera
 from app.services.media import surat_ommaviy_url
+from app.services.storage.rasm import rasm_saqla
 
 router = APIRouter(prefix="/kiplar", tags=["kiplar"])
 
@@ -129,6 +130,18 @@ def smena_royxati(
     ]
 
 
+@router.get("/kamera-sozlamalari")
+def kamera_sozlamalari(
+    _: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.operator)),
+) -> dict:
+    """Operator ilovasi (offline rejimda ham) LAN kamerasidan surat oladigan
+    MANZILNI qaytaradi — operator kompyuteridagi Stansiya Agenti (localhost).
+    Kamera login/parol HECH QACHON qaytarilmaydi: Digest autentifikatsiya
+    agent ichida bajariladi. `null` bo'lsa — offline surat imkoniyati o'chirilgan."""
+    manba = settings.STANSIYA_AGENT_URL
+    return {"agent_surat_url": f"{manba.rstrip('/')}/kamera/surat" if manba else None}
+
+
 @router.post("/sinxron", response_model=list[KipSinxronNatija])
 def sinxronlash(
     malumotlar: list[KipYaratish],
@@ -233,6 +246,37 @@ def saqlash(
     db.add(kip)
     db.commit()
     db.refresh(kip)
+
+    javob = KipJavob.model_validate(kip)
+    javob.surat_yoli = surat_ommaviy_url(kip.surat_yoli)
+    return javob
+
+
+@router.post("/{kip_id}/surat", response_model=KipJavob)
+async def surat_yuklash(
+    kip_id: int,
+    surat: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    foydalanuvchi: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.operator)),
+) -> KipJavob:
+    """Offline navbatdan sinxronlangan kipга keyinroq suratni biriktiradi
+    (Flutter offline paytda LAN kamerasidan olib, lokal saqlagan bo'ladi).
+    Surat mavjud papka tuzilmasiga (Oy/Kun/Smena/Mahsulot) yoziladi.
+    Idempotent: kip'da allaqachon surat bo'lsa — o'zgartirmasdan qaytariladi."""
+    kip = db.get(Kip, kip_id)
+    if kip is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kip topilmadi")
+
+    if not kip.surat_yoli:
+        baytlar = await surat.read()
+        if baytlar:
+            partiya = db.get(Partiya, kip.partiya_id)
+            mahsulot = db.get(Mahsulot, partiya.mahsulot_id)
+            kip.surat_yoli = rasm_saqla(
+                baytlar, smena=kip.smena.value, vaqt=kip.vaqt, turi="kip", mahsulot_nomi=mahsulot.nomi
+            )
+            db.commit()
+            db.refresh(kip)
 
     javob = KipJavob.model_validate(kip)
     javob.surat_yoli = surat_ommaviy_url(kip.surat_yoli)

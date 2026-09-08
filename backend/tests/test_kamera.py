@@ -171,3 +171,62 @@ def test_mijoz_bergan_surat_yoli_kamera_bilan_almashtirilmaydi(
 
     assert javob.status_code == 201
     assert javob.json()["surat_yoli"].endswith("/media/tola/2026-09/2026-09-08/A/mavjud.jpg")
+
+
+# --- Offline: kamera-sozlamalari + keyinroq surat biriktirish ---
+
+
+def test_kamera_sozlamalari_faqat_manzil_qaytaradi(client, operator_headers):
+    javob = client.get("/api/v1/kiplar/kamera-sozlamalari", headers=operator_headers)
+    assert javob.status_code == 200
+    data = javob.json()
+    assert data["agent_surat_url"].endswith("/kamera/surat")
+    # HECH QANDAY maxfiy ma'lumot chiqmasligi kerak
+    matn = str(data).lower()
+    assert "parol" not in matn and "b11223344" not in matn and "admin" not in matn
+
+
+def test_kamera_sozlamalari_ochirilgan_bolsa_null(client, operator_headers, monkeypatch):
+    monkeypatch.setattr(settings, "STANSIYA_AGENT_URL", None)
+    javob = client.get("/api/v1/kiplar/kamera-sozlamalari", headers=operator_headers)
+    assert javob.json()["agent_surat_url"] is None
+
+
+def test_kamera_sozlamalari_operatorga_xos(client, admin_headers):
+    assert client.get("/api/v1/kiplar/kamera-sozlamalari", headers=admin_headers).status_code == 403
+    assert client.get("/api/v1/kiplar/kamera-sozlamalari").status_code == 401
+
+
+def test_kipga_keyinroq_surat_biriktirish(client, db, operator_headers, mahsulot_tola, monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "STORAGE_PATH", str(tmp_path))
+    partiya = _partiya(client, operator_headers, 210)
+    kip = client.post("/api/v1/kiplar", json=_payload(partiya["id"], 155.0), headers=operator_headers).json()
+    assert kip["surat_yoli"] is None
+
+    javob = client.post(
+        f"/api/v1/kiplar/{kip['id']}/surat",
+        files={"surat": ("k.jpg", SOXTA_JPEG, "image/jpeg")},
+        headers=operator_headers,
+    )
+    assert javob.status_code == 200
+    surat_yoli = javob.json()["surat_yoli"]
+    assert "/Smena_A/Tola/" in surat_yoli and surat_yoli.endswith(".jpg")
+    nisbiy = surat_yoli.split("/media/", 1)[1]
+    assert (tmp_path / nisbiy).read_bytes() == SOXTA_JPEG
+
+    # Idempotent — ikkinchi marta yuborilsa mavjud surat o'zgarmaydi
+    qayta = client.post(
+        f"/api/v1/kiplar/{kip['id']}/surat",
+        files={"surat": ("boshqa.jpg", b"\xff\xd8boshqa\xff\xd9", "image/jpeg")},
+        headers=operator_headers,
+    )
+    assert qayta.json()["surat_yoli"] == surat_yoli
+
+
+def test_kipga_surat_notogri_kip_404(client, operator_headers):
+    javob = client.post(
+        "/api/v1/kiplar/999999/surat",
+        files={"surat": ("k.jpg", SOXTA_JPEG, "image/jpeg")},
+        headers=operator_headers,
+    )
+    assert javob.status_code == 404

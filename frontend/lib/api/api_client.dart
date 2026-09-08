@@ -88,6 +88,25 @@ class ApiClient {
     return _javobniQayta(javob);
   }
 
+  /// Multipart (fayl) yuklash — masalan offline navbatdan kelgan kip suratini
+  /// `POST /kiplar/{id}/surat` ga biriktirish uchun.
+  Future<dynamic> postFile(
+    String yol, {
+    required String maydon,
+    required Uint8List baytlar,
+    required String faylNomi,
+    String? tokenOverride,
+  }) async {
+    final amaldagiToken = tokenOverride ?? token;
+    final sorov = http.MultipartRequest('POST', _uri(yol))
+      ..files.add(http.MultipartFile.fromBytes(maydon, baytlar, filename: faylNomi))
+      ..headers.addAll({
+        if (amaldagiToken != null) 'Authorization': 'Bearer $amaldagiToken',
+      });
+    final javob = await http.Response.fromStream(await sorov.send());
+    return _javobniQayta(javob);
+  }
+
   Future<dynamic> patch(String yol, {Map<String, dynamic>? tana}) async {
     final javob = await http.patch(_uri(yol), headers: _sarlavhalar(), body: tana == null ? null : jsonEncode(tana));
     return _javobniQayta(javob);

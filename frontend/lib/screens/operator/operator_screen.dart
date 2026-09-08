@@ -10,7 +10,9 @@ import '../../models/mahsulot.dart';
 import '../../models/partiya.dart';
 import '../../models/smena_holati.dart';
 import '../../services/fayl_yuklab_olish.dart';
+import '../../services/kamera_agent.dart';
 import '../../services/offline_kip_navbati.dart';
+import '../../services/offline_surat.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/clock_widget.dart';
@@ -93,6 +95,10 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   bool _navbatSinxronlanmoqda = false;
   Timer? _navbatTaymeri;
 
+  // Offline surat uchun Stansiya Agenti (localhost) manzili — backend beradi,
+  // kamera login/parol EMAS. null bo'lsa offline surat olinmaydi (kip suratsiz).
+  String? _agentSuratUrl;
+
   @override
   void initState() {
     super.initState();
@@ -136,6 +142,20 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
       await _blokniTekshirish();
     } catch (e) {
       _xatoKorsat(e.toString());
+    }
+    await _kameraSozlamalariniYukla();
+  }
+
+  /// Offline surat uchun — backend LAN kamerasi manzilini (Stansiya Agenti
+  /// localhost URL'i) beradi. Faqat MANZIL, kamera login/parol EMAS. Backend
+  /// hozir ulanmasa jimgina o'tkazib yuboriladi (keyingi sinxronда qayta olinadi).
+  Future<void> _kameraSozlamalariniYukla() async {
+    try {
+      final javob = await _holat.api.get('/kiplar/kamera-sozlamalari').timeout(const Duration(seconds: 5));
+      final url = (javob as Map)['agent_surat_url'] as String?;
+      if (mounted) setState(() => _agentSuratUrl = url);
+    } catch (_) {
+      // Backend ulanmasa — _agentSuratUrl null qoladi, keyingi urinishda olinadi.
     }
   }
 
@@ -357,9 +377,22 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
 
   /// Tarmoq xatosi tufayli kip lokal navbatga yoziladi — operator bloklanmaydi,
   /// ish davom etadi, fon jarayoni aloqa tiklangach avtomatik yuboradi.
+  ///
+  /// Surat: backend uzilgan bo'lsa ham kamera LOKAL TARMOQDA — Stansiya Agenti
+  /// (localhost) orqali bitta kadr olishga urinamiz va uni kip bilan birga
+  /// navbatga qo'yamiz. Agent/kamera ham o'chgan bo'lsa — kip suratsiz saqlanadi.
   Future<void> _lokalNavbatgaSaqla(Map<String, dynamic> tana) async {
     final lok = _holat.lok;
-    await OfflineKipNavbati.qoshish(tana: tana, token: _holat.api.token ?? '');
+    final mijozId = tana['mijoz_id'] as String;
+
+    String? suratYoli;
+    final agentUrl = _agentSuratUrl;
+    if (agentUrl != null) {
+      final baytlar = await agentdanSurat(agentUrl);
+      if (baytlar != null) suratYoli = await suratniSaqla(baytlar, mijozId);
+    }
+
+    await OfflineKipNavbati.qoshish(tana: tana, token: _holat.api.token ?? '', suratYoli: suratYoli);
     if (!mounted) return;
     _dasturiyTozalash = true;
     _ogirlikKontrolleri.clear();
@@ -371,7 +404,7 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(lok.t('offline_lokal_saqlandi')),
+        content: Text(lok.t(suratYoli != null ? 'offline_lokal_saqlandi_surat' : 'offline_lokal_saqlandi')),
         backgroundColor: Colors.orange.shade800,
         duration: const Duration(seconds: 4),
       ),
@@ -398,6 +431,8 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
     final lok = _holat.lok;
     final xabarchi = ScaffoldMessenger.of(context);
     try {
+      // Backend qayta ulangan bo'lsa va agent manzilini hali olmagan bo'lsak — olamiz.
+      if (_agentSuratUrl == null) await _kameraSozlamalariniYukla();
       final natija = await OfflineKipNavbati.sinxronla(_holat.api);
       if (!mounted) return;
       await _navbatUzunliginiYangilash();
@@ -409,11 +444,24 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
         await _ochiqPartiyalarniYangilash();
         await _smenaRoyxatiniYangilash();
       }
+      // Sinxronlangan (surat bilan) oxirgi kipni "so'nggi kip surati" panelida ko'rsat.
+      if (natija.songgiKipId != null) await _sinxronlanganKipniKorsat(natija.songgiKipId!);
       for (final xato in natija.xatolar) {
         _xatoKorsat('${lok.t('navbat_yuborilmadi')}: $xato');
       }
     } finally {
       if (mounted) setState(() => _navbatSinxronlanmoqda = false);
+    }
+  }
+
+  /// Offline navbatdan sinxronlangan kip ma'lumotini (surat bilan) olib,
+  /// "so'nggi tortilgan kip surati" panelida ko'rsatadi.
+  Future<void> _sinxronlanganKipniKorsat(int kipId) async {
+    try {
+      final javob = await _holat.api.get('/kiplar/$kipId');
+      if (mounted) setState(() => _oxirgiSaqlanganKip = (javob as Map).cast<String, dynamic>());
+    } catch (_) {
+      // muhim emas — panel eski holatida qoladi
     }
   }
 

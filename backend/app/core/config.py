@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     AGENT_HOLAT_YUBORISH_SONIYA: int = 30
     # Shu muddatdan uzoq vaqt xabar kelmasa, dashboard agentni "offline" deb ko'rsatadi
     AGENT_HOLAT_ESKIRISH_SONIYA: int = 90
+    # Operator kompyuteridagi Stansiya Agenti manzili (Flutter shu orqali,
+    # backend uzilganda ham, LAN kamerasidan surat oladi). None -> offline surat
+    # imkoniyati o'chirilgan.
+    STANSIYA_AGENT_URL: str | None = "http://127.0.0.1:8100"
 
     # Kamera (snapshot HTTP endpoint — indikator kabi, model aniqlangach o'zgaradi)
     CAMERA_SNAPSHOT_URL: str | None = None

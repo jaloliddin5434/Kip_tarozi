@@ -51,14 +51,7 @@ class RS232Watchdog:
                 logger.info("RS232 ulandi")
                 self._oquvchi.oqish_tsikli()
             except RS232OqishXatosi as exc:
-                self.holat.ulangan = False
-                self.holat.oxirgi_xato = str(exc)
-                self.holat.qayta_urinishlar += 1
-                logger.warning(
-                    "RS232 aloqasi uzildi (%s). %s soniyadan so'ng qayta urinish.",
-                    exc,
-                    settings.RS232_RECONNECT_SECONDS,
-                )
+                self._ulanmadi(exc)
             except Exception as exc:  # kutilmagan xato ham watchdog'ni to'xtatmasligi kerak
                 self.holat.ulangan = False
                 self.holat.oxirgi_xato = str(exc)
@@ -68,3 +61,29 @@ class RS232Watchdog:
             if self._toxtatilsin:
                 break
             time.sleep(settings.RS232_RECONNECT_SECONDS)
+
+    def _ulanmadi(self, exc: Exception) -> None:
+        """RS232 ulanmadi/uzildi — bu Agentni TO'XTATMAYDI. Birinchi marta
+        WARNING bilan ogohlantiramiz, keyingi urinishlar log'ni to'ldirmasin
+        deb DEBUG darajasida."""
+        avval_ulangan = self.holat.oxirgi_ulanish_vaqt is not None
+        birinchi_marta = self.holat.qayta_urinishlar == 0
+        self.holat.ulangan = False
+        self.holat.oxirgi_xato = str(exc)
+        self.holat.qayta_urinishlar += 1
+
+        if birinchi_marta and not avval_ulangan:
+            logger.warning(
+                "RS232 (tarozi) ulanmadi: %s. Agent kamera va boshqa funksiyalar bilan ishlashda "
+                "davom etadi; har %s soniyada qayta urinamiz.",
+                exc,
+                settings.RS232_RECONNECT_SECONDS,
+            )
+        elif birinchi_marta:
+            logger.warning(
+                "RS232 (tarozi) aloqasi uzildi: %s. %s soniyadan so'ng qayta urinamiz.",
+                exc,
+                settings.RS232_RECONNECT_SECONDS,
+            )
+        else:
+            logger.debug("RS232 hali ulanmagan (urinish #%s): %s", self.holat.qayta_urinishlar, exc)

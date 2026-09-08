@@ -24,10 +24,12 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 import httpx
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
+from app.services.kamera import snapshot_ol as kamera_snapshot_ol
 from app.services.rs232 import navbat
 from app.services.rs232.anti_ogirlik import AntiOgirlikHolati, AntiOgirlikNazorati
 from app.services.rs232.bus import OgirlikKanali
@@ -97,6 +99,31 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Kip Tarozi — Stansiya Agenti", lifespan=lifespan)
+
+# Agent faqat localhost'da (127.0.0.1) tinglaydi — LAN'dan ko'rinmaydi.
+# CORS ochiq: Flutter WEB build ham (brauzer localhost'ni "ishonchli" deb biladi)
+# offline paytda /kamera/surat'ni chaqira olsin. Javob faqat JPEG, maxfiy
+# ma'lumot yo'q; kamera login/parol AGENT ichida qoladi, mijozga chiqmaydi.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/kamera/surat")
+def kamera_surat() -> Response:
+    """LAN kamerasidan bitta JPEG kadr. Backend/internet uzilganda Flutter shu
+    yerdan (localhost) suratni oladi va offline navbatga qo'shadi. Kamera
+    ulanmasa 204 — kip suratsiz saqlanadi (funksionallik buzilmaydi).
+    Digest autentifikatsiya va kamera login/parol AGENT ichida — hech qачон
+    Flutter'ga chiqmaydi."""
+    baytlar = kamera_snapshot_ol()
+    if not baytlar:
+        return Response(status_code=204)
+    return Response(content=baytlar, media_type="image/jpeg")
 
 
 @app.get("/holat")
