@@ -19,6 +19,7 @@ from app.schemas.smena import MahsulotBoyichaHolat, SmenaHolati, SmenaKipYozuvi
 from app.services import kamera
 from app.services.media import surat_ommaviy_url
 from app.services.storage.rasm import rasm_saqla
+from app.services.telegram import surat_yubor
 
 router = APIRouter(prefix="/kiplar", tags=["kiplar"])
 
@@ -153,6 +154,8 @@ def sinxronlash(
     tomonidan (offline holatda) qaror qilingan haqiqiy amallar, faqat mijoz_id
     orqali texnik dublikatning oldi olinadi."""
     natijalar: list[KipSinxronNatija] = []
+    # (surat_yoli, mahsulot_nomi, partiya_raqami, kip_raqami, ogirlik)
+    yuboriladigan_suratlar: list[tuple[str, str, int, int, float]] = []
 
     for malumot in malumotlar:
         mavjud = db.scalar(select(Kip).where(Kip.mijoz_id == malumot.mijoz_id))
@@ -181,8 +184,16 @@ def sinxronlash(
         db.add(kip)
         db.flush()
         natijalar.append(KipSinxronNatija(mijoz_id=malumot.mijoz_id, holat="saqlandi", kip_id=kip.id))
+        if kip.surat_yoli:
+            mahsulot = db.get(Mahsulot, partiya.mahsulot_id)
+            yuboriladigan_suratlar.append(
+                (kip.surat_yoli, mahsulot.nomi, partiya.partiya_raqami, kip.kip_raqami, float(kip.ogirlik))
+            )
 
     db.commit()
+    # Suratlar commit'dan KEYIN yuboriladi (surat_yubor xatolarni yutadi).
+    for surat_yoli, mahsulot_nomi, partiya_raqami, kip_raqami, ogirlik in yuboriladigan_suratlar:
+        surat_yubor(db, surat_yoli, mahsulot_nomi, partiya_raqami, kip_raqami, ogirlik)
     return natijalar
 
 
@@ -227,9 +238,9 @@ def saqlash(
     # sozlangan bo'lsa — backend to'g'ridan-to'g'ri kameradan bitta kadr oladi.
     # kamera modulidagi barcha xatolar yutiladi: kamera ishlamasa ham kip
     # suratsiz saqlanadi, operator bloklanmaydi.
+    mahsulot = db.get(Mahsulot, partiya.mahsulot_id)
     surat_yoli = malumot.surat_yoli
     if surat_yoli is None and kamera.sozlangan():
-        mahsulot = db.get(Mahsulot, partiya.mahsulot_id)
         surat_yoli = kamera.kip_uchun_surat_saqla(mahsulot.nomi, foydalanuvchi.smena.value, hozir)
 
     kip = Kip(
@@ -246,6 +257,10 @@ def saqlash(
     db.add(kip)
     db.commit()
     db.refresh(kip)
+
+    # Surat mavjud bo'lsa — alohida "surat boti"ga mahsulot/partiya/og'irlik bilan yuboramiz.
+    # surat_yubor() barcha xatolarni yutadi, operatorni bloklamaydi.
+    surat_yubor(db, kip.surat_yoli, mahsulot.nomi, partiya.partiya_raqami, kip.kip_raqami, kip.ogirlik)
 
     javob = KipJavob.model_validate(kip)
     javob.surat_yoli = surat_ommaviy_url(kip.surat_yoli)
@@ -277,6 +292,8 @@ async def surat_yuklash(
             )
             db.commit()
             db.refresh(kip)
+            # Offline sinxronlangan kipga endi surat biriktirildi — surat botiga ham yuboramiz.
+            surat_yubor(db, kip.surat_yoli, mahsulot.nomi, partiya.partiya_raqami, kip.kip_raqami, kip.ogirlik)
 
     javob = KipJavob.model_validate(kip)
     javob.surat_yoli = surat_ommaviy_url(kip.surat_yoli)

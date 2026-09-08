@@ -410,6 +410,19 @@ const Map<String, Map<Til, String>> _matnlar = {
   'telegram_statistika_bot_token': {Til.uz: 'Bot tokeni', Til.ru: 'Токен бота'},
   'telegram_statistika_chat_id': {Til.uz: 'Chat ID', Til.ru: 'ID чата'},
 
+  'telegram_surat_bolimi': {
+    Til.uz: 'Kip suratlari (Telegram)',
+    Til.ru: 'Фото кипов (Telegram)',
+  },
+  'telegram_surat_tavsif': {
+    Til.uz:
+        'Har bir kip surati (olingan bo\'lsa) mahsulot nomi bilan shu Telegram botga yuboriladi',
+    Til.ru:
+        'Фото каждого кипа (если снято) отправляется в этот Telegram-бот с названием продукта',
+  },
+  'telegram_surat_bot_token': {Til.uz: 'Bot tokeni', Til.ru: 'Токен бота'},
+  'telegram_surat_chat_id': {Til.uz: 'Chat ID', Til.ru: 'ID чата'},
+
   // Partiya sort/og'irlik to'ldirish (Tayyor mahsulotlar bo'limi)
   'sort_ogirlik_toldirish': {
     Til.uz: 'Sort/og\'irlik to\'ldirish',

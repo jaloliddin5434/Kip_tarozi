@@ -44,6 +44,18 @@ const _bolimlar = [
       _SozlamaMaydoni(kalit: 'telegram_statistika_chat_id', labelKaliti: 'telegram_statistika_chat_id'),
     ],
   ),
+  (
+    sarlavhaKaliti: 'telegram_surat_bolimi',
+    maydonlar: [
+      _SozlamaMaydoni(
+        kalit: 'telegram_surat_bot_token',
+        labelKaliti: 'telegram_surat_bot_token',
+        tavsifKaliti: 'telegram_surat_tavsif',
+        maxfiy: true,
+      ),
+      _SozlamaMaydoni(kalit: 'telegram_surat_chat_id', labelKaliti: 'telegram_surat_chat_id'),
+    ],
+  ),
 ];
 
 const _yashiriladiganKalitlar = {'moliyaviy_parol_hash', 'agent_oxirgi_holat'};
