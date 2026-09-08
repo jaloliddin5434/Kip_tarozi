@@ -27,6 +27,16 @@ from app.models.mahsulot import Mahsulot
 from app.models.stansiya import Stansiya
 
 
+@pytest.fixture(autouse=True)
+def _kamera_ochirilgan(monkeypatch):
+    """Testlar HECH QACHON real IP kameraga chiqmasligi kerak. .env'da haqiqiy
+    KAMERA_* qiymatlari bo'lsa ham, har bir testda ular o'chiriladi — kamera
+    integratsiyasini sinaydigan testlar (test_kamera.py) o'zi qayta yoqadi."""
+    monkeypatch.setattr(settings, "KAMERA_IP", None)
+    monkeypatch.setattr(settings, "KAMERA_LOGIN", None)
+    monkeypatch.setattr(settings, "KAMERA_PAROL", None)
+
+
 def _test_database_url() -> str:
     berilgan = os.environ.get("TEST_DATABASE_URL")
     if berilgan:

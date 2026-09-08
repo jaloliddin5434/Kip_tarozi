@@ -113,6 +113,10 @@ const Map<String, Map<Til, String>> _matnlar = {
 
   // Smena Excel hisoboti
   'excel_yuklab_olish': {Til.uz: 'Excel yuklab olish', Til.ru: 'Скачать Excel'},
+  'smena_mahsulot_excel': {
+    Til.uz: 'Smena + mahsulot Excel',
+    Til.ru: 'Excel: смена + продукт',
+  },
   'excel_hisobot_tanlash': {
     Til.uz: 'Excel hisobotni tanlash',
     Til.ru: 'Выбор отчёта Excel',
@@ -319,6 +323,38 @@ const Map<String, Map<Til, String>> _matnlar = {
     Til.uz: 'Sozlama saqlandi',
     Til.ru: 'Настройка сохранена',
   },
+
+  // Sozlamalar — Foydalanuvchilar bo'limi
+  'foydalanuvchilar': {Til.uz: 'Foydalanuvchilar', Til.ru: 'Пользователи'},
+  'foydalanuvchilar_tavsif': {
+    Til.uz: 'Hisoblarning login va parolini shu yerdan o\'zgartiring',
+    Til.ru: 'Здесь можно изменить логин и пароль учётных записей',
+  },
+  'hisobni_tahrirlash': {
+    Til.uz: 'Hisobni tahrirlash',
+    Til.ru: 'Редактирование учётной записи',
+  },
+  'yangi_login': {Til.uz: 'Yangi login', Til.ru: 'Новый логин'},
+  'yangi_parol': {Til.uz: 'Yangi parol', Til.ru: 'Новый пароль'},
+  'bosh_qoldirilsa_ozgarmaydi': {
+    Til.uz: 'Bo\'sh qoldirilsa o\'zgarmaydi',
+    Til.ru: 'Оставьте пустым, чтобы не менять',
+  },
+  'kamida_bitta_maydon': {
+    Til.uz: 'Kamida bitta maydonni to\'ldiring',
+    Til.ru: 'Заполните хотя бы одно поле',
+  },
+  'foydalanuvchi_yangilandi': {
+    Til.uz: 'Hisob ma\'lumoti yangilandi',
+    Til.ru: 'Данные учётной записи обновлены',
+  },
+  'oz_hisob_ogohlantirish': {
+    Til.uz:
+        'Bu sizning joriy hisobingiz. O\'zgartirilsa, keyingi safar yangi login/parol bilan kirishingiz kerak bo\'ladi. Davom etasizmi?',
+    Til.ru:
+        'Это ваша текущая учётная запись. После изменения при следующем входе нужно будет использовать новый логин/пароль. Продолжить?',
+  },
+  'davom_etish': {Til.uz: 'Davom etish', Til.ru: 'Продолжить'},
   'boshqa_sozlamalar': {
     Til.uz: 'Boshqa sozlamalar',
     Til.ru: 'Другие настройки',

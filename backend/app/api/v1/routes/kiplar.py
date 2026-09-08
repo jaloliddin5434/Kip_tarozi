@@ -16,6 +16,8 @@ from app.models.shubhali_holat import ShubhaliHolat, ShubhaliHolatStatusi
 from app.schemas.hujjat import AuditLogJavob
 from app.schemas.kip import KipBatafsilJavob, KipJavob, KipSinxronNatija, KipTahrirlash, KipYaratish
 from app.schemas.smena import MahsulotBoyichaHolat, SmenaHolati, SmenaKipYozuvi
+from app.services import kamera
+from app.services.media import surat_ommaviy_url
 
 router = APIRouter(prefix="/kiplar", tags=["kiplar"])
 
@@ -176,10 +178,12 @@ def saqlash(
     malumot: KipYaratish,
     db: Session = Depends(get_db),
     foydalanuvchi: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.operator)),
-) -> Kip:
+) -> KipJavob:
     mavjud = db.scalar(select(Kip).where(Kip.mijoz_id == malumot.mijoz_id))
     if mavjud is not None:
-        return mavjud
+        javob = KipJavob.model_validate(mavjud)
+        javob.surat_yoli = surat_ommaviy_url(mavjud.surat_yoli)
+        return javob
 
     partiya = db.get(Partiya, malumot.partiya_id)
     if partiya is None or partiya.holati != PartiyaHolati.ochiq:
@@ -206,6 +210,15 @@ def saqlash(
                 },
             )
 
+    # Surat: agar mijoz (Stansiya Agenti) suratni o'zi bermagan bo'lsa va IP kamera
+    # sozlangan bo'lsa — backend to'g'ridan-to'g'ri kameradan bitta kadr oladi.
+    # kamera modulidagi barcha xatolar yutiladi: kamera ishlamasa ham kip
+    # suratsiz saqlanadi, operator bloklanmaydi.
+    surat_yoli = malumot.surat_yoli
+    if surat_yoli is None and kamera.sozlangan():
+        mahsulot = db.get(Mahsulot, partiya.mahsulot_id)
+        surat_yoli = kamera.kip_uchun_surat_saqla(mahsulot.nomi, foydalanuvchi.smena.value, hozir)
+
     kip = Kip(
         mijoz_id=malumot.mijoz_id,
         partiya_id=partiya.id,
@@ -214,13 +227,16 @@ def saqlash(
         smena=foydalanuvchi.smena,
         operator_id=foydalanuvchi.id,
         mahalliy_vaqt=malumot.mahalliy_vaqt,
-        surat_yoli=malumot.surat_yoli,
+        surat_yoli=surat_yoli,
         stansiya_id=malumot.stansiya_id,
     )
     db.add(kip)
     db.commit()
     db.refresh(kip)
-    return kip
+
+    javob = KipJavob.model_validate(kip)
+    javob.surat_yoli = surat_ommaviy_url(kip.surat_yoli)
+    return javob
 
 
 @router.get("/{kip_id}", response_model=KipBatafsilJavob)
@@ -283,7 +299,7 @@ def batafsil(
         mahalliy_vaqt=kip.mahalliy_vaqt,
         vaqt=kip.vaqt,
         sinxronlangan=kip.sinxronlangan,
-        surat_yoli=kip.surat_yoli,
+        surat_yoli=surat_ommaviy_url(kip.surat_yoli),
         holati=kip.holati,
         stansiya_id=kip.stansiya_id,
         audit_log=audit_log,

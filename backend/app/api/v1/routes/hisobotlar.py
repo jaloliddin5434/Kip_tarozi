@@ -97,6 +97,78 @@ def smena_excel(
     )
 
 
+@router.get("/smena-mahsulot-excel")
+def smena_mahsulot_excel(
+    sana: date = Query(...),
+    smena: Smena = Query(...),
+    mahsulot_kodi: str = Query(...),
+    db: Session = Depends(get_db),
+    foydalanuvchi: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.admin, Rol.operator)),
+) -> StreamingResponse:
+    """Bitta KUN + bitta SMENA + bitta MAHSULOT uchun tor eksport — shu
+    kombinatsiyada tortilgan har bir kip alohida qator (kip raqami, vaqt, kg)
+    va oxirida JAMI qatori. /smena-excel'dan farqli — u barcha mahsulotlarni
+    bitta jamlanma sifatida beradi, bu esa bitta mahsulotning to'liq ro'yxati."""
+    if foydalanuvchi.rol == Rol.operator and foydalanuvchi.smena != smena:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Faqat o'z smenangiz hisobotini olishingiz mumkin",
+        )
+
+    mahsulot = db.scalar(select(Mahsulot).where(Mahsulot.kod == mahsulot_kodi))
+    if mahsulot is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mahsulot topilmadi")
+
+    qatorlar = db.execute(
+        select(Kip.kip_raqami, Kip.vaqt, Kip.ogirlik, Partiya.partiya_raqami)
+        .join(Partiya, Partiya.id == Kip.partiya_id)
+        .where(
+            Partiya.mahsulot_id == mahsulot.id,
+            Kip.holati == KipHolati.aktiv,
+            Kip.smena == smena,
+            func.date(Kip.vaqt) == sana,
+        )
+        .order_by(Kip.vaqt, Kip.kip_raqami)
+    ).all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Smena {smena.value} — {mahsulot.nomi}"[:31]
+
+    ws.append([f"Smena {smena.value} — {mahsulot.nomi} — {sana.isoformat()}"])
+    ws["A1"].font = Font(bold=True, size=14)
+    ws.append([])
+
+    ws.append(["Kip №", "Partiya №", "Vaqt", "Og'irlik, kg"])
+    for hujayra in ws[ws.max_row]:
+        hujayra.font = Font(bold=True)
+
+    jami_kg = 0.0
+    for kip_raqami, vaqt, ogirlik, partiya_raqami in qatorlar:
+        ws.append([kip_raqami, partiya_raqami, vaqt.strftime("%H:%M:%S"), round(float(ogirlik), 2)])
+        jami_kg += float(ogirlik)
+
+    ws.append([f"JAMI ({len(qatorlar)} kip)", "", "", round(jami_kg, 2)])
+    for hujayra in ws[ws.max_row]:
+        hujayra.font = Font(bold=True)
+        hujayra.fill = _JAMI_FON
+
+    for i, kenglik in enumerate([18, 12, 12, 14], start=1):
+        ws.column_dimensions[get_column_letter(i)].width = kenglik
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    nom_qismi = mahsulot.nomi.replace(" ", "_") or mahsulot.kod
+    fayl_nomi = f"Smena_{smena.value}_{nom_qismi}_{sana.isoformat()}.xlsx"
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fayl_nomi}"'},
+    )
+
+
 def _mavsum_boshi_sozlamadan(db: Session) -> date | None:
     sozlama = db.get(Sozlama, MAVSUM_BOSHI_SOZLAMA_KALITI)
     if sozlama is None or not sozlama.qiymat:

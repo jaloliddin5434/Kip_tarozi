@@ -41,9 +41,8 @@ async def hodisa_royxatga_ol(
     surat_yoli = None
     if surat is not None:
         baytlar = await surat.read()
-        surat_yoli = rasm_saqla(
-            baytlar, mahsulot_kodi=mahsulot_kodi or "umumiy", smena=smena or "umumiy", vaqt=vaqt, turi="shubha"
-        )
+        # Shubhali holat surati mahsulot papkasidan tashqarida — Smena_<X>/shubhali_holatlar/
+        surat_yoli = rasm_saqla(baytlar, smena=smena or "umumiy", vaqt=vaqt, turi="shubha")
 
     hodisa = ShubhaliHolat(vaqt=vaqt, smena=smena_enum, ogirlik=ogirlik, surat_yoli=surat_yoli, stansiya_id=stansiya_id)
     db.add(hodisa)

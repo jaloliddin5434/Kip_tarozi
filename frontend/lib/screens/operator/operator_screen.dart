@@ -24,10 +24,10 @@ const _nishonSoni = {'tola': 220, 'lint': 210, 'pux': 210, 'ulyuk': 210};
 
 int _nishon(String mahsulotKodi) => _nishonSoni[mahsulotKodi] ?? 210;
 
-/// Og'irlik va surat panellari uchun QAT'IY balandlik — ikkalasi ham aynan
-/// shu balandlikda, "imkon qadar katta" emas. Bu qiymat o'zgarmas konstanta
-/// bo'lib qolishi kerak: oldingi urinishda Expanded/flex bilan "iloji boricha
-/// katta" qilishga harakat qilingan, natijada butun ekran buzilgan edi.
+/// O'RTA ustundagi og'irlik ko'rsatkichi qutisi uchun QAT'IY balandlik —
+/// "imkon qadar katta" emas, o'zgarmas konstanta. (Surat paneli avval ham shu
+/// balandlikda edi, endi u mustaqil ravishda Expanded bilan kattaroq — qarang
+/// _ongPanel. Bu yerda faqat og'irlik qutisi qat'iy qoladi.)
 const _panelBalandligi = 270.0;
 
 class OperatorEkrani extends StatefulWidget {
@@ -51,6 +51,7 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   bool _partiyaYuklanmoqda = false;
   bool _saqlashYuklanmoqda = false;
   bool _excelYuklanmoqda = false;
+  bool _mahsulotExcelYuklanmoqda = false;
   Map<String, dynamic>? _oxirgiSaqlanganKip;
 
   // Og'irlik ko'rsatkichining rang-signal holati: tarozida yuk bormi (yashil)
@@ -376,6 +377,37 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
     }
   }
 
+  /// Tanlangan mahsulot uchun tor eksport — faqat bugungi kun + operatorning
+  /// o'z smenasi + shu mahsulot bo'yicha kiplar ro'yxati (backend:
+  /// /hisobotlar/smena-mahsulot-excel).
+  Future<void> _mahsulotExcelYuklab() async {
+    final smena = _holat.foydalanuvchi?.smena;
+    final mahsulot = _tanlanganMahsulot;
+    if (smena == null || mahsulot == null) return;
+
+    setState(() => _mahsulotExcelYuklanmoqda = true);
+    try {
+      final sana = DateTime.now().toIso8601String().substring(0, 10);
+      final baytlar = await _holat.api.getBaytlar(
+        '/hisobotlar/smena-mahsulot-excel',
+        query: {'sana': sana, 'smena': smena, 'mahsulot_kodi': mahsulot.kod},
+      );
+      final nom = mahsulot.nomi.replaceAll(' ', '_');
+      final yol = await faylniSaqlash(baytlar, 'Smena_${smena}_${nom}_$sana.xlsx');
+      if (mounted) {
+        final lok = _holat.lok;
+        final xabar = yol == null ? lok.t('fayl_yuklab_olindi') : '${lok.t('fayl_saqlandi')}: $yol';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(xabar)));
+      }
+    } on ApiException catch (e) {
+      _xatoKorsat(e.xabar);
+    } catch (e) {
+      _xatoKorsat('${_holat.lok.t('fayl_saqlash_xatosi')}: $e');
+    } finally {
+      if (mounted) setState(() => _mahsulotExcelYuklanmoqda = false);
+    }
+  }
+
   void _xatoKorsat(String xabar) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(xabar), backgroundColor: Colors.red.shade700));
@@ -436,9 +468,10 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
           const SizedBox(width: 8),
         ],
       ),
-      // Uch ustunli qat'iy tuzilish — hech bir element "imkon qadar katta"
-      // bo'lishga harakat qilmaydi, faqat 2- va 3-ustunlardagi asosiy
-      // panellar (og'irlik va surat) QAT'IY _panelBalandligi (270px) balandlikda.
+      // Uch ustunli qat'iy tuzilish. O'rta ustundagi og'irlik qutisi QAT'IY
+      // _panelBalandligi (270px). O'ng ustundagi surat paneli esa mustaqil va
+      // kattaroq (Expanded) — lekin butun ekran baribir bitta ekranga sig'adi,
+      // scroll yo'q (ichki panellar o'z joyiga moslashadi).
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -531,6 +564,8 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
                           const SizedBox(height: 12),
                           _partiyaProgressPaneli(lok),
                         ],
+                        const SizedBox(height: 12),
+                        _mahsulotExcelTugmasi(lok),
                       ],
                     ),
                   ),
@@ -570,6 +605,38 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Tanlangan mahsulot bo'yicha tor Excel eksport tugmasi (bugungi kun,
+  /// o'z smenasi, faqat shu mahsulot). Chap panelda mahsulot tanlanganda
+  /// ko'rinadi.
+  Widget _mahsulotExcelTugmasi(dynamic lok) {
+    final mahsulot = _tanlanganMahsulot;
+    return SizedBox(
+      width: double.infinity,
+      height: 38,
+      child: OutlinedButton.icon(
+        onPressed: _mahsulotExcelYuklanmoqda || mahsulot == null ? null : _mahsulotExcelYuklab,
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: kipTaroziYashil),
+          foregroundColor: kipTaroziYashil,
+        ),
+        icon: _mahsulotExcelYuklanmoqda
+            ? const SizedBox(
+                height: 14,
+                width: 14,
+                child: CircularProgressIndicator(strokeWidth: 2, color: kipTaroziYashil),
+              )
+            : const Icon(Icons.file_download_outlined, size: 16),
+        label: Text(
+          mahsulot == null
+              ? lok.t('smena_mahsulot_excel')
+              : '${lok.t('smena_mahsulot_excel')}: ${mahsulot.nomi}',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
     );
   }
@@ -908,13 +975,17 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(height: _panelBalandligi, width: double.infinity, child: _suratPaneli(lok)),
-          const SizedBox(height: 8),
+          // Surat paneli endi og'irlik qutisidan MUSTAQIL — mavjud bo'sh joyga
+          // qarab imkon qadar katta (Expanded, kattaroq ulush). Ichki
+          // LayoutBuilder surat o'lchamini har doim panel ichiga sig'diradi,
+          // shuning uchun "bitta ekran, scroll yo'q" talabi buzilmaydi.
+          Expanded(flex: 3, child: _suratPaneli(lok)),
+          const SizedBox(height: 6),
           Text(
             lok.t('songgi_kip_surati'),
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey.shade700),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           Text(
             _tanlanganMahsulot == null
                 ? lok.t('smena_tarixi')
@@ -922,16 +993,16 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           ),
           const SizedBox(height: 6),
-          Expanded(child: _smenaTarixiPaneli(lok)),
+          Expanded(flex: 2, child: _smenaTarixiPaneli(lok)),
         ],
       ),
     );
   }
 
-  /// QAT'IY 270px balandlikdagi (tashqarida beriladi) kvadratsimon surat
-  /// paneli — chiziqli (dashed) chegara bilan. Ichidagi kvadrat surat/
-  /// placeholder mavjud bo'lgan joyga (kenglik/balandlikning kichikrog'iga)
-  /// moslashadi, lekin tashqi quti balandligi hech qachon o'zgarmaydi.
+  /// So'nggi kip surati paneli — chiziqli (dashed) chegara bilan. Tashqi quti
+  /// endi Expanded (og'irlik qutisidan mustaqil, kattaroq). Ichidagi kvadrat
+  /// surat mavjud joyning kichikroq o'lchamiga (kenglik/balandlik) moslashadi
+  /// — hech qachon panel chegarasidan chiqmaydi.
   Widget _suratPaneli(dynamic lok) {
     final suratYoli = _oxirgiSaqlanganKip?['surat_yoli'] as String?;
     return Stack(
@@ -945,7 +1016,10 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
           padding: const EdgeInsets.all(16),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final andoza = math.min(constraints.maxWidth, constraints.maxHeight).clamp(0.0, 400.0);
+              // Panel kattalashgani uchun yuqori chegara ham oshirildi — amalda
+              // min(kenglik, balandlik) hukmron, ya'ni surat hech qachon
+              // paneldan chiqmaydi.
+              final andoza = math.min(constraints.maxWidth, constraints.maxHeight).clamp(0.0, 720.0);
 
               Widget ichki;
               if (_oxirgiSaqlanganKip == null) {

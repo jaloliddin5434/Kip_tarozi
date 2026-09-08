@@ -58,6 +58,17 @@ class Settings(BaseSettings):
     # Kamera (snapshot HTTP endpoint — indikator kabi, model aniqlangach o'zgaradi)
     CAMERA_SNAPSHOT_URL: str | None = None
 
+    # IP kamera (Hikvision/ISAPI mos) — kip saqlanganda backend avtomatik bitta
+    # surat oladi. Uchalasi ham to'ldirilgan bo'lsa integratsiya faollashadi;
+    # bo'lmasa kip suratsiz saqlanadi (blok bo'lmaydi). Parol HECH QACHON kodga
+    # yozilmaydi — faqat .env orqali.
+    KAMERA_IP: str | None = None
+    KAMERA_LOGIN: str | None = None
+    KAMERA_PAROL: str | None = None
+    # Snapshot uchun ISAPI kanal yo'li (101 = 1-kanal asosiy oqim)
+    KAMERA_SNAPSHOT_YOLI: str = "/ISAPI/Streaming/channels/101/picture"
+    KAMERA_TIMEOUT_SONIYA: float = 5.0
+
     # Kunlik Telegram hisoboti (F.3)
     VAQT_ZONASI: str = "Asia/Tashkent"
     KUNLIK_HISOBOT_VAQTI: str = "20:00"

@@ -13,6 +13,7 @@ from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya
 from app.schemas.hujjat import AuditLogJavob, HujjatKipJavob
 from app.schemas.sahifalash import Sahifalangan
+from app.services.media import surat_ommaviy_url
 
 router = APIRouter(prefix="/hujjatlar", tags=["hujjatlar"])
 
@@ -76,7 +77,7 @@ def kiplar_royxati(
             operator_id=kip.operator_id,
             operator_ism=operator_ism,
             vaqt=kip.vaqt,
-            surat_yoli=kip.surat_yoli,
+            surat_yoli=surat_ommaviy_url(kip.surat_yoli),
             holati=kip.holati,
         )
         for kip, partiya_raqami_, mahsulot_kodi_, mahsulot_nomi, operator_ism in natijalar

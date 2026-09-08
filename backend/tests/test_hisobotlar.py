@@ -221,3 +221,80 @@ def test_smena_excel_boshqa_rol_kira_olmaydi(client, db):
         "/api/v1/hisobotlar/smena-excel", params={"sana": date.today().isoformat(), "smena": "A"}, headers=headers
     )
     assert javob.status_code == 403
+
+
+# ============ smena + mahsulot bo'yicha tor eksport ============
+
+
+def test_smena_mahsulot_excel_faqat_mos_kiplarni_beradi(client, db, admin_headers, operator, mahsulot_tola):
+    lint = Mahsulot(kod="lint", nomi="Lint")
+    db.add(lint)
+    db.commit()
+    db.refresh(lint)
+
+    sana = date.today()
+    tola_p = _partiya_yarat(db, mahsulot_tola.id, 930)
+    lint_p = _partiya_yarat(db, lint.id, 931)
+
+    _kip_yarat(db, tola_p.id, 1, 100.0, Smena.A, sana, operator.id)
+    _kip_yarat(db, tola_p.id, 2, 105.5, Smena.A, sana, operator.id)
+    _kip_yarat(db, tola_p.id, 3, 200.0, Smena.B, sana, operator.id)  # boshqa smena
+    _kip_yarat(db, lint_p.id, 1, 77.0, Smena.A, sana, operator.id)   # boshqa mahsulot
+    bekor = _kip_yarat(db, tola_p.id, 4, 999.0, Smena.A, sana, operator.id)  # bekor qilingan
+    bekor.holati = KipHolati.bekor_qilingan
+    db.commit()
+
+    javob = client.get(
+        "/api/v1/hisobotlar/smena-mahsulot-excel",
+        params={"sana": sana.isoformat(), "smena": "A", "mahsulot_kodi": "tola"},
+        headers=admin_headers,
+    )
+    assert javob.status_code == 200
+    assert javob.headers["content-type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    assert f"Smena_A_Tola_{sana.isoformat()}.xlsx" in javob.headers["content-disposition"]
+
+    ws = load_workbook(BytesIO(javob.content)).active
+    # kip qatorlari: sarlavha (A1), bo'sh, ustun sarlavhalari, keyin kiplar, keyin JAMI
+    kip_qatorlari = [r for r in ws.iter_rows(values_only=True) if isinstance(r[0], int)]
+    assert [r[0] for r in kip_qatorlari] == [1, 2]  # faqat Smena A + Tola + aktiv
+    assert kip_qatorlari[0][3] == 100.0
+    assert kip_qatorlari[1][3] == 105.5
+
+    jami = next(r for r in ws.iter_rows(values_only=True) if r[0] and str(r[0]).startswith("JAMI"))
+    assert "2 kip" in jami[0]
+    assert jami[3] == 205.5
+
+
+def test_smena_mahsulot_excel_operator_oz_smenasi(client, operator_headers, operator, mahsulot_tola):
+    javob = client.get(
+        "/api/v1/hisobotlar/smena-mahsulot-excel",
+        params={"sana": date.today().isoformat(), "smena": operator.smena.value, "mahsulot_kodi": "tola"},
+        headers=operator_headers,
+    )
+    assert javob.status_code == 200
+
+
+def test_smena_mahsulot_excel_operator_boshqa_smena_403(client, operator_headers, mahsulot_tola):
+    javob = client.get(
+        "/api/v1/hisobotlar/smena-mahsulot-excel",
+        params={"sana": date.today().isoformat(), "smena": "C", "mahsulot_kodi": "tola"},
+        headers=operator_headers,
+    )
+    assert javob.status_code == 403
+
+
+def test_smena_mahsulot_excel_notogri_mahsulot_404(client, admin_headers):
+    javob = client.get(
+        "/api/v1/hisobotlar/smena-mahsulot-excel",
+        params={"sana": date.today().isoformat(), "smena": "A", "mahsulot_kodi": "yoq"},
+        headers=admin_headers,
+    )
+    assert javob.status_code == 404
+
+
+def test_smena_mahsulot_excel_tokensiz_401(client):
+    javob = client.get(
+        "/api/v1/hisobotlar/smena-mahsulot-excel",
+        params={"sana": date.today().isoformat(), "smena": "A", "mahsulot_kodi": "tola"},
+    )
+    assert javob.status_code == 401

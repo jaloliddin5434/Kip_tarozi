@@ -4,7 +4,9 @@ __pycache__/
 .venv/
 venv/
 .env
-storage/
+# Faqat ildizdagi suratlar/hujjatlar papkasi — kod papkasi
+# (backend/app/services/storage/) git'da qoladi.
+/storage/
 *.db
 .pytest_cache/
 # Backup
