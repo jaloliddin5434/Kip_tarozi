@@ -105,6 +105,40 @@ def test_mijoz_id_dedup(client, operator_headers, mahsulot_tola):
     assert javob2.json()["id"] == javob1.json()["id"]  # yangi yozuv yaratilmadi
 
 
+def test_sinxron_offline_navbatni_saqlaydi_va_deduplaydi(client, operator_headers, mahsulot_tola):
+    """Operator ekranidagi offline (lokal) navbat shu endpoint orqali yuboriladi.
+    mijoz_id dedup ishlaydi, dublikat-og'irlik ogohlantirishi TEKSHIRILMAYDI."""
+    partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 71}, headers=operator_headers
+    ).json()
+
+    a = _kip_yaratish_payload(partiya["id"], 140.0)
+    b = _kip_yaratish_payload(partiya["id"], 140.1)  # yaqin og'irlik — jonli saqlashda 409 berardi
+
+    javob = client.post("/api/v1/kiplar/sinxron", json=[a, b], headers=operator_headers)
+    assert javob.status_code == 200
+    natijalar = javob.json()
+    assert [n["holat"] for n in natijalar] == ["saqlandi", "saqlandi"]
+
+    # Qayta yuborilsa — yangi yozuv yaratilmaydi
+    qayta = client.post("/api/v1/kiplar/sinxron", json=[a, b], headers=operator_headers)
+    assert [n["holat"] for n in qayta.json()] == ["allaqachon_mavjud", "allaqachon_mavjud"]
+    assert qayta.json()[0]["kip_id"] == natijalar[0]["kip_id"]
+
+
+def test_sinxron_yopiq_partiyaga_xato_qaytaradi(client, operator_headers, mahsulot_tola):
+    partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 72}, headers=operator_headers
+    ).json()
+    client.patch(f"/api/v1/partiyalar/{partiya['id']}/yopish", headers=operator_headers)
+
+    javob = client.post(
+        "/api/v1/kiplar/sinxron", json=[_kip_yaratish_payload(partiya["id"])], headers=operator_headers
+    )
+    assert javob.status_code == 200
+    assert javob.json()[0]["holat"] == "xato"
+
+
 def test_tezkor_bekor_qilish_muddati(client, db, operator_headers, mahsulot_tola):
     partiya = client.post(
         "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 6}, headers=operator_headers

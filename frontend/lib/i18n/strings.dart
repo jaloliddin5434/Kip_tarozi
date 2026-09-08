@@ -43,6 +43,26 @@ const Map<String, Map<Til, String>> _matnlar = {
   'saqlash': {Til.uz: 'Saqlash', Til.ru: 'Сохранить'},
   'bekor_qilish': {Til.uz: 'Bekor qilish', Til.ru: 'Отменить'},
   'kip_saqlandi': {Til.uz: 'Kip saqlandi', Til.ru: 'Кип сохранён'},
+
+  // Offline (lokal) navbat
+  'offline_lokal_saqlandi': {
+    Til.uz: 'Internet yo\'q — lokal saqlandi, tiklangach yuboriladi',
+    Til.ru: 'Нет интернета — сохранено локально, отправится после восстановления',
+  },
+  'navbat_indikator': {Til.uz: 'yuborilmagan', Til.ru: 'не отправлено'},
+  'navbat_tooltip': {
+    Til.uz: 'Internet yo\'q — yozuvlar navbatda, aloqa tiklangach avtomatik yuboriladi',
+    Til.ru: 'Нет связи — записи в очереди, отправятся автоматически после восстановления',
+  },
+  'navbat_yuborildi': {
+    Til.uz: 'ta kutilayotgan yozuv yuborildi',
+    Til.ru: 'ожидающих записей отправлено',
+  },
+  'navbat_yuborilmadi': {
+    Til.uz: 'Navbatdagi yozuv yuborilmadi',
+    Til.ru: 'Запись из очереди не отправлена',
+  },
+
   'progress': {Til.uz: 'Joriy partiya', Til.ru: 'Текущая партия'},
   'soni': {Til.uz: 'soni', Til.ru: 'шт'},
 

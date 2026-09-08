@@ -10,6 +10,7 @@ import '../../models/mahsulot.dart';
 import '../../models/partiya.dart';
 import '../../models/smena_holati.dart';
 import '../../services/fayl_yuklab_olish.dart';
+import '../../services/offline_kip_navbati.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/clock_widget.dart';
@@ -86,17 +87,26 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   bool _saqlashVaqtinchaNofaol = false;
   Timer? _saqlashQulfTaymeri;
 
+  // Offline (lokal) navbat: internet/server uzilganda saqlangan, hali
+  // yuborilmagan kiplar soni. > 0 bo'lsa AppBar'da indikator ko'rinadi.
+  int _navbatUzunligi = 0;
+  bool _navbatSinxronlanmoqda = false;
+  Timer? _navbatTaymeri;
+
   @override
   void initState() {
     super.initState();
     _boshlangichniYuklash();
     _blokTimer = Timer.periodic(const Duration(seconds: 5), (_) => _blokniTekshirish());
+    _navbatUzunliginiYangilash();
+    _navbatTaymeri = Timer.periodic(const Duration(seconds: 10), (_) => _navbatniSinxronla());
     _ogirlikKontrolleri.addListener(_ogirlikOzgardi);
   }
 
   @override
   void dispose() {
     _blokTimer?.cancel();
+    _navbatTaymeri?.cancel();
     _saqlashQulfTaymeri?.cancel();
     _ogirlikKontrolleri.removeListener(_ogirlikOzgardi);
     _partiyaRaqamiKontrolleri.dispose();
@@ -302,7 +312,27 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
     };
 
     try {
-      final javob = await _holat.api.post('/kiplar', tana: tana);
+      dynamic javob;
+      try {
+        // 8s timeout — noto'g'ri portga/yetib bo'lmaydigan hostga ulanishda ham
+        // "offline" holatiga tez o'tish uchun.
+        javob = await _holat.api.post('/kiplar', tana: tana).timeout(const Duration(seconds: 8));
+      } on ApiException catch (e) {
+        // Server JAVOB BERDI (validatsiya/biznes xatosi) — bu haqiqiy xato,
+        // lokal navbatga saqlanmaydi.
+        if (e.statusCode == 409 && e.tafsilot is Map && e.tafsilot['avvalgi_kip_id'] != null) {
+          _dublikatOgohlantirishKorsat();
+        } else {
+          _xatoKorsat(e.xabar);
+        }
+        return;
+      } catch (_) {
+        // ApiException EMAS => ulanish/timeout muammosi => lokal navbatga.
+        await _lokalNavbatgaSaqla(tana);
+        return;
+      }
+
+      // --- Muvaffaqiyatli saqlandi ---
       if (!mounted) return;
       _dasturiyTozalash = true;
       _ogirlikKontrolleri.clear();
@@ -320,16 +350,70 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
       await _smenaHolatiniYangilash();
       await _ochiqPartiyalarniYangilash();
       await _smenaRoyxatiniYangilash();
-    } on ApiException catch (e) {
-      if (e.statusCode == 409 && e.tafsilot is Map && e.tafsilot['avvalgi_kip_id'] != null) {
-        _dublikatOgohlantirishKorsat();
-      } else {
-        _xatoKorsat(e.xabar);
-      }
-    } catch (e) {
-      _xatoKorsat(e.toString());
     } finally {
       if (mounted) setState(() => _saqlashYuklanmoqda = false);
+    }
+  }
+
+  /// Tarmoq xatosi tufayli kip lokal navbatga yoziladi — operator bloklanmaydi,
+  /// ish davom etadi, fon jarayoni aloqa tiklangach avtomatik yuboradi.
+  Future<void> _lokalNavbatgaSaqla(Map<String, dynamic> tana) async {
+    final lok = _holat.lok;
+    await OfflineKipNavbati.qoshish(tana: tana, token: _holat.api.token ?? '');
+    if (!mounted) return;
+    _dasturiyTozalash = true;
+    _ogirlikKontrolleri.clear();
+    _dasturiyTozalash = false;
+    _saqlashQulfTaymeri?.cancel();
+    setState(() => _saqlashVaqtinchaNofaol = true);
+    _saqlashQulfTaymeri = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _saqlashVaqtinchaNofaol = false);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(lok.t('offline_lokal_saqlandi')),
+        backgroundColor: Colors.orange.shade800,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+    _ogirlikFokusi.requestFocus();
+    await _navbatUzunliginiYangilash();
+  }
+
+  Future<void> _navbatUzunliginiYangilash() async {
+    final n = await OfflineKipNavbati.uzunlik();
+    if (mounted && n != _navbatUzunligi) setState(() => _navbatUzunligi = n);
+  }
+
+  /// Fon jarayoni (har 10s) — navbatda kutilayotgan yozuvlarni backend'ga
+  /// yuborishga urinadi, muvaffaqiyatlilarni navbatdan o'chiradi.
+  Future<void> _navbatniSinxronla() async {
+    if (_navbatSinxronlanmoqda || !_holat.kirilgan) return;
+    if (await OfflineKipNavbati.uzunlik() == 0) {
+      await _navbatUzunliginiYangilash();
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _navbatSinxronlanmoqda = true);
+    final lok = _holat.lok;
+    final xabarchi = ScaffoldMessenger.of(context);
+    try {
+      final natija = await OfflineKipNavbati.sinxronla(_holat.api);
+      if (!mounted) return;
+      await _navbatUzunliginiYangilash();
+      if (natija.yuborilgan > 0) {
+        xabarchi.showSnackBar(
+          SnackBar(content: Text('${natija.yuborilgan} ${lok.t('navbat_yuborildi')}')),
+        );
+        await _smenaHolatiniYangilash();
+        await _ochiqPartiyalarniYangilash();
+        await _smenaRoyxatiniYangilash();
+      }
+      for (final xato in natija.xatolar) {
+        _xatoKorsat('${lok.t('navbat_yuborilmadi')}: $xato');
+      }
+    } finally {
+      if (mounted) setState(() => _navbatSinxronlanmoqda = false);
     }
   }
 
@@ -451,6 +535,7 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
           ],
         ),
         actions: [
+          if (_navbatUzunligi > 0) _navbatIndikatori(lok),
           _ulanishIkonkasi(Icons.dns_rounded, lok.t('server'), lok),
           _ulanishIkonkasi(Icons.videocam_rounded, lok.t('kamera'), lok),
           _ulanishIkonkasi(Icons.monitor_weight_rounded, lok.t('tarozi'), lok),
@@ -492,6 +577,41 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
       child: Tooltip(
         message: '$nomi: ${ulanganmi ? lok.t("ulangan") : lok.t("ulanmagan")}',
         child: Icon(ikonka, size: 28, color: ulanganmi ? Colors.greenAccent : Colors.redAccent.shade100),
+      ),
+    );
+  }
+
+  /// AppBar'dagi kichik indikator — lokal navbatda kutilayotgan (hali
+  /// yuborilmagan) kiplar soni. Faqat son > 0 bo'lganda ko'rinadi.
+  Widget _navbatIndikatori(dynamic lok) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Tooltip(
+        message: lok.t('navbat_tooltip'),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: Colors.orange.shade800,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _navbatSinxronlanmoqda
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.cloud_off_rounded, size: 16, color: Colors.white),
+              const SizedBox(width: 6),
+              Text(
+                '$_navbatUzunligi ${lok.t('navbat_indikator')}',
+                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

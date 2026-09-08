@@ -75,8 +75,16 @@ class ApiClient {
     _xatoTashla(javob);
   }
 
-  Future<dynamic> post(String yol, {Map<String, dynamic>? tana}) async {
-    final javob = await http.post(_uri(yol), headers: _sarlavhalar(), body: tana == null ? null : jsonEncode(tana));
+  /// [tana] Map yoki List (JSON-kodlanadigan har qanday qiymat) bo'lishi mumkin —
+  /// masalan `/kiplar/sinxron` ro'yxat qabul qiladi. [tokenOverride] berilsa,
+  /// joriy sessiya tokeni o'rniga o'sha ishlatiladi (offline navbatni saqlagan
+  /// operator tokeni bilan yuborish uchun).
+  Future<dynamic> post(String yol, {Object? tana, String? tokenOverride}) async {
+    final javob = await http.post(
+      _uri(yol),
+      headers: _sarlavhalar(tokenOverride),
+      body: tana == null ? null : jsonEncode(tana),
+    );
     return _javobniQayta(javob);
   }
 
