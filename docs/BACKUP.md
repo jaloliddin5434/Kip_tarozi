@@ -54,26 +54,85 @@ deb chiqadi.
 
 ## Tiklashni sinash (restore test)
 
-Backup'ning haqiqatan ishlashini vaqti-vaqti bilan tekshirish kerak — buning
-uchun uni **asosiy bazaga emas**, alohida test bazasiga tiklang:
+Backup'ning haqiqatan ishlashini oyiga bir marta tekshirib turing — tiklashni
+**asosiy `kip_tarozi` bazasiga emas**, alohida vaqtinchalik test bazasiga qiling.
+Quyidagi 4 qadam asl bazaga hech narsa yozmaydi (faqat undan `pg_dump` bilan
+o'qiydi va `count(*)` bilan solishtiradi).
 
+PowerShell'da (bir sessiyada ketma-ket):
+
+```powershell
+$PG   = "C:\Program Files\PostgreSQL\18\bin"      # pg_dump / pg_restore / psql bin papkasi
+$PORT = 47432
+$TESTDB = "kip_tarozi_restore_test"
+
+# 1) Yangi backup (yoki mavjud eng so'nggi .dump'ni ol)
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\Kip_tarozi\scripts\backup_yarat.ps1
+$DUMP = (Get-ChildItem C:\Kip_tarozi\backups\kip_tarozi_*.dump | Sort-Object LastWriteTime -Desc)[0].FullName
+"Tiklanadigan fayl: $DUMP"
+& "$PG\pg_restore.exe" --list $DUMP | Select-String "Format|dbname|Dumped from"   # fayl butunligini tekshir
+
+# 2) Vaqtinchalik test bazasi yarat va unga tikla
+& "$PG\psql.exe"       -h localhost -p $PORT -U postgres -d postgres -c "CREATE DATABASE $TESTDB;"
+& "$PG\pg_restore.exe" -h localhost -p $PORT -U postgres -d $TESTDB --no-owner --exit-on-error $DUMP
+"pg_restore exit code (0 bo'lishi kerak): $LASTEXITCODE"
+
+# 3) Har bir jadval qatorlari sonini asl baza bilan solishtir
+$sql = @"
+SELECT 'kiplar' t,count(*) n FROM kiplar
+UNION ALL SELECT 'partiyalar',count(*) FROM partiyalar
+UNION ALL SELECT 'foydalanuvchilar',count(*) FROM foydalanuvchilar
+UNION ALL SELECT 'mahsulotlar',count(*) FROM mahsulotlar
+UNION ALL SELECT 'sozlamalar',count(*) FROM sozlamalar
+UNION ALL SELECT 'audit_log',count(*) FROM audit_log
+UNION ALL SELECT 'shubhali_holatlar',count(*) FROM shubhali_holatlar
+UNION ALL SELECT 'stansiyalar',count(*) FROM stansiyalar ORDER BY t;
+"@
+"--- ASL kip_tarozi ---"
+& "$PG\psql.exe" -h localhost -p $PORT -U postgres -d kip_tarozi -c $sql
+"--- TIKLANGAN $TESTDB ---"
+& "$PG\psql.exe" -h localhost -p $PORT -U postgres -d $TESTDB -c $sql
+# Har bir qatordagi son ikkala ro'yxatda AYNAN bir xil bo'lishi SHART.
+
+# 4) Test bazasini o'chir — hech qanday iz qoldirmaydi
+& "$PG\psql.exe" -h localhost -p $PORT -U postgres -d postgres -c "DROP DATABASE $TESTDB;"
 ```
-"C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 47432 -U postgres -d postgres -c "CREATE DATABASE kip_tarozi_restore_test;"
-"C:\Program Files\PostgreSQL\18\bin\pg_restore.exe" -h localhost -p 47432 -U postgres -d kip_tarozi_restore_test "C:\Kip_tarozi\backups\kip_tarozi_2026-08-19_0902.dump"
+
+`pg_restore` "already exists" / "constraint ... multiple primary keys" kabi
+xatolar bersa — test bazasi bo'sh emas edi: uni `DROP DATABASE` qilib qaytadan
+`CREATE DATABASE` qiling. `--exit-on-error` bo'lgani uchun jiddiy xato bo'lsa
+`pg_restore` exit code 1 qaytaradi.
+
+## Haqiqiy avariya holatida tiklash (asosiy baza yo'qolgan/buzilgan)
+
+Xuddi yuqoridagi kabi, faqat test bazasiga emas — **bo'sh `kip_tarozi`**
+bazasiga tiklanadi:
+
+```powershell
+$PG = "C:\Program Files\PostgreSQL\18\bin"; $PORT = 47432
+# 0) Backend/agent xizmatlarini to'xtatib turing (bazaga yozmasin):
+#    nssm stop KipTarozi-Backend   (yoki Task Manager orqali)
+
+# 1) Eng so'nggi ishonchli backup faylni tanlang
+$DUMP = (Get-ChildItem C:\Kip_tarozi\backups\kip_tarozi_*.dump | Sort-Object LastWriteTime -Desc)[0].FullName
+
+# 2) Buzilgan bazani o'chirib, bo'sh qayta yarating
+#    (agar baza umuman yo'qolgan bo'lsa — 2-qadamning faqat CREATE qismi)
+& "$PG\psql.exe" -h localhost -p $PORT -U postgres -d postgres -c "DROP DATABASE IF EXISTS kip_tarozi;"
+& "$PG\psql.exe" -h localhost -p $PORT -U postgres -d postgres -c "CREATE DATABASE kip_tarozi OWNER postgres;"
+
+# 3) Backup'ni tiklang
+& "$PG\pg_restore.exe" -h localhost -p $PORT -U postgres -d kip_tarozi --no-owner --exit-on-error $DUMP
+
+# 4) Tekshiring va xizmatlarni qayta ishga tushiring
+& "$PG\psql.exe" -h localhost -p $PORT -U postgres -d kip_tarozi -c "SELECT count(*) FROM kiplar;"
+#    nssm start KipTarozi-Backend
 ```
 
-Tekshirish uchun jadval qatorlari sonini solishtiring:
-
-```
-psql ... -d kip_tarozi -c "SELECT count(*) FROM kiplar;"
-psql ... -d kip_tarozi_restore_test -c "SELECT count(*) FROM kiplar;"
-```
-
-So'ng test bazasini o'chiring: `DROP DATABASE kip_tarozi_restore_test;`
-
-Haqiqiy avariya holatida (asosiy baza yo'qolgan/buzilgan) tiklash xuddi
-shunday, faqat `-d kip_tarozi_restore_test` o'rniga to'g'ridan-to'g'ri (bo'sh)
-`kip_tarozi` bazasiga qilinadi.
+> Backup faqat `pg_dump` olingan **paytgacha** bo'lgan ma'lumotni tiklaydi —
+> oxirgi backupdan keyingi kiplar yo'qoladi. Shuning uchun backup har kuni
+> avtomatik olinishi va `$BackupRemoteDir` (tashqi nusxa) sozlangan bo'lishi
+> muhim.
 
 ## Har kuni avtomatik ishga tushirish — Task Scheduler
 
