@@ -18,8 +18,21 @@ $BackupRemoteDir = ""
 
 # Nechchi kundan eski backup fayllar avtomatik o'chirilsin (disk to'lib
 # qolmasligi uchun). Shu muddat $BackupLocalDir'ga, sozlangan bo'lsa
-# $BackupRemoteDir'ga ham qo'llanadi.
+# $BackupRemoteDir'ga ham qo'llanadi. Ham baza .dump'lariga, ham
+# storage_* nusxa papkalariga amal qiladi.
 $RetentionDays = 30
+
+# storage\ papkasini (kamera suratlari + storage\nakladnoy\ PDF'lari) ham
+# zaxiralash. $true bo'lsa har ishga tushishda storage_YYYY-MM-DD_HHmm\
+# papkasiga to'liq nusxa (siqishsiz) olinadi. Faqat bazani zaxiralash kifoya
+# bo'lsa $false qiling (yoki skriptni bir martaga -SkipStorage bilan chaqiring).
+$BackupStorage = $true
+
+# storage\ papkasi shu hajmdan (GB) oshsa backup.log'ga ogohlantirish
+# yoziladi. Har kunlik zaxira storage\ ning to'liq nusxasi bo'lgani uchun
+# (inkremental emas) juda katta papkada disk joyini tez to'ldirishi mumkin -
+# docs\BACKUP.md "Katta storage papkasi" bo'limiga qarang.
+$StorageWarnGB = 5
 
 # pg_dump.exe/psql.exe qayerdaligini aniq ko'rsatish kerak bo'lsa (masalan
 # bir nechta PostgreSQL versiyasi o'rnatilgan bo'lsa) shu yerga to'liq "bin"

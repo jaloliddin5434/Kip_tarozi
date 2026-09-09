@@ -1,20 +1,37 @@
 <#
-    Kip Tarozi - kunlik PostgreSQL backup skripti.
+    Kip Tarozi - kunlik backup skripti.
 
-    backend\.env dagi DATABASE_URL'dan baza ulanish ma'lumotlarini o'qiydi,
-    pg_dump bilan to'liq backup oladi (custom format, .dump), uni mahalliy
-    papkaga yozadi, sozlangan bo'lsa tashqi joyga ham nusxalaydi va
-    $RetentionDays'dan eski fayllarni o'chiradi.
+    1) backend\.env dagi DATABASE_URL'dan baza ulanish ma'lumotlarini o'qiydi,
+       pg_dump bilan to'liq baza backup'ini oladi (custom format, .dump).
+    2) backend\.env dagi STORAGE_PATH papkasini (kamera suratlari + nakladnoy
+       PDF'lari) sana bilan nomlangan papkaga to'liq nusxalaydi (siqishsiz,
+       fayl-fayl: storage_YYYY-MM-DD_HHmm\). -SkipStorage berilsa yoki
+       $BackupStorage = $false bo'lsa - o'tkazib yuboriladi.
+    3) Ikkalasini ($BackupLocalDir'ga) yozadi, $BackupRemoteDir sozlangan
+       bo'lsa - o'sha tarmoq joyiga ham ko'chiradi.
+    4) $RetentionDays'dan (standart: 30 kun) eski .dump fayllar VA storage
+       nusxa papkalarini mahalliy va (sozlangan bo'lsa) tashqi joydan o'chiradi.
+    5) Har bir ishga tushishni C:\Kip_tarozi\backups\logs\backup.log'ga yozadi.
 
-    Ishga tushirish: powershell -ExecutionPolicy Bypass -File scripts\backup_yarat.ps1
-    Sozlamalar: scripts\backup_config.ps1 (namuna: backup_config.ps1.example)
+    Ishga tushirish:  powershell -ExecutionPolicy Bypass -File scripts\backup_yarat.ps1
+    Faqat baza:       ... -File scripts\backup_yarat.ps1 -SkipStorage
+    Sozlamalar:       scripts\backup_config.ps1 (namuna: backup_config.ps1.example)
     To'liq yo'riqnoma: docs\BACKUP.md
+
+    Baza backup'i muvaffaqiyatsiz bo'lsa - skript exit code 1 bilan tugaydi
+    (Task Scheduler "muvaffaqiyatsiz" deb belgilashi uchun). Storage zaxirasi
+    muvaffaqiyatsiz bo'lsa - baza .dump'i baribir saqlanadi, skript exit 0
+    bilan tugaydi, lekin backup.log'ga ko'zga tashlanadigan WARN yoziladi.
 #>
 
 param(
     # Ixtiyoriy: berilsa, backend\.env dagi DATABASE_URL o'rniga shu qiymat
     # ishlatiladi (masalan boshqa skriptdan sinov bazasi uchun chaqirilganda).
-    [string]$DatabaseUrl
+    [string]$DatabaseUrl,
+
+    # Berilsa, storage/ papkasi zaxiralanmaydi (faqat baza .dump'i olinadi) -
+    # masalan restore-test faqat bazani tekshirganda katta nusxa shart emas.
+    [switch]$SkipStorage
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,6 +45,8 @@ $BackupLocalDir = "C:\Kip_tarozi\backups"
 $BackupRemoteDir = ""
 $RetentionDays = 30
 $PgBinDir = ""
+$BackupStorage = $true      # storage/ papkasini (suratlar + nakladnoy PDF) ham zaxiralash (papka nusxasi)
+$StorageWarnGB = 5          # storage shu hajmdan (GB) oshsa backup.log'da ogohlantirish
 
 $ConfigFile = Join-Path $ScriptDir "backup_config.ps1"
 if (Test-Path $ConfigFile) {
@@ -70,20 +89,76 @@ function Find-PgBin {
 }
 
 function Remove-OldBackups {
-    param([string]$Dir, [int]$Days)
+    # $Folder berilsa - fayllar emas, papkalar (masalan storage_* nusxalari) tozalanadi.
+    param([string]$Dir, [int]$Days, [string]$Filter = "kip_tarozi_*.dump", [switch]$Folder)
 
     if (-not (Test-Path $Dir)) { return }
     $threshold = (Get-Date).AddDays(-$Days)
-    $old = Get-ChildItem -Path $Dir -Filter "kip_tarozi_*.dump" -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.LastWriteTime -lt $threshold }
+    $wantContainer = [bool]$Folder
+    $old = Get-ChildItem -Path $Dir -Filter $Filter -ErrorAction SilentlyContinue |
+        Where-Object { $_.PSIsContainer -eq $wantContainer -and $_.LastWriteTime -lt $threshold }
     foreach ($f in $old) {
         try {
-            Remove-Item $f.FullName -Force
+            Remove-Item $f.FullName -Recurse -Force
             Write-Log "Eski backup o'chirildi: $($f.FullName)"
         } catch {
             Write-Log "Eski backupni o'chirib bo'lmadi: $($f.FullName) - $($_.Exception.Message)" "WARN"
         }
     }
+}
+
+function Get-StorageDir {
+    # STORAGE_PATH'ni backend\.env'dan oladi; topilmasa <ProjectRoot>\storage.
+    if (Test-Path $EnvFile) {
+        $line = (Get-Content $EnvFile) | Where-Object { $_ -match '^\s*STORAGE_PATH\s*=' } | Select-Object -First 1
+        if ($line) {
+            $p = ($line -split '=', 2)[1].Trim().Trim('"').Trim("'")
+            if ($p) { return ($p -replace '/', '\') }
+        }
+    }
+    return (Join-Path $ProjectRoot "storage")
+}
+
+function Copy-StorageFolder {
+    <#
+        $SourceDir tarkibini (rekursiv) $DestDir ichiga fayl-fayl nusxalaydi
+        (siqishsiz, papka tuzilishini saqlab). Har bir fayl ALOHIDA try/catch
+        ichida - bittasi qulflangan/o'qib bo'lmaydigan bo'lsa (masalan ayni
+        damda yozilayotgan surat yoki agent SQLite navbati), u O'TKAZIB
+        yuboriladi, qolgan nusxa buzilmaydi. $ExcludePrefix bilan boshlanadigan
+        yo'llar (masalan backups papkasining o'zi) nusxalanmaydi.
+        Natija: nusxalangan/o'tkazilgan fayl soni + nusxalanganlar umumiy hajmi.
+    #>
+    param([string]$SourceDir, [string]$DestDir, [string]$ExcludePrefix = "")
+
+    $base = (Resolve-Path -LiteralPath $SourceDir).Path.TrimEnd('\') + '\'
+    $exclude = if ($ExcludePrefix -and (Test-Path -LiteralPath $ExcludePrefix)) {
+        (Resolve-Path -LiteralPath $ExcludePrefix).Path
+    } else { $null }
+    $files = @(Get-ChildItem -LiteralPath $SourceDir -Recurse -File -Force -ErrorAction SilentlyContinue)
+
+    $copied = 0
+    $skipped = 0
+    $bytes = [int64]0
+
+    foreach ($f in $files) {
+        if ($exclude -and $f.FullName.StartsWith($exclude, [StringComparison]::OrdinalIgnoreCase)) { continue }
+        $rel = $f.FullName.Substring($base.Length)
+        $target = Join-Path $DestDir $rel
+        try {
+            $targetDir = Split-Path -Parent $target
+            if (-not (Test-Path -LiteralPath $targetDir)) {
+                New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+            }
+            Copy-Item -LiteralPath $f.FullName -Destination $target -Force -ErrorAction Stop
+            $copied++
+            $bytes += $f.Length
+        } catch {
+            $skipped++
+        }
+    }
+
+    return [pscustomobject]@{ Copied = $copied; Skipped = $skipped; SourceBytes = $bytes }
 }
 
 try {
@@ -163,12 +238,85 @@ try {
         Write-Log "BackupRemoteDir sozlanmagan - faqat mahalliy backup saqlandi (docs\BACKUP.md'ga qarang)." "WARN"
     }
 
-    Remove-OldBackups -Dir $BackupLocalDir -Days $RetentionDays
-    if ($BackupRemoteDir -and (Test-Path $BackupRemoteDir)) {
-        Remove-OldBackups -Dir $BackupRemoteDir -Days $RetentionDays
+    # --- Storage (kamera suratlari + nakladnoy PDF) zaxirasi ---
+    $storageMuvaffaqiyat = $null
+    if (-not ($BackupStorage -and (-not $SkipStorage))) {
+        $sabab = if ($SkipStorage) { "-SkipStorage berilgan" } else { "backup_config.ps1'da BackupStorage = `$false" }
+        Write-Log "Storage zaxirasi o'tkazib yuborildi ($sabab)."
+    } else {
+        try {
+            $storageDir = Get-StorageDir
+            if (-not (Test-Path -LiteralPath $storageDir)) {
+                Write-Log "Storage papkasi topilmadi ($storageDir) - zaxira o'tkazib yuborildi (hali surat/PDF bo'lmasligi mumkin)." "WARN"
+                $storageMuvaffaqiyat = $true
+            } else {
+                $storageBackupName = "storage_${timestamp}"
+                $storageBackupLocal = Join-Path $BackupLocalDir $storageBackupName
+                Write-Log "Storage papkasi: $storageDir"
+                Write-Log "Storage nusxasi: $storageBackupLocal"
+
+                if (Test-Path -LiteralPath $storageBackupLocal) {
+                    Remove-Item -LiteralPath $storageBackupLocal -Recurse -Force
+                }
+                New-Item -ItemType Directory -Force -Path $storageBackupLocal | Out-Null
+
+                $r = Copy-StorageFolder -SourceDir $storageDir -DestDir $storageBackupLocal -ExcludePrefix $BackupLocalDir
+
+                if ($r.Copied -eq 0 -and $r.Skipped -eq 0) {
+                    Write-Log "Storage papkasi bo'sh - nusxa saqlanmadi." "WARN"
+                    Remove-Item -LiteralPath $storageBackupLocal -Recurse -Force -ErrorAction SilentlyContinue
+                    $storageMuvaffaqiyat = $true
+                } elseif ($r.Copied -eq 0) {
+                    throw "Storage nusxasiga birorta ham fayl ko'chirilmadi ($($r.Skipped) ta fayl o'qib bo'lmadi)."
+                } else {
+                    $srcMb = [math]::Round($r.SourceBytes / 1MB, 1)
+                    $srcGb = [math]::Round($r.SourceBytes / 1GB, 2)
+                    Write-Log "Storage nusxasi tayyor: $storageBackupLocal ($($r.Copied) fayl; ~$srcMb MB)"
+                    if ($r.Skipped -gt 0) {
+                        Write-Log "Storage: $($r.Skipped) ta fayl o'qib bo'lmadi (qulflangan bo'lishi mumkin) - nusxaga kirmadi." "WARN"
+                    }
+                    if ($srcGb -ge $StorageWarnGB) {
+                        Write-Log ("OGOHLANTIRISH: storage hajmi ~{0} GB. Har kuni to'liq nusxa olish disk joyini tez to'ldirishi mumkin - docs\BACKUP.md 'Katta storage papkasi' bo'limiga qarang." -f $srcGb) "WARN"
+                    }
+
+                    if ($BackupRemoteDir) {
+                        try {
+                            if (-not (Test-Path $BackupRemoteDir)) {
+                                New-Item -ItemType Directory -Force -Path $BackupRemoteDir | Out-Null
+                            }
+                            $storageRemote = Join-Path $BackupRemoteDir $storageBackupName
+                            if (Test-Path -LiteralPath $storageRemote) {
+                                Remove-Item -LiteralPath $storageRemote -Recurse -Force
+                            }
+                            Copy-Item -LiteralPath $storageBackupLocal -Destination $storageRemote -Recurse -Force
+                            Write-Log "Storage nusxasi tashqi joyga ko'chirildi: $storageRemote"
+                        } catch {
+                            Write-Log "Storage nusxasini tashqi joyga ko'chirishda xato: $($_.Exception.Message)" "WARN"
+                        }
+                    }
+                    $storageMuvaffaqiyat = $true
+                }
+            }
+        } catch {
+            $storageMuvaffaqiyat = $false
+            Write-Log "Storage zaxirasida XATO: $($_.Exception.Message)" "WARN"
+            Write-Log "Baza backup'i muvaffaqiyatli - skript davom etadi, storage keyingi safar qayta uriniladi." "WARN"
+        }
     }
 
-    Write-Log "Backup muvaffaqiyatli yakunlandi."
+    # --- Eski fayllarni tozalash: .dump fayllar VA storage nusxa papkalari ---
+    Remove-OldBackups -Dir $BackupLocalDir -Days $RetentionDays
+    Remove-OldBackups -Dir $BackupLocalDir -Days $RetentionDays -Filter "storage_*" -Folder
+    if ($BackupRemoteDir -and (Test-Path $BackupRemoteDir)) {
+        Remove-OldBackups -Dir $BackupRemoteDir -Days $RetentionDays
+        Remove-OldBackups -Dir $BackupRemoteDir -Days $RetentionDays -Filter "storage_*" -Folder
+    }
+
+    if ($storageMuvaffaqiyat -eq $false) {
+        Write-Log "Backup yakunlandi - LEKIN storage zaxirasi MUVAFFAQIYATSIZ (yuqoridagi WARN). Baza .dump'i saqlandi." "WARN"
+    } else {
+        Write-Log "Backup muvaffaqiyatli yakunlandi."
+    }
     exit 0
 } catch {
     Write-Log "XATO: $($_.Exception.Message)" "ERROR"
