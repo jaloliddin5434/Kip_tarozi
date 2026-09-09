@@ -10,7 +10,7 @@ from app.api.v1.routes.agent import AGENT_HOLAT_KALITI
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.foydalanuvchi import Foydalanuvchi, Rol
-from app.models.kip import Kip, KipHolati
+from app.models.kip import HISOBLANADIGAN_HOLATLAR, Kip
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya, PartiyaHolati
 from app.models.shubhali_holat import ShubhaliHolat, ShubhaliHolatStatusi
@@ -68,7 +68,7 @@ def dashboard(
         .join(Partiya, Partiya.mahsulot_id == Mahsulot.id)
         .join(Kip, Kip.partiya_id == Partiya.id)
         .where(
-            Kip.holati == KipHolati.aktiv,
+            Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
             func.date(Kip.vaqt) >= boshlanish,
             func.date(Kip.vaqt) <= tugash,
         )
@@ -82,7 +82,7 @@ def dashboard(
     smena_qatorlari = db.execute(
         select(Kip.smena, func.count(Kip.id), func.coalesce(func.sum(Kip.ogirlik), 0))
         .where(
-            Kip.holati == KipHolati.aktiv,
+            Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
             func.date(Kip.vaqt) >= boshlanish,
             func.date(Kip.vaqt) <= tugash,
         )

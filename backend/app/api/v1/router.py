@@ -7,6 +7,7 @@ from app.api.v1.routes import (
     foydalanuvchilar,
     hisobotlar,
     hujjatlar,
+    kamera_tasdiq,
     kiplar,
     mahsulotlar,
     moliyaviy,
@@ -21,6 +22,7 @@ api_router.include_router(auth.router)
 api_router.include_router(mahsulotlar.router)
 api_router.include_router(partiyalar.router)
 api_router.include_router(kiplar.router)
+api_router.include_router(kamera_tasdiq.router)
 api_router.include_router(shubhali_holatlar.router)
 api_router.include_router(hujjatlar.router)
 api_router.include_router(statistika.router)

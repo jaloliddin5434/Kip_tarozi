@@ -10,7 +10,7 @@ from app.api.deps import rollarga_ruxsat
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.foydalanuvchi import Foydalanuvchi, Rol
-from app.models.kip import Kip, KipHolati
+from app.models.kip import HISOBLANADIGAN_HOLATLAR, Kip
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya, PartiyaHolati
 from app.schemas.partiya import PartiyaJavob, PartiyaOchish, PartiyaOlchov, PartiyaSotish
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/partiyalar", tags=["partiyalar"])
 def _javobga_ayirib(db: Session, partiya: Partiya, mahsulot: Mahsulot) -> PartiyaJavob:
     jamlanma = db.execute(
         select(func.count(Kip.id), func.coalesce(func.sum(Kip.ogirlik), 0)).where(
-            Kip.partiya_id == partiya.id, Kip.holati == KipHolati.aktiv
+            Kip.partiya_id == partiya.id, Kip.holati.in_(HISOBLANADIGAN_HOLATLAR)
         )
     ).one()
     return PartiyaJavob(
@@ -151,7 +151,7 @@ def sotish(
 
     mahsulot = db.get(Mahsulot, partiya.mahsulot_id)
     kip_soni = db.scalar(
-        select(func.count(Kip.id)).where(Kip.partiya_id == partiya.id, Kip.holati == KipHolati.aktiv)
+        select(func.count(Kip.id)).where(Kip.partiya_id == partiya.id, Kip.holati.in_(HISOBLANADIGAN_HOLATLAR))
     ) or 0
 
     partiya.nakladnoy_raqami = nakladnoy_raqami_yarat(partiya)

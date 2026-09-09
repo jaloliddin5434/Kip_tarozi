@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -9,17 +10,18 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.audit_log import AuditAmal, AuditLog
 from app.models.foydalanuvchi import Foydalanuvchi, Rol
-from app.models.kip import Kip, KipHolati
+from app.models.kip import HISOBLANADIGAN_HOLATLAR, Kip, KipHolati
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya, PartiyaHolati
 from app.models.shubhali_holat import ShubhaliHolat, ShubhaliHolatStatusi
 from app.schemas.hujjat import AuditLogJavob
+from app.schemas.kamera_tasdiq import KameraTasdiqKutilmoqda
 from app.schemas.kip import KipBatafsilJavob, KipJavob, KipSinxronNatija, KipTahrirlash, KipYaratish
 from app.schemas.smena import MahsulotBoyichaHolat, SmenaHolati, SmenaKipYozuvi
-from app.services import kamera
+from app.services import kamera, kamera_tasdiq
 from app.services.media import surat_ommaviy_url
 from app.services.storage.rasm import rasm_saqla
-from app.services.telegram import surat_yubor
+from app.services.telegram import surat_yubor, xatolik_xabari
 
 router = APIRouter(prefix="/kiplar", tags=["kiplar"])
 
@@ -68,7 +70,7 @@ def _smena_kunlik_jamlanma(db: Session, smena, sana: date) -> SmenaHolati:
         .join(Kip, Kip.partiya_id == Partiya.id)
         .where(
             Kip.smena == smena,
-            Kip.holati == KipHolati.aktiv,
+            Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
             func.date(Kip.vaqt) == sana,
         )
         .group_by(Mahsulot.kod, Mahsulot.nomi)
@@ -197,12 +199,22 @@ def sinxronlash(
     return natijalar
 
 
-@router.post("", response_model=KipJavob, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=KipJavob,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        202: {
+            "model": KameraTasdiqKutilmoqda,
+            "description": "Kamera sozlangan-u surat ololmadi — kip saqlanmadi, Admin ruxsati kutilmoqda",
+        }
+    },
+)
 def saqlash(
     malumot: KipYaratish,
     db: Session = Depends(get_db),
     foydalanuvchi: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.operator)),
-) -> KipJavob:
+) -> KipJavob | JSONResponse:
     mavjud = db.scalar(select(Kip).where(Kip.mijoz_id == malumot.mijoz_id))
     if mavjud is not None:
         javob = KipJavob.model_validate(mavjud)
@@ -236,12 +248,39 @@ def saqlash(
 
     # Surat: agar mijoz (Stansiya Agenti) suratni o'zi bermagan bo'lsa va IP kamera
     # sozlangan bo'lsa — backend to'g'ridan-to'g'ri kameradan bitta kadr oladi.
-    # kamera modulidagi barcha xatolar yutiladi: kamera ishlamasa ham kip
-    # suratsiz saqlanadi, operator bloklanmaydi.
     mahsulot = db.get(Mahsulot, partiya.mahsulot_id)
     surat_yoli = malumot.surat_yoli
     if surat_yoli is None and kamera.sozlangan():
         surat_yoli = kamera.kip_uchun_surat_saqla(mahsulot.nomi, foydalanuvchi.smena.value, hozir)
+        if surat_yoli is None:
+            # Kamera SOZLANGAN, lekin surat OLINMADI — kip SAQLANMAYDI.
+            # Operator to'liq bloklanadi; Admin real vaqtda (panel yoki 2-bosqichda
+            # Telegram tugmasi orqali) ruxsat bermaguncha kutadi.
+            sorov = kamera_tasdiq.sorov_yarat(
+                db,
+                mijoz_id=malumot.mijoz_id,
+                partiya_id=partiya.id,
+                ogirlik=malumot.ogirlik,
+                smena=foydalanuvchi.smena,
+                operator_id=foydalanuvchi.id,
+                mahalliy_vaqt=malumot.mahalliy_vaqt,
+                stansiya_id=malumot.stansiya_id,
+                majburiy=malumot.majburiy,
+            )
+            db.commit()
+            xatolik_xabari(
+                db,
+                "📷 KAMERA ISHLAMADI — kip saqlanmadi, Admin ruxsati kutilmoqda.\n"
+                f"Mahsulot: {mahsulot.nomi}\n"
+                f"Partiya: #{partiya.partiya_raqami}\n"
+                f"Smena: {foydalanuvchi.smena.value}\n"
+                f"Og'irlik: {float(malumot.ogirlik):.1f} kg\n"
+                f"So'rov ID: {sorov.id}",
+            )
+            return JSONResponse(
+                status_code=status.HTTP_202_ACCEPTED,
+                content=KameraTasdiqKutilmoqda(sorov_id=sorov.id).model_dump(mode="json"),
+            )
 
     kip = Kip(
         mijoz_id=malumot.mijoz_id,

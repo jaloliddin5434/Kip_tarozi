@@ -16,6 +16,7 @@ import '../../services/offline_surat.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/clock_widget.dart';
+import '../../widgets/kamera_tasdiq_kutish_dialog.dart';
 import '../../widgets/smena_kalendar_dialogi.dart';
 import '../../widgets/yuk_saqlanmadi_dialog.dart';
 
@@ -82,6 +83,10 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   Timer? _blokTimer;
   bool _blokDialogiKorinmoqda = false;
 
+  // Kamera ishlamasa — Admin ruxsatini kutish (POST /kiplar -> 202).
+  bool _kameraTasdiqKutilmoqda = false;
+  Timer? _kameraTasdiqPoll;
+
   // Saqlash bosilgandan keyin 3 soniyalik oddiy kutish — tezkor ketma-ket
   // xato bosishning oldini oladi. Avvalgi 30s "Bekor qilish" hisoblagichi
   // butunlay olib tashlandi, backend endpointi (/kiplar/{id}/bekor-qilish)
@@ -114,6 +119,7 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
     _blokTimer?.cancel();
     _navbatTaymeri?.cancel();
     _saqlashQulfTaymeri?.cancel();
+    _kameraTasdiqPoll?.cancel();
     _ogirlikKontrolleri.removeListener(_ogirlikOzgardi);
     _partiyaRaqamiKontrolleri.dispose();
     _ogirlikKontrolleri.dispose();
@@ -188,6 +194,78 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
       }
     } catch (_) {
       // Aloqa muammosi — keyingi tsiklda qayta uriniladi
+    }
+
+    // Kamera tasdiq so'rovi (kutilayotgan) bo'lsa — operatorni qayta bloklaymiz.
+    // Ilova qayta ochilsa yoki dialog qandaydir yo'l bilan yopilsa ham blok
+    // shu tekshiruv orqali tiklanadi.
+    try {
+      final k = await _holat.api.get('/kamera-tasdiq/mening-kutilayotganim');
+      if (k != null && !_kameraTasdiqKutilmoqda && mounted) {
+        await _kameraTasdiginiKut(k['id'] as int);
+      }
+    } catch (_) {
+      // Aloqa muammosi — keyingi tsiklda qayta
+    }
+  }
+
+  /// Kamera surat ololmadi (POST /kiplar -> HTTP 202): operator TO'LIQ
+  /// bloklanadi, Admin (panel yoki Telegram tugmasi) tasdiqlash/rad etguncha.
+  /// Har 3 soniyada holat so'raladi — tasdiqlansa kip saqlangan hisoblanadi
+  /// va ekran avtomatik davom etadi; rad etilsa operator qaytadan urinadi.
+  Future<void> _kameraTasdiginiKut(int sorovId) async {
+    if (_kameraTasdiqKutilmoqda) return;
+    _kameraTasdiqKutilmoqda = true;
+
+    final tugadi = Completer<String>(); // 'tasdiqlangan' | 'rad_etilgan'
+    String? izoh;
+
+    _kameraTasdiqPoll?.cancel();
+    _kameraTasdiqPoll = Timer.periodic(const Duration(seconds: 3), (_) async {
+      try {
+        final h = await _holat.api.get('/kamera-tasdiq/$sorovId/holat');
+        final holati = h['holati'] as String?;
+        if (holati == 'tasdiqlangan' || holati == 'rad_etilgan') {
+          izoh = h['izoh'] as String?;
+          _kameraTasdiqPoll?.cancel();
+          if (!tugadi.isCompleted) tugadi.complete(holati);
+        }
+      } catch (_) {
+        // tarmoq muammosi — keyingi tsiklda qayta
+      }
+    });
+
+    if (mounted) {
+      await kameraTasdiqKutishDialogniKorsat(
+        context: context,
+        lok: _holat.lok,
+        tugash: tugadi.future,
+      );
+    }
+    _kameraTasdiqPoll?.cancel();
+    _kameraTasdiqKutilmoqda = false;
+
+    if (!tugadi.isCompleted) return;
+    final natija = await tugadi.future;
+    if (!mounted) return;
+    final lok = _holat.lok;
+
+    if (natija == 'tasdiqlangan') {
+      _dasturiyTozalash = true;
+      _ogirlikKontrolleri.clear();
+      _dasturiyTozalash = false;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(lok.t('kamera_tasdigi_tasdiqlandi'))));
+      _ogirlikFokusi.requestFocus();
+      await _smenaHolatiniYangilash();
+      await _ochiqPartiyalarniYangilash();
+      await _smenaRoyxatiniYangilash();
+    } else if (natija == 'rad_etilgan') {
+      final matn = (izoh == null || izoh!.isEmpty)
+          ? lok.t('kamera_tasdigi_rad_etildi')
+          : '${lok.t('kamera_tasdigi_rad_etildi')} — $izoh';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(matn), backgroundColor: Colors.orange.shade800, duration: const Duration(seconds: 5)),
+      );
     }
   }
 
@@ -349,6 +427,13 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
       } catch (_) {
         // ApiException EMAS => ulanish/timeout muammosi => lokal navbatga.
         await _lokalNavbatgaSaqla(tana);
+        return;
+      }
+
+      // Kamera SOZLANGAN, lekin surat OLINMADI (HTTP 202) — kip saqlanmadi.
+      // Operator TO'LIQ bloklanadi, Admin ruxsatini kutadi.
+      if (javob is Map && javob['kamera_tasdiq_kutilmoqda'] == true) {
+        await _kameraTasdiginiKut(javob['sorov_id'] as int);
         return;
       }
 

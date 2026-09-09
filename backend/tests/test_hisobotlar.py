@@ -85,6 +85,29 @@ def test_smena_excel_admin_togri_malumot_bilan_generatsiya_qiladi(client, db, ad
     assert jami_qatori[2].value == 260.0
 
 
+def test_smena_excel_tahrirlangan_kip_hisoblanadi_bekor_hisoblanmaydi(
+    client, db, admin_headers, operator, mahsulot_tola
+):
+    sana = date.today()
+    partiya = _partiya_yarat(db, mahsulot_tola.id, 940)
+    _kip_yarat(db, partiya.id, 1, 100.0, Smena.A, sana, operator.id)
+    _kip_yarat(db, partiya.id, 2, 60.0, Smena.A, sana, operator.id).holati = KipHolati.tahrirlangan
+    _kip_yarat(db, partiya.id, 3, 999.0, Smena.A, sana, operator.id).holati = KipHolati.bekor_qilingan
+    db.commit()
+
+    javob = client.get(
+        "/api/v1/hisobotlar/smena-excel", params={"sana": sana.isoformat(), "smena": "A"}, headers=admin_headers
+    )
+    assert javob.status_code == 200
+    ws = load_workbook(BytesIO(javob.content)).active
+    qatorlar = {row[0].value: row for row in ws.iter_rows(min_row=2)}
+    # aktiv (100) + tahrirlangan (60) = 2 ta / 160 kg; bekor (999) chiqib ketadi
+    assert qatorlar["Tola"][1].value == 2
+    assert qatorlar["Tola"][2].value == 160.0
+    assert qatorlar["JAMI"][1].value == 2
+    assert qatorlar["JAMI"][2].value == 160.0
+
+
 def test_smena_excel_operator_oz_smenasini_olishi_mumkin(client, operator_headers, operator):
     javob = client.get(
         "/api/v1/hisobotlar/smena-excel",
@@ -160,6 +183,28 @@ def test_mavsum_jurnali_kunlik_qatorlar_va_jamlanma(client, db, admin_headers, o
     assert mavsum_jami[2].value == 3
     assert mavsum_jami[3].value == 310.0
     assert mavsum_jami[4].value == round(310.0 / 3, 2)
+
+
+def test_mavsum_jurnali_tahrirlangan_kip_hisoblanadi(client, db, admin_headers, operator, mahsulot_tola):
+    partiya = _partiya_yarat(db, mahsulot_tola.id, 502)
+    _kip_yarat(db, partiya.id, 1, 100.0, Smena.A, date(2025, 9, 1), operator.id)
+    _kip_yarat(db, partiya.id, 2, 80.0, Smena.A, date(2025, 9, 1), operator.id).holati = KipHolati.tahrirlangan
+    _kip_yarat(db, partiya.id, 3, 999.0, Smena.A, date(2025, 9, 1), operator.id).holati = KipHolati.bekor_qilingan
+    db.commit()
+
+    javob = client.get(
+        "/api/v1/hisobotlar/mavsum-jurnali",
+        params={"mahsulot_kodi": "tola", "boshlanish": "2025-09-01", "tugash": "2025-09-02"},
+        headers=admin_headers,
+    )
+    assert javob.status_code == 200
+    ws = load_workbook(BytesIO(javob.content)).active
+    qatorlar = {row[0].value: row for row in ws.iter_rows()}
+    # aktiv (100) + tahrirlangan (80) hisoblanadi; bekor (999) yo'q
+    assert qatorlar["2025-09-01"][2].value == 2
+    assert qatorlar["2025-09-01"][3].value == 180.0
+    assert qatorlar["MAVSUM JAMI"][2].value == 2
+    assert qatorlar["MAVSUM JAMI"][3].value == 180.0
 
 
 def test_mavsum_jurnali_oylar_orasida_uzluksiz(client, db, admin_headers, operator, mahsulot_tola):
@@ -263,6 +308,28 @@ def test_smena_mahsulot_excel_faqat_mos_kiplarni_beradi(client, db, admin_header
     jami = next(r for r in ws.iter_rows(values_only=True) if r[0] and str(r[0]).startswith("JAMI"))
     assert "2 kip" in jami[0]
     assert jami[3] == 205.5
+
+
+def test_smena_mahsulot_excel_tahrirlangan_kip_hisoblanadi(client, db, admin_headers, operator, mahsulot_tola):
+    sana = date.today()
+    partiya = _partiya_yarat(db, mahsulot_tola.id, 932)
+    _kip_yarat(db, partiya.id, 1, 100.0, Smena.A, sana, operator.id)
+    _kip_yarat(db, partiya.id, 2, 90.0, Smena.A, sana, operator.id).holati = KipHolati.tahrirlangan
+    _kip_yarat(db, partiya.id, 3, 999.0, Smena.A, sana, operator.id).holati = KipHolati.bekor_qilingan
+    db.commit()
+
+    javob = client.get(
+        "/api/v1/hisobotlar/smena-mahsulot-excel",
+        params={"sana": sana.isoformat(), "smena": "A", "mahsulot_kodi": "tola"},
+        headers=admin_headers,
+    )
+    assert javob.status_code == 200
+    ws = load_workbook(BytesIO(javob.content)).active
+    kip_qatorlari = [r for r in ws.iter_rows(values_only=True) if isinstance(r[0], int)]
+    assert [r[0] for r in kip_qatorlari] == [1, 2]  # aktiv + tahrirlangan
+    jami = next(r for r in ws.iter_rows(values_only=True) if r[0] and str(r[0]).startswith("JAMI"))
+    assert "2 kip" in jami[0]
+    assert jami[3] == 190.0
 
 
 def test_smena_mahsulot_excel_operator_oz_smenasi(client, operator_headers, operator, mahsulot_tola):

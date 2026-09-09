@@ -128,7 +128,11 @@ def test_kip_saqlashda_kameradan_surat_olinadi(client, operator_headers, mahsulo
     assert (kamera_sozlangan / nisbiy).read_bytes() == SOXTA_JPEG
 
 
-def test_kamera_xato_bersa_kip_baribir_saqlanadi(client, operator_headers, mahsulot_tola, monkeypatch, kamera_sozlangan):
+def test_kamera_xato_bersa_admin_tasdigi_soraladi(client, operator_headers, mahsulot_tola, monkeypatch, kamera_sozlangan):
+    """Kamera SOZLANGAN, lekin surat OLINMADI — kip DARHOL saqlanmaydi, o'rniga
+    HTTP 202 + bloklovchi "kamera tasdiq" so'rovi qaytadi (batafsil sinov:
+    test_kamera_tasdiq.py)."""
+
     def soxta_get(url, **kwargs):
         raise httpx.ConnectError("kamera o'chiq")
 
@@ -137,8 +141,11 @@ def test_kamera_xato_bersa_kip_baribir_saqlanadi(client, operator_headers, mahsu
 
     javob = client.post("/api/v1/kiplar", json=_payload(partiya["id"]), headers=operator_headers)
 
-    assert javob.status_code == 201  # operator bloklanmadi
-    assert javob.json()["surat_yoli"] is None
+    assert javob.status_code == 202
+    tana = javob.json()
+    assert tana["kamera_tasdiq_kutilmoqda"] is True
+    assert tana["sorov_id"] > 0
+    assert tana["holati"] == "kutilmoqda"
 
 
 def test_kamera_sozlanmagan_bolsa_chaqirilmaydi(client, operator_headers, mahsulot_tola, monkeypatch):

@@ -1,6 +1,7 @@
 from app.models.audit_log import AuditAmal, AuditLog
 from app.models.base import Base
 from app.models.foydalanuvchi import Foydalanuvchi, Rol, Smena
+from app.models.kamera_tasdiq import KameraTasdiqHolati, KameraTasdiqSorovi
 from app.models.kip import Kip, KipHolati
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya, PartiyaHolati
@@ -24,4 +25,6 @@ __all__ = [
     "ShubhaliHolat",
     "ShubhaliHolatStatusi",
     "Sozlama",
+    "KameraTasdiqSorovi",
+    "KameraTasdiqHolati",
 ]

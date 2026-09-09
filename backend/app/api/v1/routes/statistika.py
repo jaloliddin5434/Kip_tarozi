@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import rollarga_ruxsat
 from app.core.database import get_db
 from app.models.foydalanuvchi import Foydalanuvchi, Rol, Smena
-from app.models.kip import Kip, KipHolati
+from app.models.kip import HISOBLANADIGAN_HOLATLAR, Kip
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya
 from app.schemas.statistika import (
@@ -56,7 +56,7 @@ def jamlanma(
         .join(Partiya, Partiya.mahsulot_id == Mahsulot.id)
         .join(Kip, Kip.partiya_id == Partiya.id)
         .where(
-            Kip.holati == KipHolati.aktiv,
+            Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
             func.date(Kip.vaqt) >= boshlanish,
             func.date(Kip.vaqt) <= tugash,
             *([Kip.smena == smena] if smena is not None else []),
@@ -93,7 +93,7 @@ def smena_boyicha(
     if mahsulot_kodi is not None:
         sorov = sorov.join(Partiya, Partiya.id == Kip.partiya_id).join(Mahsulot, Mahsulot.id == Partiya.mahsulot_id)
     sorov = sorov.where(
-        Kip.holati == KipHolati.aktiv,
+        Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
         func.date(Kip.vaqt) >= boshlanish,
         func.date(Kip.vaqt) <= tugash,
         *([Mahsulot.kod == mahsulot_kodi] if mahsulot_kodi is not None else []),
@@ -125,7 +125,7 @@ def operator_boyicha(
         )
         .join(Kip, Kip.operator_id == Foydalanuvchi.id)
         .where(
-            Kip.holati == KipHolati.aktiv,
+            Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
             func.date(Kip.vaqt) >= boshlanish,
             func.date(Kip.vaqt) <= tugash,
         )
@@ -160,7 +160,7 @@ def rekordlar(
     boshlanish, tugash = davr_oraligi(davr, sana)
 
     davr_sharti = (
-        Kip.holati == KipHolati.aktiv,
+        Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
         func.date(Kip.vaqt) >= boshlanish,
         func.date(Kip.vaqt) <= tugash,
     )
@@ -197,7 +197,7 @@ def rekordlar(
     kun_ustuni = func.date(Kip.vaqt)
     kun_qatori = db.execute(
         select(kun_ustuni, func.coalesce(func.sum(Kip.ogirlik), 0))
-        .where(Kip.holati == KipHolati.aktiv)
+        .where(Kip.holati.in_(HISOBLANADIGAN_HOLATLAR))
         .group_by(kun_ustuni)
         .order_by(func.sum(Kip.ogirlik).desc())
         .limit(1)

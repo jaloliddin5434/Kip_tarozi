@@ -256,6 +256,44 @@ const Map<String, Map<Til, String>> _matnlar = {
   'hujjat': {Til.uz: 'Hujjat', Til.ru: 'Документ'},
   'vaqt': {Til.uz: 'Vaqt', Til.ru: 'Время'},
 
+  // Kamera tasdiqlari bo'limi ("Kamera ishlamasa — Admin ruxsati")
+  'kamera_tasdiqlari': {
+    Til.uz: 'Kamera tasdiqlari',
+    Til.ru: 'Подтверждения камеры',
+  },
+  'kamera_tasdiqlari_yoq': {
+    Til.uz: 'Kutilayotgan tasdiq yo\'q',
+    Til.ru: 'Нет ожидающих подтверждений',
+  },
+  'tasdiqlash': {Til.uz: 'Tasdiqlash', Til.ru: 'Подтвердить'},
+  'rad_etish': {Til.uz: 'Rad etish', Til.ru: 'Отклонить'},
+  'tasdiqlangan': {Til.uz: 'Tasdiqlangan', Til.ru: 'Подтверждено'},
+  'rad_etilgan': {Til.uz: 'Rad etilgan', Til.ru: 'Отклонено'},
+  'rad_etish_sababi': {
+    Til.uz: 'Rad etish sababi (ixtiyoriy)',
+    Til.ru: 'Причина отклонения (необязательно)',
+  },
+  'kamera_tasdigi_kutilmoqda_sarlavha': {
+    Til.uz: 'Admin ruxsati kutilmoqda',
+    Til.ru: 'Ожидается разрешение администратора',
+  },
+  'kamera_tasdigi_kutilmoqda_matn': {
+    Til.uz:
+        'Kamera surat ololmadi. Kip saqlanishi uchun Admin ruxsati kerak.\n'
+            'Iltimos, kuting — ruxsat berilishi bilan avtomatik davom etadi.',
+    Til.ru:
+        'Камера не сделала снимок. Для сохранения кипа нужно разрешение администратора.\n'
+            'Пожалуйста, подождите — после разрешения продолжится автоматически.',
+  },
+  'kamera_tasdigi_tasdiqlandi': {
+    Til.uz: 'Admin ruxsat berdi — kip saqlandi',
+    Til.ru: 'Администратор разрешил — кип сохранён',
+  },
+  'kamera_tasdigi_rad_etildi': {
+    Til.uz: 'Admin rad etdi — kip saqlanmadi, qaytadan urinib ko\'ring',
+    Til.ru: 'Администратор отклонил — кип не сохранён, попробуйте снова',
+  },
+
   // Shubhali holatlar bo'limi
   'shubhali_holatlar_royxati': {
     Til.uz: 'Shubhali holatlar',

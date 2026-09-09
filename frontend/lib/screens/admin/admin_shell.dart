@@ -4,6 +4,7 @@ import '../../state/app_state.dart';
 import '../../widgets/clock_widget.dart';
 import 'dashboard_screen.dart';
 import 'hujjatlar_screen.dart';
+import 'kamera_tasdiqlari_screen.dart';
 import 'moliyaviy_kirish_screen.dart';
 import 'partiyalar_screen.dart';
 import 'shubhali_holatlar_screen.dart';
@@ -33,6 +34,7 @@ class _AdminShellState extends State<AdminShell> {
       if (!tayyorMahsulotRoli) const StatistikaEkrani(),
       const PartiyalarEkrani(),
       if (!tayyorMahsulotRoli) const ShubhaliHolatlarEkrani(),
+      if (adminRoli) const KameraTasdiqlariEkrani(),
       if (adminRoli) const MoliyaviyKirishEkrani(),
       if (adminRoli) const SozlamalarEkrani(),
     ];
@@ -59,6 +61,11 @@ class _AdminShellState extends State<AdminShell> {
         NavigationRailDestination(
           icon: const Icon(Icons.warning_amber_rounded),
           label: Text(lok.t('shubhali_holatlar_royxati')),
+        ),
+      if (adminRoli)
+        NavigationRailDestination(
+          icon: const Icon(Icons.photo_camera_front_outlined),
+          label: Text(lok.t('kamera_tasdiqlari')),
         ),
       if (adminRoli)
         NavigationRailDestination(

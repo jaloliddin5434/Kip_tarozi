@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 
 from app.core.config import settings
 from app.core.database import SessionLocal
-from app.models.kip import Kip, KipHolati
+from app.models.kip import HISOBLANADIGAN_HOLATLAR, Kip
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya
 from app.services.telegram import statistika_xabari
@@ -25,7 +25,7 @@ def _kunlik_hisobot_yubor() -> None:
             select(Mahsulot.nomi, func.count(Kip.id), func.coalesce(func.sum(Kip.ogirlik), 0))
             .join(Partiya, Partiya.mahsulot_id == Mahsulot.id)
             .join(Kip, Kip.partiya_id == Partiya.id)
-            .where(Kip.holati == KipHolati.aktiv, func.date(Kip.vaqt) == bugun)
+            .where(Kip.holati.in_(HISOBLANADIGAN_HOLATLAR), func.date(Kip.vaqt) == bugun)
             .group_by(Mahsulot.nomi)
         ).all()
 

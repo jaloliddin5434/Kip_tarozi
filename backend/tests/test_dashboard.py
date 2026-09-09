@@ -79,3 +79,22 @@ def test_dashboard_ochiq_partiyalar_va_shubhali_holatlar_davrga_bogliq_emas(
 def test_dashboard_operator_kira_olmaydi(client, operator_headers):
     javob = client.get("/api/v1/dashboard", headers=operator_headers)
     assert javob.status_code == 403
+
+
+def test_dashboard_tahrirlangan_kip_hisoblanadi_bekor_hisoblanmaydi(
+    client, db, admin_headers, operator, mahsulot_tola
+):
+    partiya = _partiya_yarat(db, mahsulot_tola.id, 930)
+    _kip_yarat(db, partiya.id, 1, 100.0, Smena.A, date.today(), operator.id)
+    tahrirlangan = _kip_yarat(db, partiya.id, 2, 40.0, Smena.A, date.today(), operator.id)
+    tahrirlangan.holati = KipHolati.tahrirlangan
+    bekor = _kip_yarat(db, partiya.id, 3, 999.0, Smena.A, date.today(), operator.id)
+    bekor.holati = KipHolati.bekor_qilingan
+    db.commit()
+
+    kunlik = client.get("/api/v1/dashboard", params={"davr": "kunlik"}, headers=admin_headers).json()
+    assert kunlik["jami_soni"] == 2
+    assert kunlik["jami_kg"] == 140.0
+    smena_a = next(s for s in kunlik["smenalar"] if s["smena"] == "A")
+    assert smena_a["soni"] == 2
+    assert smena_a["jami_kg"] == 140.0

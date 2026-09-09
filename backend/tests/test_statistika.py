@@ -191,3 +191,116 @@ def test_rekordlar_malumot_yoq_bosh_holat(client, admin_headers):
 def test_rekordlar_operator_kira_olmaydi(client, operator_headers):
     javob = client.get("/api/v1/statistika/rekordlar", params={"davr": "kunlik"}, headers=operator_headers)
     assert javob.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# "tahrirlangan" kip — Admin tomonidan tuzatilgan HAQIQIY yozuv, shuning uchun
+# statistikaga o'zining so'nggi qiymatlari bilan KIRISHI kerak. Faqat
+# "bekor_qilingan" kip chiqarib tashlanadi.
+# ---------------------------------------------------------------------------
+
+
+def test_jamlanma_tahrirlangan_kip_hisoblanadi(client, db, admin_headers, operator, mahsulot_tola):
+    partiya = _partiya_yarat(db, mahsulot_tola.id, 720)
+    _kip_yarat(db, partiya.id, 1, 100.0, Smena.A, date.today(), operator.id)
+    tahrirlangan = _kip_yarat(db, partiya.id, 2, 50.0, Smena.A, date.today(), operator.id)
+    tahrirlangan.holati = KipHolati.tahrirlangan
+    bekor = _kip_yarat(db, partiya.id, 3, 999.0, Smena.A, date.today(), operator.id)
+    bekor.holati = KipHolati.bekor_qilingan
+    db.commit()
+
+    javob = client.get("/api/v1/statistika/jamlanma", params={"davr": "kunlik"}, headers=admin_headers).json()
+    # aktiv (100) + tahrirlangan (50) hisoblanadi; bekor (999) hisoblanmaydi
+    assert javob["jami_soni"] == 2
+    assert javob["jami_kg"] == 150.0
+
+
+def test_smena_boyicha_tahrirlangan_kip_hisoblanadi(client, db, admin_headers, operator, mahsulot_tola):
+    partiya = _partiya_yarat(db, mahsulot_tola.id, 721)
+    _kip_yarat(db, partiya.id, 1, 100.0, Smena.A, date.today(), operator.id)
+    tahrirlangan = _kip_yarat(db, partiya.id, 2, 60.0, Smena.A, date.today(), operator.id)
+    tahrirlangan.holati = KipHolati.tahrirlangan
+    bekor = _kip_yarat(db, partiya.id, 3, 999.0, Smena.A, date.today(), operator.id)
+    bekor.holati = KipHolati.bekor_qilingan
+    db.commit()
+
+    javob = client.get("/api/v1/statistika/smena-boyicha", params={"davr": "kunlik"}, headers=admin_headers).json()
+    smena_a = next(s for s in javob if s["smena"] == "A")
+    assert smena_a["soni"] == 2
+    assert smena_a["jami_kg"] == 160.0
+
+
+def test_operator_boyicha_tahrirlangan_kip_hisoblanadi(client, db, admin_headers, operator, mahsulot_tola):
+    partiya = _partiya_yarat(db, mahsulot_tola.id, 722)
+    _kip_yarat(db, partiya.id, 1, 100.0, Smena.A, date.today(), operator.id)
+    tahrirlangan = _kip_yarat(db, partiya.id, 2, 70.0, Smena.A, date.today(), operator.id)
+    tahrirlangan.holati = KipHolati.tahrirlangan
+    bekor = _kip_yarat(db, partiya.id, 3, 999.0, Smena.A, date.today(), operator.id)
+    bekor.holati = KipHolati.bekor_qilingan
+    db.commit()
+
+    javob = client.get("/api/v1/statistika/operator-boyicha", params={"davr": "kunlik"}, headers=admin_headers).json()
+    qator = next(o for o in javob if o["operator_id"] == operator.id)
+    assert qator["soni"] == 2
+    assert qator["jami_kg"] == 170.0
+
+
+def test_rekordlar_tahrirlangan_kip_hisoblanadi(client, db, admin_headers, operator, mahsulot_tola):
+    partiya = _partiya_yarat(db, mahsulot_tola.id, 723)
+    kip = _kip_yarat(db, partiya.id, 1, 500.0, Smena.A, date.today(), operator.id)
+    kip.holati = KipHolati.tahrirlangan
+    db.commit()
+
+    javob = client.get("/api/v1/statistika/rekordlar", params={"davr": "kunlik"}, headers=admin_headers).json()
+    assert javob["eng_yaxshi_smena"]["smena"] == "A"
+    assert javob["eng_yaxshi_smena"]["jami_kg"] == 500.0
+    assert javob["eng_yaxshi_operator"]["soni"] == 1
+    assert javob["eng_yuqori_kunlik_yigim"]["jami_kg"] == 500.0
+
+
+def test_jamlanma_tahrirlangan_kip_TUZATILGAN_qiymat_bilan_hisoblanadi(
+    db, client, operator_headers, admin_headers, mahsulot_tola
+):
+    """To'liq oqim: operator xato og'irlik bilan kip saqlaydi, Admin uni
+    PATCH orqali tuzatadi (holati -> 'tahrirlangan'), so'ng Statistika shu
+    kipni ENDI TUZATILGAN qiymati bilan ko'rsatishi kerak."""
+    partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 724}, headers=operator_headers
+    ).json()
+    kip = client.post(
+        "/api/v1/kiplar",
+        json={
+            "mijoz_id": str(uuid.uuid4()),
+            "partiya_id": partiya["id"],
+            "ogirlik": 850.0,  # xato kiritilgan og'irlik
+            "mahalliy_vaqt": datetime.now(timezone.utc).isoformat(),
+        },
+        headers=operator_headers,
+    ).json()
+
+    oldin = client.get("/api/v1/statistika/jamlanma", params={"davr": "kunlik"}, headers=admin_headers).json()
+    assert oldin["jami_soni"] == 1
+    assert oldin["jami_kg"] == 850.0
+
+    tahrir = client.patch(
+        f"/api/v1/kiplar/{kip['id']}",
+        json={"ogirlik": 145.0, "sabab": "Tarozi noto'g'ri o'qigan — qayta tortildi"},
+        headers=admin_headers,
+    )
+    assert tahrir.status_code == 200
+
+    keyin = client.get("/api/v1/statistika/jamlanma", params={"davr": "kunlik"}, headers=admin_headers).json()
+    assert keyin["jami_soni"] == 1          # kip YO'QOLMAYDI
+    assert keyin["jami_kg"] == 145.0        # tuzatilgan qiymat bilan hisoblanadi
+
+
+def test_jamlanma_bekor_qilingan_kip_hisoblanmaydi(client, db, admin_headers, operator, mahsulot_tola):
+    partiya = _partiya_yarat(db, mahsulot_tola.id, 725)
+    _kip_yarat(db, partiya.id, 1, 100.0, Smena.A, date.today(), operator.id)
+    bekor = _kip_yarat(db, partiya.id, 2, 999.0, Smena.A, date.today(), operator.id)
+    bekor.holati = KipHolati.bekor_qilingan
+    db.commit()
+
+    javob = client.get("/api/v1/statistika/jamlanma", params={"davr": "kunlik"}, headers=admin_headers).json()
+    assert javob["jami_soni"] == 1
+    assert javob["jami_kg"] == 100.0

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import rollarga_ruxsat
 from app.core.database import get_db
 from app.models.foydalanuvchi import Foydalanuvchi, Rol, Smena
-from app.models.kip import Kip, KipHolati
+from app.models.kip import HISOBLANADIGAN_HOLATLAR, Kip
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya
 from app.models.sozlama import Sozlama
@@ -55,7 +55,7 @@ def smena_excel(
         select(Mahsulot.kod, func.count(Kip.id), func.coalesce(func.sum(Kip.ogirlik), 0))
         .join(Partiya, Partiya.mahsulot_id == Mahsulot.id)
         .join(Kip, Kip.partiya_id == Partiya.id)
-        .where(Kip.holati == KipHolati.aktiv, Kip.smena == smena, func.date(Kip.vaqt) == sana)
+        .where(Kip.holati.in_(HISOBLANADIGAN_HOLATLAR), Kip.smena == smena, func.date(Kip.vaqt) == sana)
         .group_by(Mahsulot.kod)
     ).all()
     jamlanma = {kod: (soni, float(kg)) for kod, soni, kg in qatorlar}
@@ -124,7 +124,7 @@ def smena_mahsulot_excel(
         .join(Partiya, Partiya.id == Kip.partiya_id)
         .where(
             Partiya.mahsulot_id == mahsulot.id,
-            Kip.holati == KipHolati.aktiv,
+            Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
             Kip.smena == smena,
             func.date(Kip.vaqt) == sana,
         )
@@ -212,7 +212,7 @@ def mavsum_jurnali(
         .join(Partiya, Partiya.id == Kip.partiya_id)
         .where(
             Partiya.mahsulot_id == mahsulot.id,
-            Kip.holati == KipHolati.aktiv,
+            Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
             kun_ustuni >= boshlanish,
             kun_ustuni <= tugash,
         )

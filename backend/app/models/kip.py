@@ -14,6 +14,14 @@ class KipHolati(str, enum.Enum):
     tahrirlangan = "tahrirlangan"
 
 
+# Statistika, hisobot va nakladnoy hisob-kitoblarida HISOBGA OLINADIGAN kip
+# holatlari. Faqat "bekor_qilingan" chiqarib tashlanadi; "tahrirlangan" kip —
+# bu Admin tomonidan tuzatilgan haqiqiy yozuv (masalan noto'g'ri mahsulot/partiya
+# to'g'rilangan), shuning uchun u o'zining so'nggi (tuzatilgan) qiymatlari bilan
+# hisoblanishi kerak.
+HISOBLANADIGAN_HOLATLAR: tuple[KipHolati, ...] = (KipHolati.aktiv, KipHolati.tahrirlangan)
+
+
 class Kip(Base):
     """Bitta tortilgan yuk (paket). kip_raqami partiya ichida 1 dan avtomatik ortadi.
     mijoz_id — operator qurilmasida (Stansiya Agenti) generatsiya qilingan UUID;

@@ -79,6 +79,33 @@ def test_dublikat_ogohlantirish(client, operator_headers, mahsulot_tola):
     assert javob3.status_code == 201
 
 
+def test_partiya_kip_soni_tahrirlangan_kipni_hisoblaydi(client, operator_headers, admin_headers, mahsulot_tola):
+    """Partiya javobidagi kip_soni / jami_kg (nakladnoy'ga ham shu son
+    kiradi) tahrirlangan kipni TUZATILGAN qiymati bilan hisoblashi, faqat
+    bekor qilingan kipni chiqarib tashlashi kerak."""
+    partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 60}, headers=operator_headers
+    ).json()
+
+    kip1 = client.post("/api/v1/kiplar", json=_kip_yaratish_payload(partiya["id"], 150.0), headers=operator_headers).json()
+    kip2 = client.post("/api/v1/kiplar", json=_kip_yaratish_payload(partiya["id"], 160.0), headers=operator_headers).json()
+    kip3 = client.post("/api/v1/kiplar", json=_kip_yaratish_payload(partiya["id"], 170.0), headers=operator_headers).json()
+
+    # kip2 — Admin tuzatadi (holati -> tahrirlangan)
+    client.patch(
+        f"/api/v1/kiplar/{kip2['id']}", json={"ogirlik": 155.0, "sabab": "qayta tortildi"}, headers=admin_headers
+    )
+    # kip3 — bekor qilinadi
+    client.request("DELETE", f"/api/v1/kiplar/{kip3['id']}", json={"sabab": "xato yozuv"}, headers=admin_headers)
+
+    qayta = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 60}, headers=operator_headers
+    ).json()
+    assert qayta["id"] == partiya["id"]
+    assert qayta["kip_soni"] == 2                 # kip1 + tahrirlangan kip2; bekor kip3 yo'q
+    assert qayta["jami_kg"] == 305.0             # 150.0 + 155.0 (tuzatilgan)
+
+
 def test_stansiya_id_saqlanadi(client, operator_headers, mahsulot_tola, stansiya):
     partiya = client.post(
         "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 41}, headers=operator_headers
@@ -180,6 +207,31 @@ def test_smena_kunlik_jamlanma(client, operator_headers, mahsulot_tola):
     bosh_javob = client.get(f"/api/v1/kiplar/smena/kunlik-jamlanma?sana={kecha}", headers=operator_headers)
     assert bosh_javob.status_code == 200
     assert bosh_javob.json()["mahsulotlar"] == []
+
+
+def test_smena_kunlik_jamlanma_tahrirlangan_kipni_hisoblaydi(
+    client, operator_headers, admin_headers, mahsulot_tola
+):
+    partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 43}, headers=operator_headers
+    ).json()
+    client.post("/api/v1/kiplar", json=_kip_yaratish_payload(partiya["id"], 100.0), headers=operator_headers)
+    kip2 = client.post(
+        "/api/v1/kiplar", json=_kip_yaratish_payload(partiya["id"], 200.0), headers=operator_headers
+    ).json()
+    kip3 = client.post(
+        "/api/v1/kiplar", json=_kip_yaratish_payload(partiya["id"], 300.0), headers=operator_headers
+    ).json()
+    client.patch(
+        f"/api/v1/kiplar/{kip2['id']}", json={"ogirlik": 120.0, "sabab": "qayta tortildi"}, headers=admin_headers
+    )
+    client.request("DELETE", f"/api/v1/kiplar/{kip3['id']}", json={"sabab": "xato"}, headers=admin_headers)
+
+    bugun = datetime.now(timezone.utc).date().isoformat()
+    data = client.get(f"/api/v1/kiplar/smena/kunlik-jamlanma?sana={bugun}", headers=operator_headers).json()
+    tola = next(m for m in data["mahsulotlar"] if m["mahsulot_kodi"] == "tola")
+    assert tola["soni"] == 2                # aktiv + tahrirlangan; bekor emas
+    assert tola["jami_kg"] == 220.0        # 100.0 + 120.0 (tuzatilgan)
 
 
 def test_admin_sababli_ochirish(client, operator_headers, admin_headers, mahsulot_tola):
