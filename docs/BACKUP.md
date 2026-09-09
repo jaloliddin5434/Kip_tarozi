@@ -16,6 +16,17 @@ Kunlik avtomatik backup uchun skript: [scripts/backup_yarat.ps1](../scripts/back
    fayl (surat, agent SQLite navbati) o'tkazib yuboriladi, qolgan nusxa
    buzilmaydi. `-SkipStorage` bilan yoki `$BackupStorage = $false` bilan bu
    qadam o'chiriladi.
+   **Zaxira nusxasida** har bir kip surati tasodifiy hash nomi o'rniga
+   tushunarli nom bilan saqlanadi:
+   `<Mahsulot>_Partiya<raqam>_Kip<raqam>_<ogirlik>kg.jpg` (masalan
+   `Tola_Partiya55_Kip4_142.6kg.jpg`). Bu nomlar
+   [backend\scripts\storage_backup_metadata.py](../backend/scripts/storage_backup_metadata.py)
+   bazadan (`kiplar` + `partiyalar` + `mahsulotlar`) **faqat o'qib** oladi —
+   **asl `storage\` papkasiga hech qachon tegilmaydi** (dastur bazada asl nom
+   bilan bog'langan). Kip bilan bog'lanmagan fayllar (masalan
+   `shubhali_holatlar\` suratlari) asl nom bilan qoladi. Metadata skripti
+   ishlamasa (baza yo'q, venv yo'q) — `WARN` yoziladi va nusxa asl nomlar
+   bilan davom etadi.
    *(Excel/PDF hisobotlar — smena/mavsum Excel'i — foydalanuvchiga
    to'g'ridan-to'g'ri yuklab beriladi, diskda saqlanmaydi, shuning uchun
    ular backupsiz — faqat `storage\nakladnoy\` dagi nakladnoy PDF'lari

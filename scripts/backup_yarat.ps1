@@ -5,7 +5,11 @@
        pg_dump bilan to'liq baza backup'ini oladi (custom format, .dump).
     2) backend\.env dagi STORAGE_PATH papkasini (kamera suratlari + nakladnoy
        PDF'lari) sana bilan nomlangan papkaga to'liq nusxalaydi (siqishsiz,
-       fayl-fayl: storage_YYYY-MM-DD_HHmm\). -SkipStorage berilsa yoki
+       fayl-fayl: storage_YYYY-MM-DD_HHmm\). ZAXIRA NUSXASIDA har bir kip
+       surati tushunarli nom bilan saqlanadi
+       (<Mahsulot>_Partiya<raqam>_Kip<raqam>_<ogirlik>kg.jpg) - bu nomlar
+       backend\scripts\storage_backup_metadata.py bazadan o'qigan ma'lumotdan
+       olinadi; ASL storage/ papkasiga TEGILMAYDI. -SkipStorage berilsa yoki
        $BackupStorage = $false bo'lsa - o'tkazib yuboriladi.
     3) Ikkalasini ($BackupLocalDir'ga) yozadi, $BackupRemoteDir sozlangan
        bo'lsa - o'sha tarmoq joyiga ham ko'chiradi.
@@ -119,6 +123,55 @@ function Get-StorageDir {
     return (Join-Path $ProjectRoot "storage")
 }
 
+function Get-StorageNameMap {
+    <#
+        backend\scripts\storage_backup_metadata.py'ni chaqirib, surat_yoli
+        (STORAGE_PATH'ga nisbiy, "/" bilan) -> zaxira nusxasidagi tushunarli
+        fayl nomi xaritasini (hashtable) qaytaradi.
+
+        MUHIM: bu skript bazadan FAQAT O'QIYDI, asl storage/ papkasiga
+        tegmaydi. Har qanday xatoda bo'sh hashtable qaytadi va WARN yoziladi -
+        zaxira baribir asl (hash) nomlar bilan davom etadi.
+    #>
+    param([string]$Root)
+
+    $map = @{}
+    $py = Join-Path $Root "backend\.venv\Scripts\python.exe"
+    if (-not (Test-Path $py)) { $py = "python" }
+    $backendDir = Join-Path $Root "backend"
+    $outFile = Join-Path $env:TEMP ("kt_namemap_" + [guid]::NewGuid().ToString('N') + ".json")
+
+    try {
+        Push-Location $backendDir
+        # Native stderr'ni $ErrorActionPreference='Stop' bilan qo'shganda PS 5.1
+        # "NativeCommandError" tashlashi mumkin - shu blokda vaqtincha yumshatamiz.
+        $eskiEAP = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $chiqish = & $py -m scripts.storage_backup_metadata --output $outFile 2>&1
+            $exit = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $eskiEAP
+            Pop-Location
+        }
+        foreach ($qator in $chiqish) { Write-Log "  [metadata] $qator" }
+        if ($exit -ne 0) { throw "storage_backup_metadata.py exit code $exit" }
+        if (-not (Test-Path $outFile)) { throw "metadata JSON fayli yaratilmadi" }
+
+        $json = [System.IO.File]::ReadAllText($outFile, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+        if ($json) {
+            foreach ($p in $json.PSObject.Properties) { $map[$p.Name] = [string]$p.Value }
+        }
+        Write-Log "Surat nomlari xaritasi tayyor: $($map.Count) ta yozuv."
+    } catch {
+        Write-Log "Surat nomlari xaritasini olishda xato: $($_.Exception.Message) - zaxira asl nomlar bilan davom etadi." "WARN"
+    } finally {
+        if (Test-Path $outFile) { Remove-Item $outFile -Force -ErrorAction SilentlyContinue }
+    }
+
+    return $map
+}
+
 function Copy-StorageFolder {
     <#
         $SourceDir tarkibini (rekursiv) $DestDir ichiga fayl-fayl nusxalaydi
@@ -127,9 +180,20 @@ function Copy-StorageFolder {
         damda yozilayotgan surat yoki agent SQLite navbati), u O'TKAZIB
         yuboriladi, qolgan nusxa buzilmaydi. $ExcludePrefix bilan boshlanadigan
         yo'llar (masalan backups papkasining o'zi) nusxalanmaydi.
-        Natija: nusxalangan/o'tkazilgan fayl soni + nusxalanganlar umumiy hajmi.
+
+        $NameMap berilsa (surat_yoli -> yangi nom): mos yozuv topilgan fayl
+        ZAXIRA NUSXASIDA yangi, tushunarli nom bilan saqlanadi (asl fayl
+        joyida, papka tuzilishida qoladi - faqat bazaviy nom o'zgaradi). Mos
+        yozuv topilmasa - asl nom bilan nusxalanadi.
+
+        Natija: nusxalangan/o'tkazilgan/qayta nomlangan fayl soni + hajm.
     #>
-    param([string]$SourceDir, [string]$DestDir, [string]$ExcludePrefix = "")
+    param(
+        [string]$SourceDir,
+        [string]$DestDir,
+        [string]$ExcludePrefix = "",
+        [hashtable]$NameMap = @{}
+    )
 
     $base = (Resolve-Path -LiteralPath $SourceDir).Path.TrimEnd('\') + '\'
     $exclude = if ($ExcludePrefix -and (Test-Path -LiteralPath $ExcludePrefix)) {
@@ -139,12 +203,24 @@ function Copy-StorageFolder {
 
     $copied = 0
     $skipped = 0
+    $renamed = 0
     $bytes = [int64]0
 
     foreach ($f in $files) {
         if ($exclude -and $f.FullName.StartsWith($exclude, [StringComparison]::OrdinalIgnoreCase)) { continue }
         $rel = $f.FullName.Substring($base.Length)
+        $relForward = $rel.Replace('\', '/')
         $target = Join-Path $DestDir $rel
+        $isRenamed = $false
+
+        if ($NameMap -and $NameMap.ContainsKey($relForward)) {
+            $yangiNom = $NameMap[$relForward]
+            if ($yangiNom) {
+                $target = Join-Path (Split-Path -Parent $target) $yangiNom
+                $isRenamed = $true
+            }
+        }
+
         try {
             $targetDir = Split-Path -Parent $target
             if (-not (Test-Path -LiteralPath $targetDir)) {
@@ -153,12 +229,13 @@ function Copy-StorageFolder {
             Copy-Item -LiteralPath $f.FullName -Destination $target -Force -ErrorAction Stop
             $copied++
             $bytes += $f.Length
+            if ($isRenamed) { $renamed++ }
         } catch {
             $skipped++
         }
     }
 
-    return [pscustomobject]@{ Copied = $copied; Skipped = $skipped; SourceBytes = $bytes }
+    return [pscustomobject]@{ Copied = $copied; Skipped = $skipped; Renamed = $renamed; SourceBytes = $bytes }
 }
 
 try {
@@ -260,7 +337,12 @@ try {
                 }
                 New-Item -ItemType Directory -Force -Path $storageBackupLocal | Out-Null
 
-                $r = Copy-StorageFolder -SourceDir $storageDir -DestDir $storageBackupLocal -ExcludePrefix $BackupLocalDir
+                # Bazadan surat_yoli -> tushunarli nom xaritasi (faqat zaxira
+                # nusxasi uchun; asl storage/ papkasiga tegilmaydi). Xato bo'lsa
+                # bo'sh xarita qaytadi - nusxa asl nomlar bilan davom etadi.
+                $nameMap = Get-StorageNameMap -Root $ProjectRoot
+
+                $r = Copy-StorageFolder -SourceDir $storageDir -DestDir $storageBackupLocal -ExcludePrefix $BackupLocalDir -NameMap $nameMap
 
                 if ($r.Copied -eq 0 -and $r.Skipped -eq 0) {
                     Write-Log "Storage papkasi bo'sh - nusxa saqlanmadi." "WARN"
@@ -271,7 +353,7 @@ try {
                 } else {
                     $srcMb = [math]::Round($r.SourceBytes / 1MB, 1)
                     $srcGb = [math]::Round($r.SourceBytes / 1GB, 2)
-                    Write-Log "Storage nusxasi tayyor: $storageBackupLocal ($($r.Copied) fayl; ~$srcMb MB)"
+                    Write-Log "Storage nusxasi tayyor: $storageBackupLocal ($($r.Copied) fayl, shundan $($r.Renamed) ta tushunarli nom bilan; ~$srcMb MB)"
                     if ($r.Skipped -gt 0) {
                         Write-Log "Storage: $($r.Skipped) ta fayl o'qib bo'lmadi (qulflangan bo'lishi mumkin) - nusxaga kirmadi." "WARN"
                     }
