@@ -136,6 +136,41 @@ def test_tahrirlash_mahsulot_partiya_ozgartirish_ishlaydi(db, client, operator_h
     assert yozuv["yangi_qiymat"]["partiya_raqami"] == 301
 
 
+def test_tahrirlash_yangi_partiyada_kip_raqami_bandligini_hal_qiladi(
+    db, client, operator_headers, admin_headers, mahsulot_tola
+):
+    """Regressiya: yangi partiyada ko'chirilayotgan kipning kip_raqami
+    allaqachon band bo'lsa (masalan ikkalasida ham partiyadagi 1-kip bo'lsa),
+    tahrirlash uq_kip_partiya_raqam cheklovini buzib 500 bermasligi kerak."""
+    lint = Mahsulot(kod="lint_kr", nomi="Lint")
+    db.add(lint)
+    db.commit()
+
+    eski_partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 305}, headers=operator_headers
+    ).json()
+    yangi_partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "lint_kr", "partiya_raqami": 306}, headers=operator_headers
+    ).json()
+
+    # Yangi partiyada ALLAQACHON 1-kip bor.
+    client.post("/api/v1/kiplar", json=_kip_yaratish_payload(yangi_partiya["id"], 50.0), headers=operator_headers)
+    # Ko'chirilayotgan kip ham o'z (eski) partiyasida 1-kip.
+    kip = client.post(
+        "/api/v1/kiplar", json=_kip_yaratish_payload(eski_partiya["id"], 130.0), headers=operator_headers
+    ).json()
+    assert kip["kip_raqami"] == 1
+
+    tahrirlash = client.patch(
+        f"/api/v1/kiplar/{kip['id']}",
+        json={"mahsulot_kodi": "lint_kr", "partiya_raqami": 306, "sabab": "Operator xato partiya tanlagan edi"},
+        headers=admin_headers,
+    )
+    assert tahrirlash.status_code == 200, tahrirlash.text
+    assert tahrirlash.json()["partiya_id"] == yangi_partiya["id"]
+    assert tahrirlash.json()["kip_raqami"] == 2  # band bo'lgan 1-dan keyingi bo'sh raqam
+
+
 def test_tahrirlash_notogri_mahsulot_kodi_400(client, operator_headers, admin_headers, mahsulot_tola):
     partiya = client.post(
         "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 302}, headers=operator_headers

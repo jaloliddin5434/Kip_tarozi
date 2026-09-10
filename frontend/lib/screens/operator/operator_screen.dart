@@ -17,6 +17,7 @@ import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/clock_widget.dart';
 import '../../widgets/kamera_tasdiq_kutish_dialog.dart';
+import '../../widgets/kip_togrilash_dialogi.dart';
 import '../../widgets/smena_kalendar_dialogi.dart';
 import '../../widgets/yuk_saqlanmadi_dialog.dart';
 
@@ -1395,12 +1396,41 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
                           ),
                         ),
                       ),
+                      if (!bekorMi)
+                        SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            icon: Icon(Icons.edit_outlined, size: 16, color: Colors.grey.shade600),
+                            tooltip: lok.t('kip_togrilash_dialog_sarlavha'),
+                            onPressed: () => _kipTogrilashSorash(
+                              kipId: y['id'] as int,
+                              kipRaqami: y['kip_raqami'] as int,
+                              ogirlik: (y['ogirlik'] as num).toDouble(),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 );
               },
             ),
     );
+  }
+
+  Future<void> _kipTogrilashSorash({required int kipId, required int kipRaqami, required double ogirlik}) async {
+    final natija = await kipTogrilashDialogniKorsat(
+      context: context,
+      holat: _holat,
+      mahsulotlar: _mahsulotlar,
+      kipId: kipId,
+      kipRaqami: kipRaqami,
+      ogirlik: ogirlik,
+    );
+    if (natija == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_holat.lok.t('kip_togrilash_yuborildi'))));
+    }
   }
 }
 

@@ -18,10 +18,10 @@ from app.schemas.hujjat import AuditLogJavob
 from app.schemas.kamera_tasdiq import KameraTasdiqKutilmoqda
 from app.schemas.kip import KipBatafsilJavob, KipJavob, KipSinxronNatija, KipTahrirlash, KipYaratish
 from app.schemas.smena import MahsulotBoyichaHolat, SmenaHolati, SmenaKipYozuvi
-from app.services import kamera, kamera_tasdiq
+from app.services import kamera, kamera_tasdiq, kip_tahrirlash
 from app.services.media import surat_ommaviy_url
 from app.services.storage.rasm import rasm_saqla
-from app.services.telegram import surat_yubor, xatolik_xabari
+from app.services.telegram import surat_yubor, xatolik_xabari_tugma_bilan
 
 router = APIRouter(prefix="/kiplar", tags=["kiplar"])
 
@@ -156,8 +156,8 @@ def sinxronlash(
     tomonidan (offline holatda) qaror qilingan haqiqiy amallar, faqat mijoz_id
     orqali texnik dublikatning oldi olinadi."""
     natijalar: list[KipSinxronNatija] = []
-    # (surat_yoli, mahsulot_nomi, partiya_raqami, kip_raqami, ogirlik)
-    yuboriladigan_suratlar: list[tuple[str, str, int, int, float]] = []
+    # (kip_id, surat_yoli, mahsulot_nomi, partiya_raqami, kip_raqami, ogirlik)
+    yuboriladigan_suratlar: list[tuple[int, str, str, int, int, float]] = []
 
     for malumot in malumotlar:
         mavjud = db.scalar(select(Kip).where(Kip.mijoz_id == malumot.mijoz_id))
@@ -189,13 +189,20 @@ def sinxronlash(
         if kip.surat_yoli:
             mahsulot = db.get(Mahsulot, partiya.mahsulot_id)
             yuboriladigan_suratlar.append(
-                (kip.surat_yoli, mahsulot.nomi, partiya.partiya_raqami, kip.kip_raqami, float(kip.ogirlik))
+                (kip.id, kip.surat_yoli, mahsulot.nomi, partiya.partiya_raqami, kip.kip_raqami, float(kip.ogirlik))
             )
 
     db.commit()
     # Suratlar commit'dan KEYIN yuboriladi (surat_yubor xatolarni yutadi).
-    for surat_yoli, mahsulot_nomi, partiya_raqami, kip_raqami, ogirlik in yuboriladigan_suratlar:
-        surat_yubor(db, surat_yoli, mahsulot_nomi, partiya_raqami, kip_raqami, ogirlik)
+    xabar_bor_kiplar = []
+    for kip_id, surat_yoli, mahsulot_nomi, partiya_raqami, kip_raqami, ogirlik in yuboriladigan_suratlar:
+        xabar_id = surat_yubor(db, surat_yoli, mahsulot_nomi, partiya_raqami, kip_raqami, ogirlik)
+        if xabar_id is not None:
+            xabar_bor_kiplar.append((kip_id, xabar_id))
+    if xabar_bor_kiplar:
+        for kip_id, xabar_id in xabar_bor_kiplar:
+            db.get(Kip, kip_id).telegram_surat_xabar_id = xabar_id
+        db.commit()
     return natijalar
 
 
@@ -268,7 +275,7 @@ def saqlash(
                 majburiy=malumot.majburiy,
             )
             db.commit()
-            xatolik_xabari(
+            xatolik_xabari_tugma_bilan(
                 db,
                 "📷 KAMERA ISHLAMADI — kip saqlanmadi, Admin ruxsati kutilmoqda.\n"
                 f"Mahsulot: {mahsulot.nomi}\n"
@@ -276,6 +283,8 @@ def saqlash(
                 f"Smena: {foydalanuvchi.smena.value}\n"
                 f"Og'irlik: {float(malumot.ogirlik):.1f} kg\n"
                 f"So'rov ID: {sorov.id}",
+                callback_prefiks="kamera",
+                obyekt_id=sorov.id,
             )
             return JSONResponse(
                 status_code=status.HTTP_202_ACCEPTED,
@@ -299,7 +308,11 @@ def saqlash(
 
     # Surat mavjud bo'lsa — alohida "surat boti"ga mahsulot/partiya/og'irlik bilan yuboramiz.
     # surat_yubor() barcha xatolarni yutadi, operatorni bloklamaydi.
-    surat_yubor(db, kip.surat_yoli, mahsulot.nomi, partiya.partiya_raqami, kip.kip_raqami, kip.ogirlik)
+    xabar_id = surat_yubor(db, kip.surat_yoli, mahsulot.nomi, partiya.partiya_raqami, kip.kip_raqami, kip.ogirlik)
+    if xabar_id is not None:
+        kip.telegram_surat_xabar_id = xabar_id
+        db.commit()
+        db.refresh(kip)
 
     javob = KipJavob.model_validate(kip)
     javob.surat_yoli = surat_ommaviy_url(kip.surat_yoli)
@@ -332,7 +345,11 @@ async def surat_yuklash(
             db.commit()
             db.refresh(kip)
             # Offline sinxronlangan kipga endi surat biriktirildi — surat botiga ham yuboramiz.
-            surat_yubor(db, kip.surat_yoli, mahsulot.nomi, partiya.partiya_raqami, kip.kip_raqami, kip.ogirlik)
+            xabar_id = surat_yubor(db, kip.surat_yoli, mahsulot.nomi, partiya.partiya_raqami, kip.kip_raqami, kip.ogirlik)
+            if xabar_id is not None:
+                kip.telegram_surat_xabar_id = xabar_id
+                db.commit()
+                db.refresh(kip)
 
     javob = KipJavob.model_validate(kip)
     javob.surat_yoli = surat_ommaviy_url(kip.surat_yoli)
@@ -451,18 +468,7 @@ def tahrirlash(
     if kip is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kip topilmadi")
 
-    eski_partiya = db.get(Partiya, kip.partiya_id)
-    eski_mahsulot = db.get(Mahsulot, eski_partiya.mahsulot_id)
-    eski_qiymat = {
-        "ogirlik": float(kip.ogirlik),
-        "holati": kip.holati.value,
-        "mahsulot_kodi": eski_mahsulot.kod,
-        "partiya_raqami": eski_partiya.partiya_raqami,
-    }
-
-    if malumot.ogirlik is not None:
-        kip.ogirlik = malumot.ogirlik
-
+    yangi_partiya = None
     if malumot.mahsulot_kodi is not None or malumot.partiya_raqami is not None:
         if malumot.mahsulot_kodi is None or malumot.partiya_raqami is None:
             raise HTTPException(
@@ -480,29 +486,14 @@ def tahrirlash(
         )
         if yangi_partiya is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Partiya topilmadi")
-        kip.partiya_id = yangi_partiya.id
 
-    kip.holati = KipHolati.tahrirlangan
-
-    joriy_partiya = db.get(Partiya, kip.partiya_id)
-    joriy_mahsulot = db.get(Mahsulot, joriy_partiya.mahsulot_id)
-    yangi_qiymat = {
-        "ogirlik": float(kip.ogirlik),
-        "holati": kip.holati.value,
-        "mahsulot_kodi": joriy_mahsulot.kod,
-        "partiya_raqami": joriy_partiya.partiya_raqami,
-    }
-
-    db.add(
-        AuditLog(
-            foydalanuvchi_id=foydalanuvchi.id,
-            jadval_nomi="kiplar",
-            yozuv_id=kip.id,
-            amal=AuditAmal.tahrirlandi,
-            eski_qiymat=eski_qiymat,
-            yangi_qiymat=yangi_qiymat,
-            sabab=malumot.sabab,
-        )
+    kip_tahrirlash.kipni_tahrir_qil(
+        db,
+        kip,
+        yangi_ogirlik=malumot.ogirlik,
+        yangi_partiya=yangi_partiya,
+        sabab=malumot.sabab,
+        foydalanuvchi_id=foydalanuvchi.id,
     )
     db.commit()
     db.refresh(kip)

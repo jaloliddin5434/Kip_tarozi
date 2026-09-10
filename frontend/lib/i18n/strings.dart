@@ -294,6 +294,43 @@ const Map<String, Map<Til, String>> _matnlar = {
     Til.ru: 'Администратор отклонил — кип не сохранён, попробуйте снова',
   },
 
+  // Kip to'g'rilash zayavkasi bo'limi (operator so'raydi, admin tasdiqlaydi)
+  'kip_togrilash_sorovlari': {
+    Til.uz: 'Kip to\'g\'rilash so\'rovlari',
+    Til.ru: 'Заявки на исправление кипа',
+  },
+  'kip_togrilash_sorovlari_yoq': {
+    Til.uz: 'Kutilayotgan so\'rov yo\'q',
+    Til.ru: 'Нет ожидающих заявок',
+  },
+  'kip_togrilash_dialog_sarlavha': {
+    Til.uz: 'Kipni to\'g\'rilash',
+    Til.ru: 'Исправить кип',
+  },
+  'kip_togrilash_yangi_mahsulot': {
+    Til.uz: 'To\'g\'ri mahsulotni tanlang',
+    Til.ru: 'Выберите правильный продукт',
+  },
+  'kip_togrilash_sabab_belgisi': {
+    Til.uz: 'Nima uchun to\'g\'rilanishi kerak?',
+    Til.ru: 'Почему нужно исправить?',
+  },
+  'kip_togrilash_yuborish': {
+    Til.uz: 'Zayavka yuborish',
+    Til.ru: 'Отправить заявку',
+  },
+  'kip_togrilash_yuborildi': {
+    Til.uz: 'To\'g\'rilash so\'rovi yuborildi — admin tasdiqlashini kuting',
+    Til.ru: 'Заявка на исправление отправлена — ждите подтверждения администратора',
+  },
+  'eski_mahsulot': {Til.uz: 'Eski', Til.ru: 'Было'},
+  'yangi_mahsulot': {Til.uz: 'Yangi', Til.ru: 'Стало'},
+  'kip_raqami': {Til.uz: 'Kip №', Til.ru: 'Кип №'},
+  'malumotlar_notogri': {
+    Til.uz: 'Mahsulot, partiya raqami va sababni to\'liq kiriting',
+    Til.ru: 'Укажите продукт, номер партии и причину полностью',
+  },
+
   // Shubhali holatlar bo'limi
   'shubhali_holatlar_royxati': {
     Til.uz: 'Shubhali holatlar',

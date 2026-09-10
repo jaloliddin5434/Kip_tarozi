@@ -30,7 +30,8 @@ def kamera_surat_bermaydi(monkeypatch, tmp_path):
 def _telegram_jim(monkeypatch):
     yuborilgan = []
     monkeypatch.setattr(
-        "app.api.v1.routes.kiplar.xatolik_xabari", lambda db, matn: yuborilgan.append(matn)
+        "app.api.v1.routes.kiplar.xatolik_xabari_tugma_bilan",
+        lambda db, matn, **kw: yuborilgan.append(matn),
     )
     return yuborilgan
 

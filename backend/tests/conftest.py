@@ -37,6 +37,20 @@ def _kamera_ochirilgan(monkeypatch):
     monkeypatch.setattr(settings, "KAMERA_PAROL", None)
 
 
+@pytest.fixture(autouse=True)
+def _telegram_polling_ochirilgan(monkeypatch):
+    """`client` fixture FastAPI lifespan'ini ishga tushiradi, u esa
+    telegram_polling threadini boshlaydi — agar (real) dev bazasida haqiqiy
+    bot tokeni sozlangan bo'lsa, bu real, ~25s bloklovchi getUpdates so'rovini
+    yuboradi. Testlar HECH QACHON real Telegramga chiqmasligi kerak (xuddi
+    kamera bilan bir xil) — shuning uchun thread ishga tushirilishining o'zi
+    har bir testda no-op qilinadi. Long-polling mantig'i (`bitta_tsikl`,
+    `yangilanishni_qayta_ishla`) alohida, to'g'ridan-to'g'ri chaqirib
+    (thread'siz) sinaladi — tests/test_telegram_polling.py."""
+    monkeypatch.setattr("app.services.telegram_polling.ishga_tushir", lambda: None)
+    monkeypatch.setattr("app.services.telegram_polling.toxtat", lambda: None)
+
+
 def _test_database_url() -> str:
     berilgan = os.environ.get("TEST_DATABASE_URL")
     if berilgan:

@@ -5,6 +5,7 @@ import '../../widgets/clock_widget.dart';
 import 'dashboard_screen.dart';
 import 'hujjatlar_screen.dart';
 import 'kamera_tasdiqlari_screen.dart';
+import 'kip_togrilash_screen.dart';
 import 'moliyaviy_kirish_screen.dart';
 import 'partiyalar_screen.dart';
 import 'shubhali_holatlar_screen.dart';
@@ -35,6 +36,7 @@ class _AdminShellState extends State<AdminShell> {
       const PartiyalarEkrani(),
       if (!tayyorMahsulotRoli) const ShubhaliHolatlarEkrani(),
       if (adminRoli) const KameraTasdiqlariEkrani(),
+      if (adminRoli) const KipTogrilashEkrani(),
       if (adminRoli) const MoliyaviyKirishEkrani(),
       if (adminRoli) const SozlamalarEkrani(),
     ];
@@ -66,6 +68,11 @@ class _AdminShellState extends State<AdminShell> {
         NavigationRailDestination(
           icon: const Icon(Icons.photo_camera_front_outlined),
           label: Text(lok.t('kamera_tasdiqlari')),
+        ),
+      if (adminRoli)
+        NavigationRailDestination(
+          icon: const Icon(Icons.edit_note),
+          label: Text(lok.t('kip_togrilash_sorovlari')),
         ),
       if (adminRoli)
         NavigationRailDestination(

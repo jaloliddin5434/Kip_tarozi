@@ -97,6 +97,132 @@ def test_telegram_xatosi_yutiladi(db, monkeypatch, surat_boti_sozlangan, surat_f
     telegram.surat_yubor(db, surat_fayli, "Tola", 1, 7, 55.5)  # istisno tashqariga chiqmasligi kerak
 
 
+# --- 0-QISM audit: message_id qaytarilishi/saqlanishi ---
+
+
+def test_surat_yubor_message_id_qaytaradi(db, monkeypatch, surat_boti_sozlangan, surat_fayli):
+    """Audit natijasi: avval surat_yubor() Telegram javobidagi message_id'ni
+    umuman o'qimas/qaytarmas edi. Endi qaytarishi kerak."""
+    monkeypatch.setattr(
+        telegram.httpx,
+        "post",
+        lambda url, **kw: httpx.Response(200, json={"ok": True, "result": {"message_id": 4242}}, request=httpx.Request("POST", url)),
+    )
+    xabar_id = telegram.surat_yubor(db, surat_fayli, "Tola", 7, 42, 204.7)
+    assert xabar_id == 4242
+
+
+def test_surat_yubor_javobda_result_yoq_bolsa_none(db, monkeypatch, surat_boti_sozlangan, surat_fayli):
+    monkeypatch.setattr(
+        telegram.httpx,
+        "post",
+        lambda url, **kw: httpx.Response(200, json={"ok": True}, request=httpx.Request("POST", url)),
+    )
+    assert telegram.surat_yubor(db, surat_fayli, "Tola", 7, 42, 204.7) is None
+
+
+def test_surat_yubor_xato_bolsa_none_qaytaradi(db, monkeypatch, surat_boti_sozlangan, surat_fayli):
+    monkeypatch.setattr(telegram.httpx, "post", lambda *a, **k: (_ for _ in ()).throw(httpx.ConnectError("x")))
+    assert telegram.surat_yubor(db, surat_fayli, "Tola", 1, 7, 55.5) is None
+
+
+def test_surat_yoq_bolsa_none_qaytaradi(db, monkeypatch, surat_boti_sozlangan):
+    monkeypatch.setattr(
+        telegram.httpx, "post", lambda *a, **k: (_ for _ in ()).throw(AssertionError("chaqirilmasligi kerak"))
+    )
+    assert telegram.surat_yubor(db, None, "Tola", 1, 1, 100.0) is None
+
+
+def test_kip_saqlanganda_telegram_surat_xabar_id_bazaga_saqlanadi(
+    client, db, operator_headers, mahsulot_tola, monkeypatch, tmp_path
+):
+    """0-QISM audit natijasiga tuzatish: message_id endi kipga saqlanadi."""
+    from app.models.kip import Kip
+
+    monkeypatch.setattr(settings, "STORAGE_PATH", str(tmp_path))
+    monkeypatch.setattr(settings, "KAMERA_IP", "10.0.0.9")
+    monkeypatch.setattr(settings, "KAMERA_LOGIN", "a")
+    monkeypatch.setattr(settings, "KAMERA_PAROL", "b")
+    monkeypatch.setattr("app.services.kamera.snapshot_ol", lambda: SOXTA_JPEG)
+    db.add(Sozlama(kalit=telegram.SURAT_TOKEN_KALITI, qiymat="tok"))
+    db.add(Sozlama(kalit=telegram.SURAT_CHAT_KALITI, qiymat="chat"))
+    db.commit()
+    monkeypatch.setattr(
+        telegram.httpx,
+        "post",
+        lambda url, **kw: httpx.Response(200, json={"ok": True, "result": {"message_id": 555}}, request=httpx.Request("POST", url)),
+    )
+
+    partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 350}, headers=operator_headers
+    ).json()
+    javob = client.post("/api/v1/kiplar", json=_payload(partiya["id"]), headers=operator_headers)
+    assert javob.status_code == 201
+
+    kip = db.get(Kip, javob.json()["id"])
+    assert kip.telegram_surat_xabar_id == 555
+
+
+def test_kip_saqlanganda_message_id_bolmasa_maydon_null_qoladi(
+    client, db, operator_headers, mahsulot_tola, monkeypatch, tmp_path
+):
+    from app.models.kip import Kip
+
+    monkeypatch.setattr(settings, "STORAGE_PATH", str(tmp_path))
+    monkeypatch.setattr(settings, "KAMERA_IP", "10.0.0.9")
+    monkeypatch.setattr(settings, "KAMERA_LOGIN", "a")
+    monkeypatch.setattr(settings, "KAMERA_PAROL", "b")
+    monkeypatch.setattr("app.services.kamera.snapshot_ol", lambda: SOXTA_JPEG)
+    db.add(Sozlama(kalit=telegram.SURAT_TOKEN_KALITI, qiymat="tok"))
+    db.add(Sozlama(kalit=telegram.SURAT_CHAT_KALITI, qiymat="chat"))
+    db.commit()
+    monkeypatch.setattr(telegram.httpx, "post", lambda *a, **k: (_ for _ in ()).throw(httpx.ConnectError("x")))
+
+    partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 351}, headers=operator_headers
+    ).json()
+    javob = client.post("/api/v1/kiplar", json=_payload(partiya["id"]), headers=operator_headers)
+    assert javob.status_code == 201
+
+    kip = db.get(Kip, javob.json()["id"])
+    assert kip.telegram_surat_xabar_id is None
+
+
+# --- surat_xabarini_yangila (editMessageCaption) ---
+
+
+def test_surat_xabarini_yangila_editmessagecaption_chaqiradi(db, monkeypatch, surat_boti_sozlangan):
+    chaqiruvlar = {}
+
+    def soxta_post(url, **kw):
+        chaqiruvlar["url"] = url
+        chaqiruvlar["json"] = kw.get("json")
+        return httpx.Response(200, json={"ok": True}, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(telegram.httpx, "post", soxta_post)
+
+    telegram.surat_xabarini_yangila(db, 555, "Lint", 9, 3, 88.8)
+
+    assert chaqiruvlar["url"].endswith("/bot123:ABC/editMessageCaption")
+    assert chaqiruvlar["json"]["chat_id"] == "7250979081"
+    assert chaqiruvlar["json"]["message_id"] == 555
+    assert chaqiruvlar["json"]["caption"] == (
+        "🔄 Tuzatildi:\nMahsulot: Lint\nPartiya: #9\nKip №3\nOg'irlik: 88.8 kg"
+    )
+
+
+def test_surat_xabarini_yangila_xato_bolsa_yutiladi(db, monkeypatch, surat_boti_sozlangan):
+    monkeypatch.setattr(telegram.httpx, "post", lambda *a, **k: (_ for _ in ()).throw(httpx.ConnectError("x")))
+    telegram.surat_xabarini_yangila(db, 555, "Lint", 9, 3, 88.8)  # istisno chiqmasligi kerak
+
+
+def test_surat_xabarini_yangila_sozlanmagan_bot_jimgina_otkazadi(db, monkeypatch):
+    monkeypatch.setattr(
+        telegram.httpx, "post", lambda *a, **k: (_ for _ in ()).throw(AssertionError("chaqirilmasligi kerak"))
+    )
+    telegram.surat_xabarini_yangila(db, 555, "Lint", 9, 3, 88.8)
+
+
 # --- Integratsiya: kip saqlash oqimi ---
 
 

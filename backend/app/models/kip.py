@@ -50,3 +50,9 @@ class Kip(Base):
 
     surat_yoli: Mapped[str | None] = mapped_column(String(500), nullable=True)
     holati: Mapped[KipHolati] = mapped_column(Enum(KipHolati, name="kip_holati_turi"), default=KipHolati.aktiv)
+
+    # "Surat boti"ga yuborilgan Telegram xabarining message_id'si (bo'lsa) —
+    # kip keyinroq tahrirlansa (mahsulot o'zgarsa), shu xabarning caption'ini
+    # editMessageCaption bilan yangilash uchun kerak. Surat yuborilmagan yoki
+    # yuborishda xato bo'lgan bo'lsa — None.
+    telegram_surat_xabar_id: Mapped[int | None] = mapped_column(Integer, nullable=True)

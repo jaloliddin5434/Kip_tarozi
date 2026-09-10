@@ -8,13 +8,15 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
 from app.core.config import settings
-from app.services import rejalashtiruvchi
+from app.services import rejalashtiruvchi, telegram_polling
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     rejalashtiruvchi.ishga_tushir()
+    telegram_polling.ishga_tushir()
     yield
+    telegram_polling.toxtat()
     rejalashtiruvchi.toxtat()
 
 
