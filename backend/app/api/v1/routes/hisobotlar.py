@@ -15,16 +15,11 @@ from app.models.foydalanuvchi import Foydalanuvchi, Rol, Smena
 from app.models.kip import HISOBLANADIGAN_HOLATLAR, Kip
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya
-from app.models.sozlama import Sozlama
-from app.services.davr import mavsum_boshlanishi
+from app.services.davr import mavsum_boshi_sozlamadan, mavsum_boshlanishi
 
 router = APIRouter(prefix="/hisobotlar", tags=["hisobotlar"])
 
 _MAHSULOT_TARTIBI = ["tola", "lint", "pux", "ulyuk"]
-
-# Mavsum jurnalidagi "boshlanish" sanasini bu sozlama kaliti belgilaydi
-# (yo'q yoki noto'g'ri bo'lsa — mavsum_boshlanishi() qoidasiga qaytiladi).
-MAVSUM_BOSHI_SOZLAMA_KALITI = "mavsum_boshlanish_sanasi"
 
 _HAFTA_KUNLARI = ["Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba", "Yakshanba"]
 _OY_NOMLARI = {
@@ -169,16 +164,6 @@ def smena_mahsulot_excel(
     )
 
 
-def _mavsum_boshi_sozlamadan(db: Session) -> date | None:
-    sozlama = db.get(Sozlama, MAVSUM_BOSHI_SOZLAMA_KALITI)
-    if sozlama is None or not sozlama.qiymat:
-        return None
-    try:
-        return date.fromisoformat(sozlama.qiymat.strip())
-    except ValueError:
-        return None
-
-
 @router.get("/mavsum-jurnali")
 def mavsum_jurnali(
     mahsulot_kodi: str = Query(...),
@@ -197,7 +182,7 @@ def mavsum_jurnali(
 
     bugun = date.today()
     if boshlanish is None:
-        boshlanish = _mavsum_boshi_sozlamadan(db) or mavsum_boshlanishi(bugun)
+        boshlanish = mavsum_boshi_sozlamadan(db) or mavsum_boshlanishi(bugun)
     if tugash is None:
         tugash = bugun
     if tugash < boshlanish:

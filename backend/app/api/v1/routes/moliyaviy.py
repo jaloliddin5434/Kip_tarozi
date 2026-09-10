@@ -86,7 +86,7 @@ def hisobot(
 ) -> MoliyaviyHisobot:
     if davr not in ("kunlik", "haftalik", "oylik", "mavsum"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Noma'lum davr: {davr}")
-    boshlanish, tugash = davr_oraligi(davr, sana)
+    boshlanish, tugash = davr_oraligi(davr, sana, db)
 
     qatorlar = db.execute(
         select(

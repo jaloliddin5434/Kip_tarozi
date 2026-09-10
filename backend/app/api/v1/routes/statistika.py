@@ -44,7 +44,7 @@ def jamlanma(
     _: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.admin)),
 ) -> DavrJamlanmasi:
     _davrni_tekshir(davr)
-    boshlanish, tugash = davr_oraligi(davr, sana)
+    boshlanish, tugash = davr_oraligi(davr, sana, db)
 
     qatorlar = db.execute(
         select(
@@ -87,7 +87,7 @@ def smena_boyicha(
     _: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.admin)),
 ) -> list[SmenaJamlanmasi]:
     _davrni_tekshir(davr)
-    boshlanish, tugash = davr_oraligi(davr, sana)
+    boshlanish, tugash = davr_oraligi(davr, sana, db)
 
     sorov = select(Kip.smena, func.count(Kip.id), func.coalesce(func.sum(Kip.ogirlik), 0))
     if mahsulot_kodi is not None:
@@ -112,7 +112,7 @@ def operator_boyicha(
     _: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.admin)),
 ) -> list[OperatorJamlanmasi]:
     _davrni_tekshir(davr)
-    boshlanish, tugash = davr_oraligi(davr, sana)
+    boshlanish, tugash = davr_oraligi(davr, sana, db)
 
     qatorlar = db.execute(
         select(
@@ -157,7 +157,7 @@ def rekordlar(
     va eng yaxshi operator (kip soni bo'yicha), hamda BARCHA VAQT bo'yicha
     bir kundagi eng yuqori jami kg. Ma'lumot bo'lmasa tegishli maydon null."""
     _davrni_tekshir(davr)
-    boshlanish, tugash = davr_oraligi(davr, sana)
+    boshlanish, tugash = davr_oraligi(davr, sana, db)
 
     davr_sharti = (
         Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),

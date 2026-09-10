@@ -27,10 +27,11 @@ MAHSULOTLAR = [
     ("ulyuk", "Ulyuk"),
 ]
 
-# Mavsum jurnali (GET /hisobotlar/mavsum-jurnali) shu sanadan boshlab kunlik
-# qatorlarni yozadi. Admin panelidan (Sozlamalar) o'zgartirilishi mumkin.
+# Butun ilovadagi "mavsum" davri (Statistika, Dashboard, Rekord, Moliyaviy,
+# Mavsum jurnali) shu sanadan boshlanadi. Admin panelidan (Sozlamalar)
+# o'zgartirilishi mumkin.
 SOZLAMALAR = [
-    ("mavsum_boshlanish_sanasi", "2025-09-01", "Mavsum jurnali qaysi sanadan boshlanadi (YYYY-MM-DD)"),
+    ("mavsum_boshlanish_sanasi", "2025-09-01", "Mavsum davri qaysi sanadan boshlanadi (YYYY-MM-DD)"),
 ]
 
 

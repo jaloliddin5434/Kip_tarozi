@@ -56,7 +56,7 @@ def dashboard(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Noma'lum davr: {davr}. Ruxsat etilgan: {', '.join(DAVRLAR)}",
         )
-    boshlanish, tugash = davr_oraligi(davr, date.today())
+    boshlanish, tugash = davr_oraligi(davr, date.today(), db)
 
     qatorlar = db.execute(
         select(
