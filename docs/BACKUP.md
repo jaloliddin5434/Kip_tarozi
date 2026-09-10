@@ -9,30 +9,53 @@ Kunlik avtomatik backup uchun skript: [scripts/backup_yarat.ps1](../scripts/back
 2. `pg_dump -F c` bilan **baza**ning to'liq backup'ini oladi (custom format,
    `.dump`) va `C:\Kip_tarozi\backups\kip_tarozi_YYYY-MM-DD_HHmm.dump` nomi
    bilan saqlaydi.
-3. **`STORAGE_PATH` papkasini** (`backend\.env` dan; kamera suratlari
-   `storage\<oy>\...` va nakladnoy PDF'lari `storage\nakladnoy\`) siqishsiz,
-   sana bilan nomlangan `storage_YYYY-MM-DD_HHmm\` papkasiga fayl-fayl to'liq
-   nusxalaydi. Har fayl alohida ko'chiriladi — ayni damda yozilayotgan/qulflangan
-   fayl (surat, agent SQLite navbati) o'tkazib yuboriladi, qolgan nusxa
-   buzilmaydi. `-SkipStorage` bilan yoki `$BackupStorage = $false` bilan bu
-   qadam o'chiriladi.
-   **Zaxira nusxasida** har bir kip surati tasodifiy hash nomi o'rniga
-   tushunarli nom bilan saqlanadi:
-   `<Mahsulot>_Partiya<raqam>_Kip<raqam>_<ogirlik>kg.jpg` (masalan
-   `Tola_Partiya55_Kip4_142.6kg.jpg`). Bu nomlar
-   [backend\scripts\storage_backup_metadata.py](../backend/scripts/storage_backup_metadata.py)
-   bazadan (`kiplar` + `partiyalar` + `mahsulotlar`) **faqat o'qib** oladi —
-   **asl `storage\` papkasiga hech qachon tegilmaydi** (dastur bazada asl nom
-   bilan bog'langan). Kip bilan bog'lanmagan fayllar (masalan
-   `shubhali_holatlar\` suratlari) asl nom bilan qoladi. Metadata skripti
-   ishlamasa (baza yo'q, venv yo'q) — `WARN` yoziladi va nusxa asl nomlar
-   bilan davom etadi.
-   *(Excel/PDF hisobotlar — smena/mavsum Excel'i — foydalanuvchiga
-   to'g'ridan-to'g'ri yuklab beriladi, diskda saqlanmaydi, shuning uchun
-   ular backupsiz — faqat `storage\nakladnoy\` dagi nakladnoy PDF'lari
-   diskda turadi va nusxaga kiradi.)*
-4. Baza `.dump`'i va storage `storage_...\` papkasi — ikkalasi ham, sozlangan
-   bo'lsa, tashqi joyga (`$BackupRemoteDir`) ham nusxalanadi.
+3. **`STORAGE_PATH` papkasini** (`backend\.env` dan) siqishsiz, sana bilan
+   nomlangan `storage_YYYY-MM-DD_HHmm\` papkasiga zaxiralaydi. `-SkipStorage`
+   bilan yoki `$BackupStorage = $false` bilan bu qadam o'chiriladi. Ichida
+   **to'rt** qism bo'ladi:
+
+   ```
+   storage_2026-09-10_2000\
+   ├── storage-xom\                         # XOM (hash nomli) to'liq nusxa
+   │   ├── 2026-09\2026-09-10\Smena_A\Tola\d6d8e44f0a....jpg
+   │   └── nakladnoy\N-00012.pdf
+   ├── KIP-Tarozi Rasm\                     # suratlar — tushunarli tuzilma
+   │   └── Sentabr\10.09.2026\Smena_A\Tola\Tola_Partiya55_Kip4_142.6kg.jpg
+   ├── KIP-Tarozi Excel\                    # har REAL kunlik smena+mahsulot Excel
+   │   └── Sentabr\10.09.2026\Smena_A\Tola\Smena_A_Tola_2026-09-10.xlsx
+   └── KIP-Tarozi Nakladnoy\                # sotuv nakladnoy PDF'lari
+       └── N-00012.pdf
+   ```
+
+   - **`storage-xom\`** — `storage\` papkasining aynan nusxasi, fayl-fayl,
+     **qayta nomlashsiz**. Ayni damda yozilayotgan/qulflangan fayl (surat, agent
+     SQLite navbati) o'tkazib yuboriladi, qolgan nusxa buzilmaydi. Ilovani
+     tiklashda baza `surat_yoli` aynan shu hash nomlarga bog'langani uchun —
+     **haqiqiy avariya tiklashida shu papka ishlatiladi** (pastga qarang).
+   - **`KIP-Tarozi Rasm\`** — har bir HISOBGA OLINADIGAN (aktiv + tahrirlangan;
+     bekor qilinganlar faqat `storage-xom\` da) kip surati
+     `<Oy>\<DD.MM.YYYY>\Smena_<X>\<Mahsulot>\` tuzilmasida, tushunarli nom bilan:
+     `<Mahsulot>_Partiya<raqam>_Kip<raqam>_<ogirlik>kg.jpg` (masalan
+     `Tola_Partiya55_Kip4_142.6kg.jpg`). Faqat o'sha kuni/smenada haqiqatan
+     ishlagan `Smena_<X>` papkalari yaratiladi.
+   - **`KIP-Tarozi Excel\`** — smena Excel hisobotlari diskda saqlanmaydi
+     (foydalanuvchiga real vaqtda yuklanadi), shuning uchun zaxira jarayoni
+     har REAL kunlik `(sana, smena, mahsulot)` kombinatsiyasi uchun (kamida
+     1 ta hisobga olinadigan kip) Excel'ni **shu yerda yangidan generatsiya
+     qiladi** (`GET /hisobotlar/smena-mahsulot-excel` bilan bir xil mantiq,
+     [app/services/hisobotlar_excel.py](../backend/app/services/hisobotlar_excel.py)).
+   - **`KIP-Tarozi Nakladnoy\`** — `storage\nakladnoy\*.pdf` (sotuv
+     nakladnoylari) tekis nusxa.
+
+   `KIP-Tarozi *` uchtasini
+   [backend\scripts\backup_tuzilma.py](../backend/scripts/backup_tuzilma.py)
+   bazadan (`kiplar` + `partiyalar` + `mahsulotlar`) **faqat o'qib** yasaydi —
+   **asl `storage\` papkasiga hech qachon tegilmaydi**. Bu skript ishlamasa
+   (baza yo'q, venv yo'q) — `WARN` yoziladi, `storage-xom\` baribir saqlangan
+   bo'ladi va keyingi safar qayta uriniladi.
+4. Baza `.dump`'i va storage `storage_...\` papkasi (to'rtala qismi bilan) —
+   ikkalasi ham, sozlangan bo'lsa, tashqi joyga (`$BackupRemoteDir`) ham
+   nusxalanadi.
 5. `$RetentionDays`'dan (standart: 30 kun) eski `.dump` fayllar **va**
    `storage_*\` nusxa papkalarini mahalliy va (sozlangan bo'lsa) tashqi joydan
    o'chiradi.
@@ -86,8 +109,11 @@ powershell -ExecutionPolicy Bypass -File scripts\backup_yarat.ps1
 ```
 
 Muvaffaqiyatli bo'lsa `backups\` papkasida yangi `kip_tarozi_*.dump` fayli
-**va** `storage_*\` nusxa papkasi paydo bo'ladi va `backups\logs\backup.log`'da
-"Backup muvaffaqiyatli yakunlandi" deb chiqadi.
+**va** `storage_*\` nusxa papkasi (`storage-xom\`, `KIP-Tarozi Rasm\`,
+`KIP-Tarozi Excel\`, `KIP-Tarozi Nakladnoy\` bilan) paydo bo'ladi va
+`backups\logs\backup.log`'da "Backup muvaffaqiyatli yakunlandi" deb chiqadi.
+Log'da `[tuzilma]` prefiksli qatorlar `KIP-Tarozi *` papkalari qancha fayl
+bilan to'lganini ko'rsatadi.
 
 Faqat bazani (storage'siz) olish:
 
@@ -98,12 +124,14 @@ powershell -ExecutionPolicy Bypass -File scripts\backup_yarat.ps1 -SkipStorage
 ## Katta storage papkasi (disk joyi)
 
 Har kunlik zaxira — `storage\` papkasining **to'liq nusxasi** (inkremental
-emas). 30 kun saqlansa, `backups\` da `storage\` joriy hajmining ~30 barobari
-band bo'ladi.
+emas). Endi har kunlik `storage_*\` papkasida suratlar **ikki marta** turadi:
+bir marta `storage-xom\` da (hash nom), bir marta `KIP-Tarozi Rasm\` da
+(tushunarli nom) — ustiga kichik Excel fayllar. Ya'ni har kunlik nusxa
+`storage\` hajmining **~2 barobari**.
 
-Joriy hisob-kitob: `storage\` ~62 MB atrofida → 30 kunlik saqlash ~1.85 GB.
-Bu tashvishga o'rin qoldirmaydi. Mavsum davomida papka biroz o'ssa ham
-(suratlar ~250–300 KB/dona) hajm bir necha GB'dan oshmaydi.
+Joriy hisob-kitob: `storage\` ~62 MB → har kunlik nusxa ~130 MB → 30 kunlik
+saqlash ~3.9 GB. Bu hali ham tashvishga o'rin qoldirmaydi. Mavsum davomida
+papka o'ssa ham (suratlar ~250–300 KB/dona) hajm bir necha GB'dan oshmaydi.
 
 Agar kelajakda `storage\` kutilmaganda juda kattalashsa (`$StorageWarnGB`,
 standart 5 GB, dan oshganda skript `backup.log`'ga `OGOHLANTIRISH` yozadi) —
@@ -203,6 +231,16 @@ $DUMP = (Get-ChildItem C:\Kip_tarozi\backups\kip_tarozi_*.dump | Sort-Object Las
 > oxirgi backupdan keyingi kiplar yo'qoladi. Shuning uchun backup har kuni
 > avtomatik olinishi va `$BackupRemoteDir` (tashqi nusxa) sozlangan bo'lishi
 > muhim.
+
+**Surat fayllari** (`storage\`) alohida tiklanadi — baza `surat_yoli` aynan
+hash nomlarga bog'langani uchun **`storage-xom\`** papkasidan (`KIP-Tarozi
+Rasm\` dan EMAS — u tushunarli nomga o'zgartirilgan, faqat odam ko'rishi
+uchun):
+
+```powershell
+$SNAP = (Get-ChildItem C:\Kip_tarozi\backups\storage_* -Directory | Sort-Object LastWriteTime -Desc)[0].FullName
+robocopy "$SNAP\storage-xom" "C:\Kip_tarozi\storage" /E /R:1 /W:2 /NFL /NDL /NP
+```
 
 ## Har kuni avtomatik ishga tushirish — Task Scheduler
 

@@ -3,13 +3,19 @@
 
     1) backend\.env dagi DATABASE_URL'dan baza ulanish ma'lumotlarini o'qiydi,
        pg_dump bilan to'liq baza backup'ini oladi (custom format, .dump).
-    2) backend\.env dagi STORAGE_PATH papkasini (kamera suratlari + nakladnoy
-       PDF'lari) sana bilan nomlangan papkaga to'liq nusxalaydi (siqishsiz,
-       fayl-fayl: storage_YYYY-MM-DD_HHmm\). ZAXIRA NUSXASIDA har bir kip
-       surati tushunarli nom bilan saqlanadi
-       (<Mahsulot>_Partiya<raqam>_Kip<raqam>_<ogirlik>kg.jpg) - bu nomlar
-       backend\scripts\storage_backup_metadata.py bazadan o'qigan ma'lumotdan
-       olinadi; ASL storage/ papkasiga TEGILMAYDI. -SkipStorage berilsa yoki
+    2) backend\.env dagi STORAGE_PATH papkasini sana bilan nomlangan papkaga
+       (storage_YYYY-MM-DD_HHmm\) zaxiralaydi. Ichida:
+         - storage-xom\        : xom (hash nomli) to'liq nusxa - ilovani
+                                 tiklash uchun (baza surat_yoli aynan shu
+                                 nomlarga bog'liq), fayl-fayl, siqishsiz.
+         - KIP-Tarozi Rasm\    : suratlar Oy\Kun\Smena_X\Mahsulot\ tuzilmasida,
+                                 tushunarli nom bilan
+                                 (<Mahsulot>_Partiya<raqam>_Kip<raqam>_<kg>kg.jpg).
+         - KIP-Tarozi Excel\   : har REAL kunlik smena+mahsulot uchun Excel
+                                 hisobot (diskda saqlanmaydi - shu yerda yasaladi).
+         - KIP-Tarozi Nakladnoy\: sotuv nakladnoy PDF'lari.
+       Oxirgi uchtasini backend\scripts\backup_tuzilma.py bazadan REAL O'QIB
+       yaratadi; ASL storage/ papkasiga TEGILMAYDI. -SkipStorage berilsa yoki
        $BackupStorage = $false bo'lsa - o'tkazib yuboriladi.
     3) Ikkalasini ($BackupLocalDir'ga) yozadi, $BackupRemoteDir sozlangan
        bo'lsa - o'sha tarmoq joyiga ham ko'chiradi.
@@ -123,53 +129,36 @@ function Get-StorageDir {
     return (Join-Path $ProjectRoot "storage")
 }
 
-function Get-StorageNameMap {
+function Invoke-BackupTuzilma {
     <#
-        backend\scripts\storage_backup_metadata.py'ni chaqirib, surat_yoli
-        (STORAGE_PATH'ga nisbiy, "/" bilan) -> zaxira nusxasidagi tushunarli
-        fayl nomi xaritasini (hashtable) qaytaradi.
+        backend\scripts\backup_tuzilma.py'ni chaqiradi - u bazadan REAL O'QIB,
+        $Dest ichida "KIP-Tarozi Rasm", "KIP-Tarozi Excel" va
+        "KIP-Tarozi Nakladnoy" papkalarini yaratadi (tushunarli tuzilma).
 
         MUHIM: bu skript bazadan FAQAT O'QIYDI, asl storage/ papkasiga
-        tegmaydi. Har qanday xatoda bo'sh hashtable qaytadi va WARN yoziladi -
-        zaxira baribir asl (hash) nomlar bilan davom etadi.
+        tegmaydi. Xato bo'lsa - throw qiladi (chaqiruvchi WARN bilan davom etadi,
+        xom nusxa baribir saqlangan bo'ladi).
     #>
-    param([string]$Root)
+    param([string]$Root, [string]$Dest)
 
-    $map = @{}
     $py = Join-Path $Root "backend\.venv\Scripts\python.exe"
     if (-not (Test-Path $py)) { $py = "python" }
     $backendDir = Join-Path $Root "backend"
-    $outFile = Join-Path $env:TEMP ("kt_namemap_" + [guid]::NewGuid().ToString('N') + ".json")
 
+    Push-Location $backendDir
+    # Native stderr'ni $ErrorActionPreference='Stop' bilan qo'shganda PS 5.1
+    # "NativeCommandError" tashlashi mumkin - shu blokda vaqtincha yumshatamiz.
+    $eskiEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     try {
-        Push-Location $backendDir
-        # Native stderr'ni $ErrorActionPreference='Stop' bilan qo'shganda PS 5.1
-        # "NativeCommandError" tashlashi mumkin - shu blokda vaqtincha yumshatamiz.
-        $eskiEAP = $ErrorActionPreference
-        $ErrorActionPreference = 'Continue'
-        try {
-            $chiqish = & $py -m scripts.storage_backup_metadata --output $outFile 2>&1
-            $exit = $LASTEXITCODE
-        } finally {
-            $ErrorActionPreference = $eskiEAP
-            Pop-Location
-        }
-        foreach ($qator in $chiqish) { Write-Log "  [metadata] $qator" }
-        if ($exit -ne 0) { throw "storage_backup_metadata.py exit code $exit" }
-        if (-not (Test-Path $outFile)) { throw "metadata JSON fayli yaratilmadi" }
-
-        $json = [System.IO.File]::ReadAllText($outFile, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
-        if ($json) {
-            foreach ($p in $json.PSObject.Properties) { $map[$p.Name] = [string]$p.Value }
-        }
-        Write-Log "Surat nomlari xaritasi tayyor: $($map.Count) ta yozuv."
-    } catch {
-        Write-Log "Surat nomlari xaritasini olishda xato: $($_.Exception.Message) - zaxira asl nomlar bilan davom etadi." "WARN"
+        $chiqish = & $py -m scripts.backup_tuzilma --dest $Dest 2>&1
+        $exit = $LASTEXITCODE
     } finally {
-        if (Test-Path $outFile) { Remove-Item $outFile -Force -ErrorAction SilentlyContinue }
+        $ErrorActionPreference = $eskiEAP
+        Pop-Location
     }
-
-    return $map
+    foreach ($qator in $chiqish) { Write-Log "  [tuzilma] $qator" }
+    if ($exit -ne 0) { throw "backup_tuzilma.py exit code $exit" }
 }
 
 function Copy-StorageFolder {
@@ -337,12 +326,11 @@ try {
                 }
                 New-Item -ItemType Directory -Force -Path $storageBackupLocal | Out-Null
 
-                # Bazadan surat_yoli -> tushunarli nom xaritasi (faqat zaxira
-                # nusxasi uchun; asl storage/ papkasiga tegilmaydi). Xato bo'lsa
-                # bo'sh xarita qaytadi - nusxa asl nomlar bilan davom etadi.
-                $nameMap = Get-StorageNameMap -Root $ProjectRoot
-
-                $r = Copy-StorageFolder -SourceDir $storageDir -DestDir $storageBackupLocal -ExcludePrefix $BackupLocalDir -NameMap $nameMap
+                # 1) Xom (hash nomli) to'liq nusxa -> storage-xom\. Ilovani
+                # tiklashda baza surat_yoli aynan shu nomlarga bog'liq, shuning
+                # uchun bu nusxada fayllar QAYTA NOMLANMAYDI.
+                $xomDest = Join-Path $storageBackupLocal "storage-xom"
+                $r = Copy-StorageFolder -SourceDir $storageDir -DestDir $xomDest -ExcludePrefix $BackupLocalDir
 
                 if ($r.Copied -eq 0 -and $r.Skipped -eq 0) {
                     Write-Log "Storage papkasi bo'sh - nusxa saqlanmadi." "WARN"
@@ -353,9 +341,18 @@ try {
                 } else {
                     $srcMb = [math]::Round($r.SourceBytes / 1MB, 1)
                     $srcGb = [math]::Round($r.SourceBytes / 1GB, 2)
-                    Write-Log "Storage nusxasi tayyor: $storageBackupLocal ($($r.Copied) fayl, shundan $($r.Renamed) ta tushunarli nom bilan; ~$srcMb MB)"
+                    Write-Log "Xom nusxa tayyor: $xomDest ($($r.Copied) fayl; ~$srcMb MB)"
                     if ($r.Skipped -gt 0) {
                         Write-Log "Storage: $($r.Skipped) ta fayl o'qib bo'lmadi (qulflangan bo'lishi mumkin) - nusxaga kirmadi." "WARN"
+                    }
+
+                    # 2) Tushunarli tuzilma (KIP-Tarozi Rasm / Excel / Nakladnoy) -
+                    # bazadan real o'qib. Xato bo'lsa xom nusxa baribir saqlangan.
+                    try {
+                        Invoke-BackupTuzilma -Root $ProjectRoot -Dest $storageBackupLocal
+                        Write-Log "Tushunarli tuzilma tayyor: $storageBackupLocal (KIP-Tarozi Rasm / Excel / Nakladnoy)"
+                    } catch {
+                        Write-Log "Tushunarli tuzilma yasashda xato: $($_.Exception.Message) - xom nusxa saqlandi, keyingi safar qayta uriniladi." "WARN"
                     }
                     if ($srcGb -ge $StorageWarnGB) {
                         Write-Log ("OGOHLANTIRISH: storage hajmi ~{0} GB. Har kuni to'liq nusxa olish disk joyini tez to'ldirishi mumkin - docs\BACKUP.md 'Katta storage papkasi' bo'limiga qarang." -f $srcGb) "WARN"

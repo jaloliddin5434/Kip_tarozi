@@ -540,8 +540,10 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
     return InkWell(
       onTap: () => kipBatafsilDialogniKorsat(context: context, kipId: k.id),
       child: Container(
-        color: _qatorRangi(k.holati),
-        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.grey.shade200))),
+        decoration: BoxDecoration(
+          color: _qatorRangi(k.holati),
+          border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+        ),
         child: Row(
           children: [
             _hujayra(0, _suratThumbnail(k, lok)),

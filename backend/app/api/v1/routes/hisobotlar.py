@@ -16,6 +16,7 @@ from app.models.kip import HISOBLANADIGAN_HOLATLAR, Kip
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya
 from app.services.davr import mavsum_boshi_sozlamadan, mavsum_boshlanishi
+from app.services.hisobotlar_excel import smena_mahsulot_jadval
 
 router = APIRouter(prefix="/hisobotlar", tags=["hisobotlar"])
 
@@ -114,42 +115,7 @@ def smena_mahsulot_excel(
     if mahsulot is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mahsulot topilmadi")
 
-    qatorlar = db.execute(
-        select(Kip.kip_raqami, Kip.vaqt, Kip.ogirlik, Partiya.partiya_raqami)
-        .join(Partiya, Partiya.id == Kip.partiya_id)
-        .where(
-            Partiya.mahsulot_id == mahsulot.id,
-            Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
-            Kip.smena == smena,
-            func.date(Kip.vaqt) == sana,
-        )
-        .order_by(Kip.vaqt, Kip.kip_raqami)
-    ).all()
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = f"Smena {smena.value} — {mahsulot.nomi}"[:31]
-
-    ws.append([f"Smena {smena.value} — {mahsulot.nomi} — {sana.isoformat()}"])
-    ws["A1"].font = Font(bold=True, size=14)
-    ws.append([])
-
-    ws.append(["Kip №", "Partiya №", "Vaqt", "Og'irlik, kg"])
-    for hujayra in ws[ws.max_row]:
-        hujayra.font = Font(bold=True)
-
-    jami_kg = 0.0
-    for kip_raqami, vaqt, ogirlik, partiya_raqami in qatorlar:
-        ws.append([kip_raqami, partiya_raqami, vaqt.strftime("%H:%M:%S"), round(float(ogirlik), 2)])
-        jami_kg += float(ogirlik)
-
-    ws.append([f"JAMI ({len(qatorlar)} kip)", "", "", round(jami_kg, 2)])
-    for hujayra in ws[ws.max_row]:
-        hujayra.font = Font(bold=True)
-        hujayra.fill = _JAMI_FON
-
-    for i, kenglik in enumerate([18, 12, 12, 14], start=1):
-        ws.column_dimensions[get_column_letter(i)].width = kenglik
+    wb = smena_mahsulot_jadval(db, sana, smena, mahsulot)
 
     buffer = BytesIO()
     wb.save(buffer)
