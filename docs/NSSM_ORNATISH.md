@@ -107,3 +107,52 @@ KipTaroziBackend`) yoki `nssm set <xizmat> <parametr> <qiymat>` bilan
 istalgan sozlamani (port, muhit o'zgaruvchilari va h.k.) keyinroq
 o'zgartirish mumkin — buning uchun avval `.env` faylni yangilab, keyin
 xizmatni qayta ishga tushirish kifoya (`nssm restart KipTaroziBackend`).
+
+## 5. Real watchdog sinovi — natija (2026-09-10)
+
+`KipTaroziAgent` xizmati shu kompyuterda (`C:\hazorasp_tarozi\nssm.exe`,
+NSSM 2.24 64-bit) haqiqatan o'rnatilib, watchdog (avtomatik qayta ishga
+tushirish) xususiyati REAL sinaldi — faqat `KipTaroziAgent` o'rnatildi,
+`KipTaroziBackend` ATAYLAB o'rnatilmadi (chunki port 8000'da qo'lda
+ishga tushirilgan dev-backend allaqachon ishlayotgan edi; skriptni
+to'liq ishga tushirish ikkalasini ham o'rnatgan bo'lardi).
+
+**Sinov bosqichlari va natija:**
+
+1. O'rnatishdan oldin: `HazoraspBackend` (Stopped), `HazoraspFrontend`
+   (Running) — holat yozib olindi.
+2. `KipTaroziAgent` o'rnatildi (`nssm install` + `AppExit Default
+   Restart`, `AppRestartDelay=3000ms`, `AppThrottle=1500ms`,
+   `Start=SERVICE_AUTO_START`, loglar `backups\nssm-logs\agent.*.log`).
+3. O'rnatishdan keyin: `HazoraspBackend`/`HazoraspFrontend` holati
+   **o'zgarmadi** (hech qanday ta'sir yo'q), `KipTaroziBackend` xizmati
+   **yaratilmadi**.
+4. `Start-Service KipTaroziAgent` → `GET http://127.0.0.1:8100/holat` →
+   `200 OK` (RS232/COM3 ulanmagani kutilgan — bu dev kompyuterda
+   jismoniy tarozi yo'q, agentning o'zi sog'lom ishlayotgani muhim).
+5. Watchdog sinovi — real jarayonni (NSSM emas, uning bola
+   `python.exe` jarayonini) `Stop-Process -Force` bilan **3 marta**
+   ketma-ket "o'ldirildi":
+
+   | # | O'ldirilgan PID | ~5s dan keyin holat | Yangi PID | `/holat` |
+   |---|---|---|---|---|
+   | 1 | 13116 | Running | 22444 | 200 OK |
+   | 2 | 22444 | Running | 21392 | 200 OK |
+   | 3 | 21392 | Running | 13776 | 200 OK |
+
+   Har safar: xizmat holati (`Get-Service`) uzluksiz **Running** bo'lib
+   qoldi (chunki NSSM'ning o'zi — servis egasi jarayon — o'lmadi, faqat
+   uning nazorat qilayotgan bola jarayoni o'ldirildi), va NSSM ~3
+   soniya ichida yangi jarayonni ishga tushirdi (`agent.err.log`da har
+   bitta qayta ishga tushirishda alohida "Started server process
+   [PID]" yozuvi va "Uvicorn running on http://0.0.0.0:8100" tasdiqi
+   bor).
+6. Yakunda xizmat **Running** holatida qoldirildi (Automatic start) —
+   productionga tayyor holatni ko'rsatish uchun ataylab shunday
+   qoldirildi; agar kerak bo'lmasa `nssm stop KipTaroziAgent` yoki
+   `scripts\nssm_ochirish.ps1` bilan o'chirish mumkin.
+
+**Xulosa:** NSSM watchdog xususiyati haqiqiy Windows xizmati sifatida
+kutilganidek ishlaydi — jarayon kutilmagan sababdan o'lsa (masalan
+kip tarozi kompyuteri qayta ishga tushganda yoki agent qulab tushsa),
+xizmat operator aralashuvisiz ~3 soniya ichida o'zi tiklanadi.
