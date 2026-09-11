@@ -72,7 +72,6 @@ class _SozlamalarEkraniState extends State<SozlamalarEkrani> {
   String? _xato;
 
   final Map<String, TextEditingController> _kontrollerlar = {};
-  final Map<String, bool> _matnKorinadi = {};
   final Map<String, bool> _saqlanmoqda = {};
   final List<String> _qoshimchaKalitlar = [];
 
@@ -84,7 +83,6 @@ class _SozlamalarEkraniState extends State<SozlamalarEkrani> {
     for (final bolim in _bolimlar) {
       for (final maydon in bolim.maydonlar) {
         _kontrollerlar[maydon.kalit] = TextEditingController();
-        _matnKorinadi[maydon.kalit] = false;
       }
     }
     _yuklash();
@@ -131,9 +129,12 @@ class _SozlamalarEkraniState extends State<SozlamalarEkrani> {
 
         _kontrollerlar.putIfAbsent(kalit, () {
           if (!malumKalitlar.contains(kalit)) _qoshimchaKalitlar.add(kalit);
-          _matnKorinadi[kalit] = false;
           return TextEditingController();
         });
+        // Maxfiy kalitlar uchun (`maydon.maxfiy`) bu YERDA allaqachon
+        // maskalangan qiymat ("••••1234") — backend to'liq qiymatni endi
+        // hech qachon qaytarmaydi (audit tuzatishi). Maydonga yozilsa,
+        // saqlashda shu YANGI matn to'liq qiymat sifatida yuboriladi.
         _kontrollerlar[kalit]!.text = (item['qiymat'] as String?) ?? '';
       }
     } catch (e) {
@@ -148,7 +149,12 @@ class _SozlamalarEkraniState extends State<SozlamalarEkrani> {
     final holat = context.read<AppState>();
     setState(() => _saqlanmoqda[kalit] = true);
     try {
-      await holat.api.put('/sozlamalar/$kalit', tana: {'qiymat': _kontrollerlar[kalit]!.text});
+      final javob = await holat.api.put('/sozlamalar/$kalit', tana: {'qiymat': _kontrollerlar[kalit]!.text});
+      // Maxfiy kalit uchun javob MASKALANGAN qiymatni qaytaradi — maydonni
+      // shu bilan yangilaymiz, shunda admin hozirgina yozgan xom (haqiqiy)
+      // matn ekranda saqlanib qolmaydi.
+      final yangiQiymat = (javob as Map)['qiymat'] as String?;
+      if (mounted && yangiQiymat != null) _kontrollerlar[kalit]!.text = yangiQiymat;
       if (mounted) _xabarKorsat(holat.lok.t('sozlama_saqlandi'), xato: false);
     } catch (e) {
       if (mounted) _xabarKorsat(e.toString(), xato: true);
@@ -530,7 +536,6 @@ class _SozlamalarEkraniState extends State<SozlamalarEkrani> {
 
   Widget _maydonQatori(_SozlamaMaydoni maydon, dynamic lok, {bool xomLabel = false}) {
     final kontroller = _kontrollerlar[maydon.kalit]!;
-    final korinadi = _matnKorinadi[maydon.kalit] ?? false;
     final saqlanmoqda = _saqlanmoqda[maydon.kalit] ?? false;
 
     return Column(
@@ -547,18 +552,18 @@ class _SozlamalarEkraniState extends State<SozlamalarEkrani> {
             Expanded(
               child: TextField(
                 controller: kontroller,
-                obscureText: maydon.maxfiy && !korinadi,
+                // Maxfiy maydonlar endi "ko'rsatish/yashirish" tugmasiga ega
+                // EMAS — backend hech qachon to'liq qiymatni qaytarmagani
+                // uchun ko'rsatadigan (yashiriladigan) narsa yo'q; maydonda
+                // doim maskalangan qiymat ("••••1234") turadi, admin yangi
+                // to'liq qiymat kiritib ustidan yozadi.
                 decoration: InputDecoration(
                   labelText: xomLabel ? maydon.labelKaliti : lok.t(maydon.labelKaliti),
                   border: const OutlineInputBorder(),
                   isDense: true,
-                  suffixIcon: maydon.maxfiy
-                      ? IconButton(
-                          icon: Icon(korinadi ? Icons.visibility_off : Icons.visibility),
-                          tooltip: korinadi ? lok.t('parolni_yashirish') : lok.t('parolni_korsatish'),
-                          onPressed: () => setState(() => _matnKorinadi[maydon.kalit] = !korinadi),
-                        )
-                      : null,
+                  helperText: maydon.maxfiy ? lok.t('maxfiy_maydon_yordam') : null,
+                  helperMaxLines: 2,
+                  prefixIcon: maydon.maxfiy ? const Icon(Icons.lock_outline, size: 18) : null,
                 ),
               ),
             ),

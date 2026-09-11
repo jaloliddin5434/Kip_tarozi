@@ -488,6 +488,10 @@ const Map<String, Map<Til, String>> _matnlar = {
   },
   'parolni_korsatish': {Til.uz: 'Ko\'rsatish', Til.ru: 'Показать'},
   'parolni_yashirish': {Til.uz: 'Yashirish', Til.ru: 'Скрыть'},
+  'maxfiy_maydon_yordam': {
+    Til.uz: 'Xavfsizlik uchun to\'liq qiymat qaytadan ko\'rsatilmaydi — yangisini kiritib saqlang',
+    Til.ru: 'В целях безопасности полное значение больше не показывается — введите новое и сохраните',
+  },
   'telegram_xatolik_bolimi': {
     Til.uz: 'Xatolik xabarnomalari (Telegram)',
     Til.ru: 'Уведомления об ошибках (Telegram)',
