@@ -84,8 +84,10 @@ void main() {
       await _kut(tester, marta: 3);
       expect(find.text('Tola'), findsWidgets, reason: 'Boshlang\'ich jamlanma ko\'rinishi kerak');
 
-      // Davr filtri
-      await tester.tap(find.text('Haftalik'));
+      // Davr filtri. "Haftalik" matni ekranda IKKI joyda bor (asosiy davr
+      // filtri VA pastdagi "Rekord" panelining o'z mustaqil davr filtri) —
+      // .first bilan asosiy (yuqoridagi, avval qurilgan) filtrni nishonlaymiz.
+      await tester.tap(find.text('Haftalik').first);
       await _kut(tester, marta: 3);
 
       // Mahsulot filtri

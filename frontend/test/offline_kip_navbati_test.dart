@@ -10,19 +10,27 @@ import 'package:kip_tarozi/services/offline_kip_navbati.dart';
 
 /// `POST /kiplar/sinxron` -> "saqlandi", `POST /kiplar/{id}/surat` -> qayd qiladi.
 /// `oldindan` — birinchi so'rovdan OLDIN (sinxron davomida yangi kip saqlash).
+/// `xatoBerishSorovRaqami` — berilgan bo'lsa, shu tartib raqamli `post()`
+/// chaqiruvida (1-dan boshlab) tarmoq xatosi otiladi (bo'lak-xato simulyatsiyasi).
 class _SoxtaApi extends ApiClient {
   int postChaqirildi = 0;
+  final List<int> bolakHajmlari = []; // har `post()` chaqiruvidagi elementlar soni
   final List<String> suratYuklashlar = [];
   Uint8List? oxirgiSuratBaytlari;
   Future<void> Function()? oldindan;
   bool suratXato = false;
   bool suratTarmoqXato = false;
+  int? xatoBerishSorovRaqami;
 
   @override
   Future<dynamic> post(String yol, {Object? tana, String? tokenOverride}) async {
     if (postChaqirildi == 0 && oldindan != null) await oldindan!();
     postChaqirildi++;
+    if (xatoBerishSorovRaqami != null && postChaqirildi == xatoBerishSorovRaqami) {
+      throw const SocketException('tarmoq yo\'q (bo\'lak sinovi)');
+    }
     final list = tana as List;
+    bolakHajmlari.add(list.length);
     return list
         .map((e) => {'mijoz_id': (e as Map)['mijoz_id'], 'holat': 'saqlandi', 'kip_id': 1000 + postChaqirildi})
         .toList();
@@ -145,5 +153,87 @@ void main() {
     expect(await OfflineKipNavbati.uzunlik(), 0); // umidini uzdik, yozuv ketdi
     expect(fayl.existsSync(), isFalse);
     dir.deleteSync(recursive: true);
+  });
+
+  // ---------------------------------------------------------------------
+  // AUDIT TOPILMASI TUZATISHI: katta (kunlab offline) navbat endi bitta
+  // ulkan so'rov o'rniga kichik bo'laklarga bo'lib yuboriladi.
+  // ---------------------------------------------------------------------
+
+  test('katta navbat (220 ta) bo\'laklarga bo\'linib yuboriladi', () async {
+    for (var i = 0; i < 220; i++) {
+      await OfflineKipNavbati.qoshish(tana: _tana('katta-$i'), token: 't');
+    }
+    expect(await OfflineKipNavbati.uzunlik(), 220);
+
+    final api = _SoxtaApi();
+    final natija = await OfflineKipNavbati.sinxronla(api);
+
+    expect(natija.yuborilgan, 220);
+    expect(await OfflineKipNavbati.uzunlik(), 0);
+    // 220 ta, 50 tadan bo'lak -> 5 ta so'rov (4x50 + 1x20) — BITTA ULKAN
+    // so'rov o'rniga.
+    expect(api.postChaqirildi, 5);
+    expect(api.bolakHajmlari, [50, 50, 50, 50, 20]);
+  });
+
+  test('bo\'lak muvaffaqiyatsiz bo\'lsa — OLDINGI bo\'laklar navbatdan allaqachon o\'chirilgan bo\'ladi', () async {
+    for (var i = 0; i < 120; i++) {
+      await OfflineKipNavbati.qoshish(tana: _tana('bolak-$i'), token: 't');
+    }
+
+    // 1-bo'lak (50 ta) muvaffaqiyatli, 2-bo'lakda (so'rov #2) tarmoq xatosi.
+    final api = _SoxtaApi()..xatoBerishSorovRaqami = 2;
+    final natija = await OfflineKipNavbati.sinxronla(api);
+
+    expect(natija.yuborilgan, 50); // faqat 1-bo'lak muvaffaqiyatli bo'ldi
+    expect(api.postChaqirildi, 2); // 3-bo'lakka umuman yetib bormadi
+    expect(api.bolakHajmlari, [50]); // faqat 1-bo'lak natija berdi
+
+    final qolgan = await OfflineKipNavbati.royxat();
+    expect(qolgan.length, 70); // 120 - 50 (1-bo'lak) = 70 ta navbatda qoldi
+    final qolganIdlar = qolgan.map((y) => (y['tana'] as Map)['mijoz_id']).toSet();
+    // Birinchi 50 ta ('bolak-0'..'bolak-49') YO'Q, qolgani BOR.
+    for (var i = 0; i < 50; i++) {
+      expect(qolganIdlar.contains('bolak-$i'), isFalse, reason: 'bolak-$i allaqachon yuborilgan bo\'lishi kerak edi');
+    }
+    for (var i = 50; i < 120; i++) {
+      expect(qolganIdlar.contains('bolak-$i'), isTrue, reason: 'bolak-$i hali navbatda qolishi kerak edi');
+    }
+  });
+
+  test('bo\'lak muvaffaqiyatsizligidan keyingi tsikl qolganlarni tugatadi', () async {
+    for (var i = 0; i < 120; i++) {
+      await OfflineKipNavbati.qoshish(tana: _tana('davom-$i'), token: 't');
+    }
+
+    // 1-tsikl: 2-bo'lakda uziladi.
+    await OfflineKipNavbati.sinxronla(_SoxtaApi()..xatoBerishSorovRaqami = 2);
+    expect(await OfflineKipNavbati.uzunlik(), 70);
+
+    // 2-tsikl ("internet tiklandi"): qolgan 70 ta (2 bo'lak: 50+20) muvaffaqiyatli.
+    final api2 = _SoxtaApi();
+    final natija2 = await OfflineKipNavbati.sinxronla(api2);
+    expect(natija2.yuborilgan, 70);
+    expect(api2.bolakHajmlari, [50, 20]);
+    expect(await OfflineKipNavbati.uzunlik(), 0);
+  });
+
+  test('ikki xil operator tokeni alohida guruhlanadi va bo\'laklanadi', () async {
+    for (var i = 0; i < 60; i++) {
+      await OfflineKipNavbati.qoshish(tana: _tana('a-$i'), token: 'tok-A');
+    }
+    for (var i = 0; i < 10; i++) {
+      await OfflineKipNavbati.qoshish(tana: _tana('b-$i'), token: 'tok-B');
+    }
+
+    final api = _SoxtaApi();
+    final natija = await OfflineKipNavbati.sinxronla(api);
+
+    expect(natija.yuborilgan, 70);
+    // tok-A: 60 ta -> 2 bo'lak (50+10); tok-B: 10 ta -> 1 bo'lak. Jami 3 so'rov.
+    expect(api.postChaqirildi, 3);
+    expect(api.bolakHajmlari, unorderedEquals([50, 10, 10]));
+    expect(await OfflineKipNavbati.uzunlik(), 0);
   });
 }

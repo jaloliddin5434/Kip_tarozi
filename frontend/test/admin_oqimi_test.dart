@@ -29,6 +29,11 @@ void main() {
       await tester.pumpWidget(const KipTaroziApp());
       await _tarmoqniKut(tester, marta: 3);
 
+      // Login ekrani avval ROL tanlashni talab qiladi — Login/Parol
+      // maydonlari faqat rol tanlangandan keyin ko'rinadi.
+      await tester.tap(find.text('Admin'));
+      await tester.pump();
+
       await tester.enterText(find.byType(TextField).first, 'admin');
       await tester.enterText(find.byType(TextField).at(1), 'admin12345');
       await tester.pump();

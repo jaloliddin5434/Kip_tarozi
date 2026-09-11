@@ -4,7 +4,10 @@
 //
 // Ishga tushirish:
 //   1. backend/.env'da bazaga ulanish sozlangan bo'lsin, migratsiya bajarilgan,
-//      seed orqali smena_a/smenaA123 operatori yaratilgan bo'lsin.
+//      seed orqali smena A operatori (login "operator_a") yaratilgan bo'lsin
+//      (login ekrani endi operatorlar uchun loginni smena tanlovidan o'zi
+//      hosil qiladi: operator_<smena>) — pastdagi `_operatorParoli`ni haqiqiy
+//      parolga moslang.
 //   2. uvicorn app.main:app --port 8010 ishga tushirilgan bo'lsin.
 //   3. flutter test test/operator_oqimi_test.dart --dart-define=BACKEND_URL=http://localhost:8010/api/v1
 
@@ -18,6 +21,9 @@ import 'package:kip_tarozi/api/api_client.dart';
 import 'package:kip_tarozi/main.dart';
 
 const _backendUrl = String.fromEnvironment('BACKEND_URL', defaultValue: 'http://localhost:8010/api/v1');
+// Login ekrani operator uchun loginni o'zi ('operator_a') hosil qiladi —
+// faqat parol kerak. Real seedga mos parolni shu yerga qo'ying.
+const _operatorParoli = String.fromEnvironment('OPERATOR_PAROLI', defaultValue: 'smenaA123');
 
 /// Haqiqiy tarmoq javobini kutish uchun — pump() yolg'iz o'zi real IO
 /// bilan sinxronlanmaydi, shuning uchun real vaqt kechikishi bilan
@@ -42,11 +48,16 @@ void main() {
       await tester.pumpWidget(const KipTaroziApp());
       await _tarmoqniKut(tester, marta: 3);
 
-      // --- Login ---
-      final loginMaydoni = find.byType(TextField).first;
-      final parolMaydoni = find.byType(TextField).at(1);
-      await tester.enterText(loginMaydoni, 'smena_a');
-      await tester.enterText(parolMaydoni, 'smenaA123');
+      // --- Login --- Login ekrani avval ROL, so'ng (operator uchun) SMENA
+      // tanlashni talab qiladi; login shundan o'zi hosil bo'ladi
+      // (operator_a) — faqat parol maydoni qoladi.
+      await tester.tap(find.text('Operator'));
+      await tester.pump();
+      await tester.tap(find.text('A').first);
+      await tester.pump();
+
+      final parolMaydoni = find.byType(TextField).first;
+      await tester.enterText(parolMaydoni, _operatorParoli);
       await tester.pump();
 
       await tester.tap(find.text('Kirish'));

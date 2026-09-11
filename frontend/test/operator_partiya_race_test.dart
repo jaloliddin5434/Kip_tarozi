@@ -13,6 +13,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kip_tarozi/api/api_client.dart';
 import 'package:kip_tarozi/models/foydalanuvchi.dart';
@@ -125,6 +126,10 @@ void main() {
   testWidgets(
     'RACE: tez-tez partiya kiritilganda, oldingi (sekin) javob keyingisini bosib ketmasligi kerak',
     (tester) async {
+      // OperatorEkrani.initState() offline navbat uzunligini o'qiydi
+      // (OfflineKipNavbati.uzunlik() -> SharedPreferences) — mock qilinmasa
+      // MissingPluginException chiqadi.
+      SharedPreferences.setMockInitialValues({});
       await tester.runAsync(() async {
         HttpOverrides.global = null;
         // #5 SEKIN javob beradi, #8 TEZ — ya'ni #5 birinchi so'raladi, lekin
@@ -164,6 +169,10 @@ void main() {
   );
 
   testWidgets('Oddiy holat: race bo\'lmasa, partiya tanlash normal ishlashi kerak', (tester) async {
+    // OperatorEkrani.initState() offline navbat uzunligini o'qiydi
+    // (OfflineKipNavbati.uzunlik() -> SharedPreferences) — mock qilinmasa
+    // MissingPluginException chiqadi.
+    SharedPreferences.setMockInitialValues({});
     await tester.runAsync(() async {
       HttpOverrides.global = null;
       final server = _SoxtaServer({});

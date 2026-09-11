@@ -15,6 +15,9 @@ import 'package:kip_tarozi/main.dart';
 
 const _backendUrl = String.fromEnvironment('BACKEND_URL', defaultValue: 'http://localhost:8010/api/v1');
 const _agentKey = String.fromEnvironment('AGENT_KEY', defaultValue: 'CHANGE_ME_AGENT_KEY');
+// Login ekrani operator uchun loginni o'zi ('operator_a') hosil qiladi —
+// faqat parol kerak. Real seedga mos parolni shu yerga qo'ying.
+const _operatorParoli = String.fromEnvironment('OPERATOR_PAROLI', defaultValue: 'smenaA123');
 
 Future<void> _tarmoqniKut(WidgetTester tester, {int marta = 10}) async {
   for (var i = 0; i < marta; i++) {
@@ -48,8 +51,15 @@ void main() {
       await tester.pumpWidget(const KipTaroziApp());
       await _tarmoqniKut(tester, marta: 3);
 
-      await tester.enterText(find.byType(TextField).first, 'smena_a');
-      await tester.enterText(find.byType(TextField).at(1), 'smenaA123');
+      // Login ekrani avval ROL, so'ng (operator uchun) SMENA tanlashni
+      // talab qiladi; login shundan o'zi hosil bo'ladi (operator_a) —
+      // faqat parol maydoni qoladi.
+      await tester.tap(find.text('Operator'));
+      await tester.pump();
+      await tester.tap(find.text('A').first);
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField).first, _operatorParoli);
       await tester.pump();
       await tester.tap(find.text('Kirish'));
       await _tarmoqniKut(tester);

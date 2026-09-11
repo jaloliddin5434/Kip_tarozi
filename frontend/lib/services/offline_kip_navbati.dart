@@ -25,6 +25,19 @@ import 'offline_surat.dart';
 class OfflineKipNavbati {
   static const _kalit = 'offline_kip_navbati_v1';
 
+  /// AUDIT TOPILMASI (tuzatilmoqda, Stansiya Agent — sinxron.py bilan bir
+  /// xil naqsh): kip ma'lumotlari (`/kiplar/sinxron`) endi BIR-BIR emas,
+  /// shu miqdordan BO'LAKLARGA bo'lib yuboriladi — kunlar offline turgandan
+  /// keyin navbatda yuzlab yozuv to'plansa, bittalab yuborish juda ko'p
+  /// (sekin) alohida tarmoq so'rovi talab qilardi. Bitta so'rovda bir nechta
+  /// yozuv yuborish (backend allaqachon ro'yxat qabul qiladi) sinxronni
+  /// sezilarli tezlashtiradi, ayni paytda bo'lak hajmi kichik saqlanib
+  /// (so'rov hech qachon vaqt tugashiga yetib bormasin uchun) xavfsiz
+  /// qoladi. Har bo'lak yuborilgach DARHOL navbatdan o'chiriladi — keyingi
+  /// bo'lak muvaffaqiyatsiz bo'lsa ham oldingilar yo'qolmaydi.
+  static const int _bolakHajmi = 50;
+  static const Duration _bolakTaymeri = Duration(seconds: 60);
+
   /// Navbatga yozish/o'chirishni KETMA-KET bajarish uchun oddiy mutex.
   static Future<void> _kilit = Future<void>.value();
 
@@ -76,6 +89,32 @@ class OfflineKipNavbati {
     });
   }
 
+  /// Navbatdagi `ochiriladigan` (to'liq tugagan) mijoz_id'larni olib
+  /// tashlaydi va `kipIdlar`ni yozadi — HAR BO'LAK/YOZUVDAN KEYIN alohida
+  /// chaqiriladi (bitta katta yakuniy commit emas), shunda navbat har doim
+  /// "shu paytgacha haqiqatan bajarilgan ish"ni aks ettiradi — sinxronlash
+  /// o'rtada uzilib qolsa (masalan ilova yopilsa) ham allaqachon
+  /// muvaffaqiyatli bo'lgan qism yo'qolmaydi.
+  static Future<void> _navbatgaQollash({
+    required Set<String> ochiriladigan,
+    required Map<String, int> kipIdlar,
+  }) {
+    if (ochiriladigan.isEmpty && kipIdlar.isEmpty) return Future.value();
+    return _qulflab(() async {
+      final hozirgi = await royxat();
+      final yangi = <Map<String, dynamic>>[];
+      for (final y in hozirgi) {
+        final mid = _mid(y);
+        if (mid != null && ochiriladigan.contains(mid)) continue;
+        if (mid != null && kipIdlar.containsKey(mid) && y['kipId'] == null) {
+          y['kipId'] = kipIdlar[mid];
+        }
+        yangi.add(y);
+      }
+      await _yoz(yangi);
+    });
+  }
+
   /// Navbatni sinxronlaydi. `yuborilgan` — shu tsiklda backend'ga YANGI
   /// yozilgan kip soni (surat holatidan qat'i nazar). `songgiKipId` — shu
   /// tsiklda to'liq tugagan (kip+surat) oxirgi kip id'si (operator ekranidagi
@@ -84,56 +123,83 @@ class OfflineKipNavbati {
   /// Tarmoq so'rovlari QULFLANMAGAN holda (operator "Saqlash"i bloklanmasin);
   /// faqat navbatni yangilash qulf ostida.
   static Future<({int yuborilgan, List<String> xatolar, int? songgiKipId})> sinxronla(ApiClient api) async {
-    final yozuvlar = await royxat();
-    if (yozuvlar.isEmpty) return (yuborilgan: 0, xatolar: const <String>[], songgiKipId: null);
-
     var yuborilgan = 0;
     int? songgiKipId;
     final xatolar = <String>[];
-    final ochiriladigan = <String>{}; // to'liq tugagan mijoz_id'lar
-    final kipIdlar = <String, int>{}; // kip saqlandi, surat hali kutilmoqda
 
-    for (final yozuv in yozuvlar) {
-      final tana = Map<String, dynamic>.from(yozuv['tana'] as Map);
-      final mijozId = tana['mijoz_id'] as String;
-      final token = yozuv['token'] as String?;
-      final suratYoli = yozuv['suratYoli'] as String?;
-      var kipId = yozuv['kipId'] as int?;
+    // =========================================================
+    // 1-BOSQICH — kip ma'lumotlari, TOKEN bo'yicha guruhlab, har guruhni
+    // BO'LAKLARGA (_bolakHajmi) bo'lib, bitta so'rovda bir nechta yozuv.
+    // =========================================================
+    final kutilayotgan = (await royxat()).where((y) => y['kipId'] == null).toList();
+    final tokenBoyicha = <String?, List<Map<String, dynamic>>>{};
+    for (final y in kutilayotgan) {
+      tokenBoyicha.putIfAbsent(y['token'] as String?, () => []).add(y);
+    }
 
-      // --- 1-bosqich: kip ---
-      if (kipId == null) {
+    var toxtatildi = false;
+    for (final guruh in tokenBoyicha.entries) {
+      if (toxtatildi) break;
+      final token = guruh.key;
+      final elementlar = guruh.value;
+
+      for (var i = 0; i < elementlar.length; i += _bolakHajmi) {
+        final bolak = elementlar.skip(i).take(_bolakHajmi).toList();
+        final tanalar = bolak.map((y) => Map<String, dynamic>.from(y['tana'] as Map)).toList();
+
+        List<dynamic> natijalar;
         try {
-          final javob = await api
-              .post('/kiplar/sinxron', tana: [tana], tokenOverride: token)
-              .timeout(const Duration(seconds: 10));
-          final natija = (javob as List).first as Map<String, dynamic>;
+          final javob = await api.post('/kiplar/sinxron', tana: tanalar, tokenOverride: token).timeout(_bolakTaymeri);
+          natijalar = javob as List;
+        } catch (_) {
+          // Tarmoq/server xatosi — shu bo'lak (va navbatdagi bo'lak/guruhlar)
+          // KEYINGI TSIKLGA qoladi; bu bo'lakdan OLDINGI bo'laklar allaqachon
+          // pastda alohida-alohida navbatdan o'chirilgan — yo'qolmagan.
+          toxtatildi = true;
+          break;
+        }
+
+        final ochiriladiganBolak = <String>{};
+        final kipIdlarBolak = <String, int>{};
+        for (final natijaXom in natijalar) {
+          final natija = natijaXom as Map<String, dynamic>;
+          final mijozId = natija['mijoz_id'] as String;
           final holat = natija['holat'];
           if (holat == 'saqlandi' || holat == 'allaqachon_mavjud') {
-            kipId = natija['kip_id'] as int?;
-            if (kipId != null) kipIdlar[mijozId] = kipId;
+            final kipId = natija['kip_id'] as int?;
+            if (kipId != null) kipIdlarBolak[mijozId] = kipId;
             if (holat == 'saqlandi') yuborilgan++;
           } else {
             xatolar.add((natija['xabar'] as String?) ?? 'nomaʼlum xato');
-            ochiriladigan.add(mijozId);
-            continue;
+            ochiriladiganBolak.add(mijozId);
           }
-        } catch (_) {
-          break; // tarmoq/server — keyingi tsiklda qayta
         }
-      }
 
-      if (kipId == null) break; // saqlandi, lekin kip_id kelmadi — keyingi tsiklda
-
-      // --- 2-bosqich: surat (agar bor bo'lsa) ---
-      if (suratYoli == null) {
-        songgiKipId = kipId;
-        ochiriladigan.add(mijozId);
-        continue;
+        // Shu BO'LAK darhol navbatdan olib tashlanadi/yangilanadi — keyingi
+        // bo'lak muvaffaqiyatsiz bo'lib qolsa ham bu bo'lak yo'qolmaydi.
+        await _navbatgaQollash(ochiriladigan: ochiriladiganBolak, kipIdlar: kipIdlarBolak);
       }
+    }
+
+    // =========================================================
+    // 2-BOSQICH — suratlar. Multipart fayl yuklash bo'lganligi uchun
+    // bo'laklarga bo'lib bo'lmaydi (backendda ko'p-fayl endpointi yo'q va
+    // bu vazifa doirasida qo'shilmaydi) — bittalab, lekin har biri
+    // muvaffaqiyatidan so'ng DARHOL navbatdan o'chiriladi (avvalgidek).
+    // 1-bosqichda navbat allaqachon yangilangan — shu YANGI holatni o'qiymiz.
+    // =========================================================
+    final suratKutilayotgan = (await royxat()).where((y) => y['kipId'] != null && y['suratYoli'] != null).toList();
+    for (final yozuv in suratKutilayotgan) {
+      final mijozId = _mid(yozuv);
+      final kipId = yozuv['kipId'] as int?;
+      if (mijozId == null || kipId == null) continue;
+      final token = yozuv['token'] as String?;
+      final suratYoli = yozuv['suratYoli'] as String;
+
       final baytlar = await suratniOqi(suratYoli);
       if (baytlar == null || baytlar.isEmpty) {
         songgiKipId = kipId; // fayl yo'q (web/o'chirilgan) — kip saqlangan, tugadi
-        ochiriladigan.add(mijozId);
+        await _navbatgaQollash(ochiriladigan: {mijozId}, kipIdlar: const {});
         continue;
       }
       try {
@@ -143,30 +209,29 @@ class OfflineKipNavbati {
             .timeout(const Duration(seconds: 20));
         await suratniOchir(suratYoli);
         songgiKipId = kipId;
-        ochiriladigan.add(mijozId);
+        await _navbatgaQollash(ochiriladigan: {mijozId}, kipIdlar: const {});
       } on ApiException {
         await suratniOchir(suratYoli); // server rad etdi — surat umidini uzamiz
         songgiKipId = kipId;
-        ochiriladigan.add(mijozId);
+        await _navbatgaQollash(ochiriladigan: {mijozId}, kipIdlar: const {});
       } catch (_) {
-        break; // tarmoq — kip saqlangan (kipId yoziladi), surat keyingi tsiklda
+        break; // tarmoq — kip saqlangan (kipId yozilgan), surat keyingi tsiklda
       }
     }
 
-    if (ochiriladigan.isNotEmpty || kipIdlar.isNotEmpty) {
-      await _qulflab(() async {
-        final hozirgi = await royxat();
-        final yangi = <Map<String, dynamic>>[];
-        for (final y in hozirgi) {
-          final mid = _mid(y);
-          if (mid != null && ochiriladigan.contains(mid)) continue;
-          if (mid != null && kipIdlar.containsKey(mid) && y['kipId'] == null) {
-            y['kipId'] = kipIdlar[mid];
-          }
-          yangi.add(y);
-        }
-        await _yoz(yangi);
-      });
+    // Suratsiz, lekin kip_id allaqachon olingan yozuvlar (masalan offline
+    // paytda kamera surat bermagan) — navbatda "kipId bor-u, surat yo'q"
+    // holida qolib ketmasin, shu yerda ham tugallanadi.
+    final suratsizTugagan = (await royxat()).where((y) => y['kipId'] != null && y['suratYoli'] == null).toList();
+    if (suratsizTugagan.isNotEmpty) {
+      final ochiriladigan = <String>{};
+      for (final y in suratsizTugagan) {
+        final mid = _mid(y);
+        if (mid == null) continue;
+        songgiKipId = y['kipId'] as int?;
+        ochiriladigan.add(mid);
+      }
+      await _navbatgaQollash(ochiriladigan: ochiriladigan, kipIdlar: const {});
     }
 
     return (yuborilgan: yuborilgan, xatolar: xatolar, songgiKipId: songgiKipId);
