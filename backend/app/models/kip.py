@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -32,7 +32,27 @@ class Kip(Base):
     faqat offline navbatdan kech yetib kelganda farqlanishi mumkin)."""
 
     __tablename__ = "kiplar"
-    __table_args__ = (UniqueConstraint("partiya_id", "kip_raqami", name="uq_kip_partiya_raqam"),)
+    __table_args__ = (
+        UniqueConstraint("partiya_id", "kip_raqami", name="uq_kip_partiya_raqam"),
+        # Performance indekslari (migratsiya 68a051b132ed — audit topilmasi:
+        # bazada ikkilamchi indeks umuman yo'q edi). `partiya_id` uchun
+        # alohida oddiy indeks YO'Q — yuqoridagi unique cheklov (partiya_id,
+        # kip_raqami) va pastdagi (partiya_id, holati) composite orqali
+        # allaqachon qamrab olingan.
+        Index("ix_kiplar_vaqt", "vaqt"),
+        Index("ix_kiplar_smena", "smena"),
+        Index("ix_kiplar_holati", "holati"),
+        Index("ix_kiplar_operator_id", "operator_id"),
+        Index("ix_kiplar_partiya_holati", "partiya_id", "holati"),
+        Index("ix_kiplar_vaqt_holati", "vaqt", "holati"),
+        # ESLATMA: `func.date(Kip.vaqt)` predikatlari (dashboard/statistika/
+        # hisobotlar) uchun FUNKSIONAL indeks QASDDAN QO'SHILMAGAN — Postgres
+        # `date(timestamptz)`ni STABLE (IMMUTABLE emas) deb hisoblaydi va
+        # bunday indeks yaratishni rad etadi (migratsiya 68a051b132ed
+        # izohida batafsil). Bu joylar hozircha `Seq Scan` bilan qoladi —
+        # to'g'ri yechim so'rovlarni sargable oraliqqa o'tkazish (alohida,
+        # kattaroq vazifa).
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     mijoz_id: Mapped[str] = mapped_column(String(36), unique=True)

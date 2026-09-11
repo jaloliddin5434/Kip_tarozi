@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -22,6 +22,9 @@ class KipTogrilashZayavkasi(Base):
     haqiqatan o'zgarsa, to'g'ri yangi papkaga ko'chadi)."""
 
     __tablename__ = "kip_togrilash_zayavkalari"
+    # Performance indeksi (migratsiya 68a051b132ed) — kamera_tasdiq_sorovlari
+    # bilan bir xil naqsh (operator_id, holati, vaqt).
+    __table_args__ = (Index("ix_kip_togrilash_operator_holati_vaqt", "operator_id", "holati", "vaqt"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
 

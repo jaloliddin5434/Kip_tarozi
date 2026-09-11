@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -26,6 +26,10 @@ class KameraTasdiqSorovi(Base):
     allaqachon keyingi ishga o'tgan)."""
 
     __tablename__ = "kamera_tasdiq_sorovlari"
+    # Performance indeksi (migratsiya 68a051b132ed) — operator ekrani
+    # `GET /kamera-tasdiq/mening-kutilayotganim` orqali har necha soniyada
+    # o'z (operator_id, holati='kutilmoqda') so'rovini pollaydi.
+    __table_args__ = (Index("ix_kamera_tasdiq_operator_holati_vaqt", "operator_id", "holati", "vaqt"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     # Operator qurilmasida generatsiya qilingan UUID — qayta yuborishda (tarmoq

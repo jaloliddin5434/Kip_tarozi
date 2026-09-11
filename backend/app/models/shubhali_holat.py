@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -19,6 +19,11 @@ class ShubhaliHolat(Base):
     Operator 'Tushundim' bosmaguncha (korib_chiqildi) keyingi kipni torta olmaydi."""
 
     __tablename__ = "shubhali_holatlar"
+    # Performance indeksi (migratsiya 68a051b132ed) — `_bloklovchi_hodisa`/
+    # `GET /shubhali-holatlar/bloklovchi` har operator tomonidan har 5
+    # soniyada `WHERE smena=? AND holati='yangi' ORDER BY vaqt DESC LIMIT 1`
+    # so'rovini pollaydi — eng tez-tez ishlaydigan so'rovlardan biri.
+    __table_args__ = (Index("ix_shubhali_holatlar_smena_holati_operator_vaqt", "smena", "holati", "operator_id", "vaqt"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     vaqt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

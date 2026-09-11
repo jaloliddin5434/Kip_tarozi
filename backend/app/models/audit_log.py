@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,6 +19,10 @@ class AuditLog(Base):
     sabab majburiy). eski_qiymat/yangi_qiymat — o'zgargan maydonlar JSON ko'rinishida."""
 
     __tablename__ = "audit_log"
+    # Performance indeksi (migratsiya 68a051b132ed) — kip/foydalanuvchi
+    # tafsiloti ochilganda audit tarixini (jadval_nomi, yozuv_id) bo'yicha
+    # qidirish uchun.
+    __table_args__ = (Index("ix_audit_log_jadval_yozuv", "jadval_nomi", "yozuv_id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     foydalanuvchi_id: Mapped[int] = mapped_column(ForeignKey("foydalanuvchilar.id"))

@@ -1,7 +1,7 @@
 import enum
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
+from sqlalchemy import Date, DateTime, Enum, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -18,7 +18,14 @@ class Partiya(Base):
     ichida mustaqil). Sotuv maydonlari faqat 'sotilgan' holatga o'tganda to'ldiriladi."""
 
     __tablename__ = "partiyalar"
-    __table_args__ = (UniqueConstraint("mahsulot_id", "partiya_raqami", name="uq_partiya_mahsulot_raqam"),)
+    __table_args__ = (
+        UniqueConstraint("mahsulot_id", "partiya_raqami", name="uq_partiya_mahsulot_raqam"),
+        # Performance indekslari (migratsiya 68a051b132ed). `mahsulot_id`
+        # uchun alohida oddiy indeks YO'Q — yuqoridagi unique cheklov orqali
+        # allaqachon qamrab olingan.
+        Index("ix_partiyalar_holati", "holati"),
+        Index("ix_partiyalar_sotuv_sanasi", "sotuv_sanasi"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     mahsulot_id: Mapped[int] = mapped_column(ForeignKey("mahsulotlar.id"))
