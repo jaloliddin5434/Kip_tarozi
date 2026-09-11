@@ -324,6 +324,7 @@ class _SozlamalarEkraniState extends State<SozlamalarEkrani> {
     final parolKontroller = TextEditingController();
     var parolKorinadi = false;
     var saqlanmoqda = false;
+    var bekorQilinmoqda = false;
     String? xato;
 
     await showDialog<void>(
@@ -376,6 +377,52 @@ class _SozlamalarEkraniState extends State<SozlamalarEkrani> {
             }
           }
 
+          Future<void> bekorQil() async {
+            final davom = await showDialog<bool>(
+              context: dialogContext,
+              builder: (c) => AlertDialog(
+                title: Text(lok.t('tokenlarni_bekor_qilish')),
+                content: Text(lok.t('tokenlarni_bekor_qilish_ogohlantirish')),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(c, false), child: Text(lok.t('bekor'))),
+                  FilledButton(
+                    style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+                    onPressed: () => Navigator.pop(c, true),
+                    child: Text(lok.t('tokenlarni_bekor_qilish')),
+                  ),
+                ],
+              ),
+            );
+            if (davom != true) return;
+
+            setDialogState(() {
+              bekorQilinmoqda = true;
+              xato = null;
+            });
+            var muvaffaqiyatli = false;
+            try {
+              await holat.api.post('/foydalanuvchilar/${f.id}/tokenlarni-bekor-qilish');
+              muvaffaqiyatli = true;
+            } on ApiException catch (e) {
+              setDialogState(() => xato = e.xabar);
+            } catch (e) {
+              setDialogState(() => xato = e.toString());
+            } finally {
+              setDialogState(() => bekorQilinmoqda = false);
+            }
+            if (!muvaffaqiyatli) return;
+
+            if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+            if (ozimi) {
+              // O'zining tokenini bekor qildi — joriy sessiya endi yaroqsiz,
+              // ilova darhol login ekraniga qaytishi kerak.
+              await holat.chiqish();
+            } else if (mounted) {
+              _xabarKorsat(lok.t('tokenlar_bekor_qilindi'), xato: false);
+              _yuklash();
+            }
+          }
+
           return AlertDialog(
             title: Text('${lok.t('hisobni_tahrirlash')} — @${f.login}'),
             content: Column(
@@ -410,6 +457,29 @@ class _SozlamalarEkraniState extends State<SozlamalarEkrani> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+                Text(
+                  lok.t('tokenlarni_bekor_qilish_tavsif'),
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: (saqlanmoqda || bekorQilinmoqda) ? null : bekorQil,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red.shade700,
+                    side: BorderSide(color: Colors.red.shade300),
+                  ),
+                  icon: bekorQilinmoqda
+                      ? SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.red.shade700),
+                        )
+                      : const Icon(Icons.lock_reset, size: 18),
+                  label: Text(lok.t('tokenlarni_bekor_qilish')),
+                ),
                 if (xato != null) ...[
                   const SizedBox(height: 12),
                   Text(xato!, style: const TextStyle(color: Colors.red)),
@@ -418,11 +488,11 @@ class _SozlamalarEkraniState extends State<SozlamalarEkrani> {
             ),
             actions: [
               TextButton(
-                onPressed: saqlanmoqda ? null : () => Navigator.of(dialogContext).pop(),
+                onPressed: (saqlanmoqda || bekorQilinmoqda) ? null : () => Navigator.of(dialogContext).pop(),
                 child: Text(lok.t('bekor_qilish')),
               ),
               FilledButton(
-                onPressed: saqlanmoqda ? null : saqla,
+                onPressed: (saqlanmoqda || bekorQilinmoqda) ? null : saqla,
                 child: saqlanmoqda
                     ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
                     : Text(lok.t('saqlash')),

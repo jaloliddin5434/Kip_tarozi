@@ -12,7 +12,9 @@ def _tayyor_mahsulotlar_headers(db) -> dict:
     db.add(foydalanuvchi)
     db.commit()
     db.refresh(foydalanuvchi)
-    token = token_yarat({"sub": str(foydalanuvchi.id), "rol": foydalanuvchi.rol.value, "smena": None})
+    token = token_yarat(
+        {"sub": str(foydalanuvchi.id), "rol": foydalanuvchi.rol.value, "smena": None, "tv": foydalanuvchi.token_versiyasi}
+    )
     return {"Authorization": f"Bearer {token}"}
 
 

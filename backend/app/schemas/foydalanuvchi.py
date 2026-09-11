@@ -37,3 +37,12 @@ class FoydalanuvchiTahrirlash(BaseModel):
     @classmethod
     def _bosh_parol_none(cls, v: str | None) -> str | None:
         return v or None
+
+
+class FoydalanuvchiTokenBekorQilish(BaseModel):
+    """Favqulodda holat uchun (masalan operator kompyuteri o'g'irlangan) —
+    parolni o'zgartirmasdan, shu hisobning BARCHA amaldagi tokenlarini
+    darhol bekor qiladi. `sabab` ixtiyoriy — berilmasa standart matn
+    audit_log'ga yoziladi."""
+
+    sabab: str | None = None

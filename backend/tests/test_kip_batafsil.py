@@ -62,7 +62,9 @@ def test_batafsil_operator_boshqa_smenani_korolmaydi(client, db, operator_header
 
     from app.core.security import token_yarat
 
-    boshqa_token = token_yarat({"sub": str(boshqa_operator.id), "rol": "operator", "smena": "B"})
+    boshqa_token = token_yarat(
+        {"sub": str(boshqa_operator.id), "rol": "operator", "smena": "B", "tv": boshqa_operator.token_versiyasi}
+    )
     boshqa_headers = {"Authorization": f"Bearer {boshqa_token}"}
 
     rad_etildi = client.get(f"/api/v1/kiplar/{kip['id']}", headers=boshqa_headers)

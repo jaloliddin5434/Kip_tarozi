@@ -38,4 +38,13 @@ class Foydalanuvchi(Base):
     bloklangan_gacha: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     oxirgi_kirish: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # JWT tokenlari ~10 yil yashaydi (offline navbat resilience uchun —
+    # ACCESS_TOKEN_EXPIRE_MINUTES qisqartirilmadi), shuning uchun BEKOR
+    # QILISH mexanizmi shu ustun orqali ishlaydi: har token yaratilganda
+    # o'sha paytdagi qiymat "tv" claim sifatida yoziladi; `joriy_foydalanuvchi()`
+    # tokendagi "tv"ni shu ustun bilan solishtiradi — mos kelmasa (parol
+    # o'zgargan yoki admin qo'lda bekor qilgan) token endi ISHLAMAYDI, hatto
+    # muddati tugamagan bo'lsa ham.
+    token_versiyasi: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+
     yaratilgan_vaqt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

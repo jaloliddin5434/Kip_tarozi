@@ -50,7 +50,7 @@ def operator_b_headers(db):
     db.add(op_b)
     db.commit()
     db.refresh(op_b)
-    token = token_yarat({"sub": str(op_b.id), "rol": "operator", "smena": "B"})
+    token = token_yarat({"sub": str(op_b.id), "rol": "operator", "smena": "B", "tv": op_b.token_versiyasi})
     return {"Authorization": f"Bearer {token}"}
 
 

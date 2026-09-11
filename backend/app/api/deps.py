@@ -33,6 +33,14 @@ def joriy_foydalanuvchi(
     foydalanuvchi = db.get(Foydalanuvchi, int(foydalanuvchi_id))
     if foydalanuvchi is None or not foydalanuvchi.faol:
         raise xato
+
+    # Token BEKOR QILISH mexanizmi: token muddati (~10 yil) juda uzoq bo'lgani
+    # uchun, parol o'zgartirilganda yoki admin favqulodda bekor qilganda
+    # `token_versiyasi` oshiriladi — token ichidagi "tv" bazadagi joriy
+    # qiymat bilan mos kelmasa (yoki bu migratsiyadan OLDINGI eski tokenda
+    # "tv" claim'i umuman yo'q bo'lsa), token endi yaroqsiz hisoblanadi.
+    if malumot.get("tv") != foydalanuvchi.token_versiyasi:
+        raise xato
     return foydalanuvchi
 
 

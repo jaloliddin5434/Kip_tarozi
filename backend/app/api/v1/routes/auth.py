@@ -50,6 +50,10 @@ def login(malumot: LoginSorov, db: Session = Depends(get_db)) -> Token:
             "sub": str(foydalanuvchi.id),
             "rol": foydalanuvchi.rol.value,
             "smena": foydalanuvchi.smena.value if foydalanuvchi.smena else None,
+            # Token bekor qilish mexanizmi uchun (app/api/deps.py:joriy_foydalanuvchi) —
+            # parol o'zgarsa yoki admin bekor qilsa, bu qiymat oshadi va eski
+            # token (muddati tugamagan bo'lsa ham) endi ishlamay qoladi.
+            "tv": foydalanuvchi.token_versiyasi,
         }
     )
     return Token(access_token=token)

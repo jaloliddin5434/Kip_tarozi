@@ -454,6 +454,26 @@ const Map<String, Map<Til, String>> _matnlar = {
         'Это ваша текущая учётная запись. После изменения при следующем входе нужно будет использовать новый логин/пароль. Продолжить?',
   },
   'davom_etish': {Til.uz: 'Davom etish', Til.ru: 'Продолжить'},
+  'tokenlarni_bekor_qilish': {
+    Til.uz: 'Tokenlarni bekor qilish',
+    Til.ru: 'Отозвать токены',
+  },
+  'tokenlarni_bekor_qilish_tavsif': {
+    Til.uz:
+        'Favqulodda holat uchun (masalan kompyuter o\'g\'irlangan) — parolni o\'zgartirmasdan, shu hisobning barcha amaldagi tokenlarini darhol bekor qiladi.',
+    Til.ru:
+        'Для экстренных случаев (например, украден компьютер) — без смены пароля немедленно отзывает все текущие токены этой учётной записи.',
+  },
+  'tokenlarni_bekor_qilish_ogohlantirish': {
+    Til.uz:
+        'Bu hisobning barcha joriy sessiyalari (login qilingan qurilmalari) darhol uziladi va qayta login talab qilinadi. Davom etasizmi?',
+    Til.ru:
+        'Все текущие сессии (устройства, где выполнен вход) этой учётной записи будут немедленно завершены и потребуется повторный вход. Продолжить?',
+  },
+  'tokenlar_bekor_qilindi': {
+    Til.uz: 'Tokenlar bekor qilindi — hisob qayta login qilishi kerak',
+    Til.ru: 'Токены отозваны — учётной записи нужен повторный вход',
+  },
   'boshqa_sozlamalar': {
     Til.uz: 'Boshqa sozlamalar',
     Til.ru: 'Другие настройки',

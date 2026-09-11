@@ -259,7 +259,9 @@ def test_smena_excel_boshqa_rol_kira_olmaydi(client, db):
     db.commit()
     db.refresh(foydalanuvchi)
 
-    token = token_yarat({"sub": str(foydalanuvchi.id), "rol": "tayyor_mahsulotlar", "smena": None})
+    token = token_yarat(
+        {"sub": str(foydalanuvchi.id), "rol": "tayyor_mahsulotlar", "smena": None, "tv": foydalanuvchi.token_versiyasi}
+    )
     headers = {"Authorization": f"Bearer {token}"}
 
     javob = client.get(

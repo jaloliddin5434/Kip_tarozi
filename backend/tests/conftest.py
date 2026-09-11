@@ -112,7 +112,7 @@ def admin(db) -> Foydalanuvchi:
 
 @pytest.fixture()
 def admin_headers(admin: Foydalanuvchi) -> dict:
-    token = token_yarat({"sub": str(admin.id), "rol": admin.rol.value, "smena": None})
+    token = token_yarat({"sub": str(admin.id), "rol": admin.rol.value, "smena": None, "tv": admin.token_versiyasi})
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -129,7 +129,14 @@ def operator(db) -> Foydalanuvchi:
 
 @pytest.fixture()
 def operator_headers(operator: Foydalanuvchi) -> dict:
-    token = token_yarat({"sub": str(operator.id), "rol": operator.rol.value, "smena": operator.smena.value})
+    token = token_yarat(
+        {
+            "sub": str(operator.id),
+            "rol": operator.rol.value,
+            "smena": operator.smena.value,
+            "tv": operator.token_versiyasi,
+        }
+    )
     return {"Authorization": f"Bearer {token}"}
 
 
