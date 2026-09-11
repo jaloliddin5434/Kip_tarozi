@@ -51,6 +51,22 @@ def _telegram_polling_ochirilgan(monkeypatch):
     monkeypatch.setattr("app.services.telegram_polling.toxtat", lambda: None)
 
 
+@pytest.fixture(autouse=True)
+def _rejalashtiruvchi_ochirilgan(monkeypatch):
+    """`client` fixture FastAPI lifespan'ini ishga tushiradi, u esa
+    rejalashtiruvchi.ishga_tushir()ni chaqiradi — ko'p-worker himoyasi
+    (advisory lock, audit topilmasi tuzatishi) qo'shilgandan beri bu endi
+    REAL (dev) bazaga ulanadi (`app.core.database.engine` orqali advisory
+    lock so'raydi). Testlar HECH QACHON real dev bazaga (yoki uning
+    advisory lock holatiga, masalan real ishlab turgan backend bilan
+    to'qnashishga) tegmasligi kerak — xuddi telegram_polling bilan bir xil
+    sabab bilan, shuning uchun bu ham har testda no-op qilinadi. Advisory
+    lock mantig'ining o'zi alohida, to'g'ridan-to'g'ri (sinov bazasiga
+    ulangan engine bilan) sinaladi — tests/test_advisory_lock.py."""
+    monkeypatch.setattr("app.services.rejalashtiruvchi.ishga_tushir", lambda: None)
+    monkeypatch.setattr("app.services.rejalashtiruvchi.toxtat", lambda: None)
+
+
 def _test_database_url() -> str:
     berilgan = os.environ.get("TEST_DATABASE_URL")
     if berilgan:

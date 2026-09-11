@@ -38,8 +38,26 @@ Aniq VPS ma'lumotlari (IP, OS, kirish) berilgach amalga oshiriladi.
 - [ ] `python -m scripts.seed` — birinchi admin, 4 mahsulot, standart stansiya
 - [ ] NSSM orqali Windows xizmati sifatida o'rnatish:
       `nssm install KipTaroziBackend "...\.venv\Scripts\python.exe" "-m uvicorn app.main:app --host 0.0.0.0 --port 8000"`
+      — **`--workers` BERILMASIN (yoki aniq `--workers 1`)**, pastdagi
+      eslatmaga qarang.
 - [ ] Xizmat avtomatik qayta ishga tushishi sozlangan (`nssm set ... AppExit Default Restart`)
 - [ ] `GET /salomat` orqali ishga tushgani tekshirilgan
+
+> **TAVSIYA: `--workers 1`.** Backend ishga tushganda (`app/main.py`
+> `lifespan()`) ikkita fon jarayonni boshlaydi — Telegram getUpdates
+> long-polling (`telegram_polling.py`) va kunlik hisobot rejalashtiruvchisi
+> (`rejalashtiruvchi.py`). Ikkalasi ham PostgreSQL advisory lock
+> (`pg_try_advisory_lock`, `app/services/advisory_lock.py`) orqali **kod
+> darajasida** himoyalangan — agar kelajakda ko'p worker (`uvicorn
+> --workers N`) yoki bir nechta backend nusxasi ishga tushirilsa, faqat
+> BITTASI haqiqatan pollashni/rejalashtirishni boshlaydi, qolganlari
+> `backup.log`/dastur logida "advisory lock band — bu workerda ishga
+> tushirilmaydi" deb yozib, hech narsa qilmaydi (Telegram 409 Conflict va
+> kunlik hisobotning N marta takrorlanishining oldi olingan). Shunga
+> qaramay, **bitta worker bilan ishga tushirish tavsiya etiladi** — bu
+> oddiyroq, resurs isrof qilmaydi (ortiqcha workerlarning har biri baribir
+> advisory lock uchun bitta DB ulanishni butun ishga tushgan davri
+> davomida band qilib turadi) va debug qilishni osonlashtiradi.
 
 ## 3. Stansiya Agenti (har bir operator kompyuterida)
 

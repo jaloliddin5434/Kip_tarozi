@@ -16,11 +16,12 @@ import threading
 from typing import Any
 
 import httpx
+from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 from app.models.sozlama import Sozlama
-from app.services import kamera_tasdiq, kip_togrilash
+from app.services import advisory_lock, kamera_tasdiq, kip_togrilash
 from app.services.telegram import XATOLIK_TOKEN_KALITI, _sozlama_ol
 
 logger = logging.getLogger("telegram_polling")
@@ -34,8 +35,15 @@ _UZUN_POLL_SONIYA = 25  # Telegramga: shuncha vaqt yangilanish kutib tur
 _SOROV_TIMEOUT_SONIYA = 35  # httpx: uzun-poll + tarmoq zaxirasi
 _XATODAN_KEYINGI_KUTISH_SONIYA = 5
 
+# Ko'p-worker himoyasi (audit topilmasi): faqat shu kalitni ushlagan BITTA
+# worker/instance haqiqatan pollashni boshlaydi — qarang app/services/advisory_lock.py.
+# Qiymatning o'zi ixtiyoriy — faqat shu bazada boshqa advisory lock bilan
+# TO'QNASHMASLIGI kifoya (rejalashtiruvchi.py'da ishlatiladigan kalitdan farqli).
+LOCK_KALITI = 72710_0001
+
 _thread: threading.Thread | None = None
 _toxtatish_signali = threading.Event()
+_lock_ulanishi: Connection | None = None
 
 
 def _offsetni_ol(db: Session) -> int:
@@ -225,9 +233,21 @@ def _tsikl() -> None:
 
 
 def ishga_tushir() -> None:
-    global _thread
+    """Ko'p-worker himoyasi: avval advisory lock olishga urinadi — band
+    bo'lsa (boshqa worker/instance allaqachon pollamoqda) bu chaqiruv
+    HECH NARSA QILMAYDI (faqat log). Shu tufayli `uvicorn --workers N`
+    bilan ishga tushirilsa ham Telegram'ga faqat BITTA getUpdates
+    pollovchisi ulanadi (409 Conflict va takroriy callback ishlov
+    berishning oldi olinadi)."""
+    global _thread, _lock_ulanishi
     if _thread is not None and _thread.is_alive():
         return
+
+    if _lock_ulanishi is None:
+        _lock_ulanishi = advisory_lock.olishga_urin(LOCK_KALITI, "Telegram polling")
+        if _lock_ulanishi is None:
+            return
+
     _toxtatish_signali.clear()
     _thread = threading.Thread(target=_tsikl, name="telegram-polling", daemon=True)
     _thread.start()
@@ -235,7 +255,10 @@ def ishga_tushir() -> None:
 
 
 def toxtat() -> None:
+    global _lock_ulanishi
     _toxtatish_signali.set()
     if _thread is not None:
         _thread.join(timeout=5)
+    advisory_lock.boshatish(_lock_ulanishi, "Telegram polling")
+    _lock_ulanishi = None
     logger.info("Telegram getUpdates polling to'xtatildi")
