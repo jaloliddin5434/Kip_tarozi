@@ -13,6 +13,7 @@ import '../../services/fayl_yuklab_olish.dart';
 import '../../services/kamera_agent.dart';
 import '../../services/offline_kip_navbati.dart';
 import '../../services/offline_surat.dart';
+import '../../services/surat_sarlavhalari.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/clock_widget.dart';
@@ -1286,6 +1287,7 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
                   child: Image.network(
                     suratYoli,
                     key: ValueKey(suratYoli),
+                    headers: suratSarlavhalari(_holat.api.token),
                     width: andoza,
                     height: andoza,
                     fit: BoxFit.cover,

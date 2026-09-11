@@ -124,7 +124,7 @@ def test_kip_saqlashda_kameradan_surat_olinadi(client, operator_headers, mahsulo
     assert surat_yoli.endswith(".jpg")
 
     # Fayl haqiqatan diskka yozilgan
-    nisbiy = surat_yoli.split("/media/", 1)[1]
+    nisbiy = surat_yoli.split("/media/kip-surat/", 1)[1]
     assert (kamera_sozlangan / nisbiy).read_bytes() == SOXTA_JPEG
 
 
@@ -177,7 +177,7 @@ def test_mijoz_bergan_surat_yoli_kamera_bilan_almashtirilmaydi(
     javob = client.post("/api/v1/kiplar", json=payload, headers=operator_headers)
 
     assert javob.status_code == 201
-    assert javob.json()["surat_yoli"].endswith("/media/tola/2026-09/2026-09-08/A/mavjud.jpg")
+    assert javob.json()["surat_yoli"].endswith("/media/kip-surat/tola/2026-09/2026-09-08/A/mavjud.jpg")
 
 
 # --- Offline: kamera-sozlamalari + keyinroq surat biriktirish ---
@@ -218,7 +218,7 @@ def test_kipga_keyinroq_surat_biriktirish(client, db, operator_headers, mahsulot
     assert javob.status_code == 200
     surat_yoli = javob.json()["surat_yoli"]
     assert "/Smena_A/Tola/" in surat_yoli and surat_yoli.endswith(".jpg")
-    nisbiy = surat_yoli.split("/media/", 1)[1]
+    nisbiy = surat_yoli.split("/media/kip-surat/", 1)[1]
     assert (tmp_path / nisbiy).read_bytes() == SOXTA_JPEG
 
     # Idempotent — ikkinchi marta yuborilsa mavjud surat o'zgarmaydi

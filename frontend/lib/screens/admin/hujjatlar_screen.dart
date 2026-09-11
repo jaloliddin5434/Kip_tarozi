@@ -7,6 +7,7 @@ import '../../api/api_exception.dart';
 import '../../models/hujjat.dart';
 import '../../services/fayl_yuklab_olish.dart';
 import '../../services/hujjat_pdf.dart';
+import '../../services/surat_sarlavhalari.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/kalendar_vidjeti.dart';
@@ -599,6 +600,7 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
       child: Image.network(
         suratYoli,
         key: ValueKey(suratYoli),
+        headers: suratSarlavhalari(context.read<AppState>().api.token),
         width: 40,
         height: 40,
         fit: BoxFit.cover,

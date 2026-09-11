@@ -49,7 +49,12 @@ class Settings(BaseSettings):
     STANSIYA_ID: int | None = None
     AGENT_API_KEY: str = "CHANGE_ME_AGENT_KEY"
     BACKEND_URL: str = "http://localhost:8000"
-    AGENT_QUEUE_DB_PATH: str = "./storage/agent_navbat.db"
+    # MUHIM: STORAGE_PATH ICHIDA EMAS — bu SQLite navbatda operator JWT
+    # tokenlari ochiq matnda saqlanadi (offline sinxron uchun), STORAGE_PATH
+    # esa (audit topilmasidan keyin) autentifikatsiyalangan /media
+    # endpointlari orqali o'qiladi; agar bu fayl o'sha papka ichida bo'lsa,
+    # kod xatosi/qayta sozlash bilan oshkor bo'lish xavfi bo'lardi.
+    AGENT_QUEUE_DB_PATH: str = "./agent_data/agent_navbat.db"
     AGENT_SYNC_INTERVAL_SONIYA: int = 15
     AGENT_HOLAT_YUBORISH_SONIYA: int = 30
     # Shu muddatdan uzoq vaqt xabar kelmasa, dashboard agentni "offline" deb ko'rsatadi

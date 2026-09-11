@@ -5,6 +5,7 @@ import '../i18n/strings.dart';
 import '../models/kip_batafsil.dart';
 import '../models/mahsulot.dart';
 import '../services/kip_chop_etish.dart';
+import '../services/surat_sarlavhalari.dart';
 import '../state/app_state.dart';
 
 /// Hujjatlar jadvalidagi bir qatorni bosganda kipning to'liq ma'lumoti va
@@ -80,7 +81,12 @@ class _KipBatafsilIchkiState extends State<_KipBatafsilIchki> {
             ),
           );
         }
-        return _KipBatafsilTarkibi(kip: snapshot.data!, lok: lok, qaytaYuklash: _qaytaYuklash);
+        return _KipBatafsilTarkibi(
+          kip: snapshot.data!,
+          lok: lok,
+          qaytaYuklash: _qaytaYuklash,
+          token: context.read<AppState>().api.token,
+        );
       },
     );
   }
@@ -90,8 +96,9 @@ class _KipBatafsilTarkibi extends StatelessWidget {
   final KipBatafsil kip;
   final Lokalizatsiya lok;
   final VoidCallback qaytaYuklash;
+  final String? token;
 
-  const _KipBatafsilTarkibi({required this.kip, required this.lok, required this.qaytaYuklash});
+  const _KipBatafsilTarkibi({required this.kip, required this.lok, required this.qaytaYuklash, required this.token});
 
   String _holatiMatni() {
     switch (kip.holati) {
@@ -211,6 +218,7 @@ class _KipBatafsilTarkibi extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: Image.network(
         suratYoli,
+        headers: suratSarlavhalari(token),
         height: 180,
         width: double.infinity,
         fit: BoxFit.cover,

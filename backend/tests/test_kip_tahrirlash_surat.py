@@ -240,8 +240,8 @@ def test_telegram_xatosi_tahrirlashni_buzmaydi(
 
 
 def _storage_fayl(ommaviy_url_yoki_nisbiy_yol: str) -> Path:
-    """API javobi surat_yoli'ni to'liq /media/ URL qilib qaytaradi
+    """API javobi surat_yoli'ni to'liq `/media/kip-surat/` URL qilib qaytaradi
     (surat_ommaviy_url) — diskdagi haqiqiy faylni topish uchun shu URL'dan
     STORAGE_PATH'ga nisbiy qismini ajratib olamiz."""
-    nisbiy_yol = ommaviy_url_yoki_nisbiy_yol.split("/media/", 1)[-1]
+    nisbiy_yol = ommaviy_url_yoki_nisbiy_yol.split("/media/kip-surat/", 1)[-1]
     return Path(settings.STORAGE_PATH) / nisbiy_yol

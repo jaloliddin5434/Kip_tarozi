@@ -4,9 +4,9 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
+from app.api.v1.routes import media
 from app.core.config import settings
 from app.services import rejalashtiruvchi, telegram_polling
 
@@ -32,11 +32,14 @@ app.add_middleware(
 
 app.include_router(api_router, prefix="/api/v1")
 
-# Saqlangan suratlar (kip surati, shubhali holat surati) — frontend Image.network
-# orqali shu manzildan ochadi. surat_ommaviy_url() shu bilan mos yo'l qaytaradi.
-_media_papka = Path(settings.STORAGE_PATH)
-_media_papka.mkdir(parents=True, exist_ok=True)
-app.mount("/media", StaticFiles(directory=_media_papka), name="media")
+# STORAGE_PATH mavjudligini ta'minlaymiz (suratlar, nakladnoy PDF va h.k. shu
+# yerga yoziladi). AUDIT TUZATISHI: bu papka ilgari `StaticFiles` bilan hech
+# qanday autentifikatsiyasiz `/media`ga to'g'ridan-to'g'ri mount qilingan edi —
+# endi shu papkadagi fayllar FAQAT `app/api/v1/routes/media.py`dagi
+# autentifikatsiyalangan endpointlar orqali (JWT + ruxsat tekshiruvi bilan)
+# beriladi.
+Path(settings.STORAGE_PATH).mkdir(parents=True, exist_ok=True)
+app.include_router(media.router)
 
 
 @app.get("/salomat")
