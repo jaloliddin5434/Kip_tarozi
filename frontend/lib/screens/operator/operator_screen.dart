@@ -204,7 +204,11 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
     try {
       final k = await _holat.api.get('/kamera-tasdiq/mening-kutilayotganim');
       if (k != null && !_kameraTasdiqKutilmoqda && mounted) {
-        await _kameraTasdiginiKut(k['id'] as int);
+        // `vaqt` — so'rov haqiqatan qachon yaratilgani (ilova qayta ochilgan
+        // bo'lsa ham, bloklovchi dialogdagi hisoblagich haqiqiy boshlanish
+        // vaqtidan davom etsin uchun) — endi backend qaytaradi.
+        final boshlanishVaqti = DateTime.parse(k['vaqt'] as String);
+        await _kameraTasdiginiKut(k['id'] as int, boshlanishVaqti: boshlanishVaqti);
       }
     } catch (_) {
       // Aloqa muammosi — keyingi tsiklda qayta
@@ -215,7 +219,10 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   /// bloklanadi, Admin (panel yoki Telegram tugmasi) tasdiqlash/rad etguncha.
   /// Har 3 soniyada holat so'raladi — tasdiqlansa kip saqlangan hisoblanadi
   /// va ekran avtomatik davom etadi; rad etilsa operator qaytadan urinadi.
-  Future<void> _kameraTasdiginiKut(int sorovId) async {
+  /// [boshlanishVaqti] — so'rov yaratilgan vaqt (bloklovchi dialogdagi "necha
+  /// vaqtdan beri kutilmoqda" hisoblagichi uchun); berilmasa hozirgi vaqt
+  /// ishlatiladi (so'rov shu zahoti — `_saqlash()` ichida — yaratilgan holat).
+  Future<void> _kameraTasdiginiKut(int sorovId, {DateTime? boshlanishVaqti}) async {
     if (_kameraTasdiqKutilmoqda) return;
     _kameraTasdiqKutilmoqda = true;
 
@@ -241,6 +248,7 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
       await kameraTasdiqKutishDialogniKorsat(
         context: context,
         lok: _holat.lok,
+        boshlanishVaqti: boshlanishVaqti ?? DateTime.now(),
         tugash: tugadi.future,
       );
     }

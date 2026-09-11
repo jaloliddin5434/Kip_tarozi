@@ -17,9 +17,14 @@ class KameraTasdiqKutilmoqda(BaseModel):
 
 
 class KameraTasdiqHolatJavob(BaseModel):
-    """Operator polling qiladi (`GET /kamera-tasdiq/{id}/holat`)."""
+    """Operator polling qiladi (`GET /kamera-tasdiq/{id}/holat`,
+    `GET /kamera-tasdiq/mening-kutilayotganim`). `vaqt` — so'rov QACHON
+    yaratilgani (bloklovchi dialogdagi "necha vaqtdan beri kutilmoqda"
+    hisoblagichi uchun kerak — operator ilovani qayta ochsa ham, hisoblagich
+    haqiqiy boshlanish vaqtidan davom etsin)."""
 
     id: int
+    vaqt: datetime
     holati: KameraTasdiqHolati
     kip_id: int | None = None
     izoh: str | None = None

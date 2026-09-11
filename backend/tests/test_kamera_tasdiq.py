@@ -139,6 +139,12 @@ def test_mening_kutilayotganim(
     # A operatori — o'z so'rovini ko'radi
     meniki = client.get("/api/v1/kamera-tasdiq/mening-kutilayotganim", headers=operator_headers).json()
     assert meniki["id"] == sorov_id and meniki["holati"] == "kutilmoqda"
+    # `vaqt` — bloklovchi dialogdagi "necha vaqtdan beri kutilmoqda"
+    # hisoblagichi uchun (operator ilovani qayta ochsa ham to'g'ri davom etsin)
+    assert meniki["vaqt"] is not None
+
+    holat_javobi = client.get(f"/api/v1/kamera-tasdiq/{sorov_id}/holat", headers=operator_headers).json()
+    assert holat_javobi["vaqt"] == meniki["vaqt"]
 
     # B operatori — bo'sh (boshqa operatorning so'rovi ko'rinmaydi)
     assert client.get("/api/v1/kamera-tasdiq/mening-kutilayotganim", headers=operator_b_headers).json() is None

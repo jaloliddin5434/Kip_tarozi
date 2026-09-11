@@ -285,6 +285,14 @@ const Map<String, Map<Til, String>> _matnlar = {
         'Камера не сделала снимок. Для сохранения кипа нужно разрешение администратора.\n'
             'Пожалуйста, подождите — после разрешения продолжится автоматически.',
   },
+  'kamera_tasdigi_kutish_daqiqali': {
+    Til.uz: '{daq} daqiqa {son} soniyadan beri kutilmoqda',
+    Til.ru: 'В ожидании: {daq} мин {son} сек',
+  },
+  'kamera_tasdigi_kutish_soniyali': {
+    Til.uz: '{son} soniyadan beri kutilmoqda',
+    Til.ru: 'В ожидании: {son} сек',
+  },
   'kamera_tasdigi_tasdiqlandi': {
     Til.uz: 'Admin ruxsat berdi — kip saqlandi',
     Til.ru: 'Администратор разрешил — кип сохранён',
