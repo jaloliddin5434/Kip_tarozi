@@ -19,7 +19,8 @@ from app.schemas.kip_togrilash import (
 )
 from app.schemas.sahifalash import Sahifalangan
 from app.services import kip_togrilash
-from app.services.telegram import xatolik_xabari_tugma_bilan
+from app.services.kip_tahrirlash import KipTahrirlashTaqiqlangan
+from app.services.telegram import surat_xabarini_yangila, xatolik_xabari_tugma_bilan
 
 router = APIRouter(prefix="/kip-togrilash", tags=["kip-togrilash"])
 
@@ -54,14 +55,17 @@ def yaratish(
     if yangi_partiya is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Partiya topilmadi")
 
-    zayavka = kip_togrilash.zayavka_yarat(
-        db,
-        kip=kip,
-        operator_id=foydalanuvchi.id,
-        yangi_mahsulot=yangi_mahsulot,
-        yangi_partiya=yangi_partiya,
-        sabab=malumot.sabab,
-    )
+    try:
+        zayavka = kip_togrilash.zayavka_yarat(
+            db,
+            kip=kip,
+            operator_id=foydalanuvchi.id,
+            yangi_mahsulot=yangi_mahsulot,
+            yangi_partiya=yangi_partiya,
+            sabab=malumot.sabab,
+        )
+    except KipTahrirlashTaqiqlangan as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     db.commit()
     db.refresh(zayavka)
 
@@ -164,13 +168,19 @@ def tasdiqlash(
 ) -> KipTogrilashZayavkasi:
     """Admin tasdiqlaydi — kip mahsulot/partiyasi (va surati, kerak bo'lsa)
     yangilanadi. Idempotent."""
-    zayavka, _kip = kip_togrilash.zayavkani_hal_qil(
-        db, zayavka_id, tasdiqlansinmi=True, hal_qilgan_id=foydalanuvchi.id, manba="panel"
-    )
+    try:
+        zayavka, _kip, telegram_yangilash = kip_togrilash.zayavkani_hal_qil(
+            db, zayavka_id, tasdiqlansinmi=True, hal_qilgan_id=foydalanuvchi.id, manba="panel"
+        )
+    except KipTahrirlashTaqiqlangan as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     if zayavka is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Zayavka topilmadi")
     db.commit()
     db.refresh(zayavka)
+    # Telegram so'rovi COMMIT'dan KEYIN (4-QISM naqshi).
+    if telegram_yangilash is not None:
+        surat_xabarini_yangila(db, *telegram_yangilash)
     return zayavka
 
 
@@ -182,7 +192,7 @@ def rad_etish(
     foydalanuvchi: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.admin)),
 ) -> KipTogrilashZayavkasi:
     """Admin rad etadi — kip o'zgarishsiz qoladi. Idempotent."""
-    zayavka, _kip = kip_togrilash.zayavkani_hal_qil(
+    zayavka, _kip, _telegram_yangilash = kip_togrilash.zayavkani_hal_qil(
         db,
         zayavka_id,
         tasdiqlansinmi=False,

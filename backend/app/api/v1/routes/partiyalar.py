@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from sqlalchemy import String, cast, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import rollarga_ruxsat
@@ -75,8 +76,34 @@ def ochish_yoki_tanlash(
             yaratgan_id=foydalanuvchi.id,
         )
         db.add(partiya)
-        db.commit()
-        db.refresh(partiya)
+        try:
+            db.commit()
+        except IntegrityError:
+            # 3-QISM (audit topilmasi): parallel so'rov bizdan OLDIN aynan
+            # shu (mahsulot, partiya_raqami) juftligini yaratib ulgurgan —
+            # `uq_partiya_mahsulot_raqam` unique cheklovi buzildi. Bu XATO
+            # emas — 500 qaytarish o'rniga QAYTA QIDIRIB, allaqachon
+            # yaratilgan partiyani muvaffaqiyatli qaytaramiz.
+            db.rollback()
+            partiya = db.scalar(
+                select(Partiya).where(
+                    Partiya.mahsulot_id == mahsulot.id, Partiya.partiya_raqami == malumot.partiya_raqami
+                )
+            )
+            if partiya is None:
+                # Nazariy jihatdan bo'lmasligi kerak (IntegrityError aynan shu
+                # unique cheklov tufayli bo'ldi) — lekin himoya sifatida.
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Partiya yaratishda kutilmagan xato",
+                ) from None
+            if partiya.holati != PartiyaHolati.ochiq:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Partiya #{malumot.partiya_raqami} allaqachon {partiya.holati.value} — kip qo'sha olmaysiz",
+                )
+        else:
+            db.refresh(partiya)
     elif partiya.holati != PartiyaHolati.ochiq:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

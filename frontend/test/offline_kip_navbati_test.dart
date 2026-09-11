@@ -21,6 +21,7 @@ class _SoxtaApi extends ApiClient {
   bool suratXato = false;
   bool suratTarmoqXato = false;
   int? xatoBerishSorovRaqami;
+  Set<String> serverQatiyRadEtadi = const {}; // shu mijoz_id'lar "xato" holat bilan qaytadi
 
   @override
   Future<dynamic> post(String yol, {Object? tana, String? tokenOverride}) async {
@@ -31,9 +32,13 @@ class _SoxtaApi extends ApiClient {
     }
     final list = tana as List;
     bolakHajmlari.add(list.length);
-    return list
-        .map((e) => {'mijoz_id': (e as Map)['mijoz_id'], 'holat': 'saqlandi', 'kip_id': 1000 + postChaqirildi})
-        .toList();
+    return list.map((e) {
+      final mijozId = (e as Map)['mijoz_id'];
+      if (serverQatiyRadEtadi.contains(mijozId)) {
+        return {'mijoz_id': mijozId, 'holat': 'xato', 'xabar': 'Partiya topilmadi'};
+      }
+      return {'mijoz_id': mijozId, 'holat': 'saqlandi', 'kip_id': 1000 + postChaqirildi};
+    }).toList();
   }
 
   @override
@@ -153,6 +158,61 @@ void main() {
     expect(await OfflineKipNavbati.uzunlik(), 0); // umidini uzdik, yozuv ketdi
     expect(fayl.existsSync(), isFalse);
     dir.deleteSync(recursive: true);
+  });
+
+  // ---------------------------------------------------------------------
+  // 5-QISM (audit topilmasi): backend QAT'IY rad etgan ("poison") yozuv
+  // navbatdan JIMGINA o'chirilmasin — "muammoli" deb belgilanib, operator
+  // ekranida ko'rinadigan bo'lishi kerak.
+  // ---------------------------------------------------------------------
+
+  test('backend rad etgan ("xato") yozuv o\'chirilmaydi — "muammoli" deb belgilanadi', () async {
+    await OfflineKipNavbati.qoshish(tana: _tana('yaxshi-1'), token: 't');
+    await OfflineKipNavbati.qoshish(tana: _tana('yomon-1'), token: 't');
+    await OfflineKipNavbati.qoshish(tana: _tana('yaxshi-2'), token: 't');
+
+    final api = _SoxtaApi()..serverQatiyRadEtadi = {'yomon-1'};
+    final natija = await OfflineKipNavbati.sinxronla(api);
+
+    // 2 ta muvaffaqiyatli yuborildi; 1 tasi "muammoli" — natija.yuborilgan'ga
+    // kirmaydi, lekin xatolar ro'yxatida ko'rinadi.
+    expect(natija.yuborilgan, 2);
+    expect(natija.xatolar, ['Partiya topilmadi']);
+
+    // Navbat UMUMAN bo'sh emas — muammoli yozuv HALI HAM saqlangan.
+    expect(await OfflineKipNavbati.uzunlik(), 1);
+    expect(await OfflineKipNavbati.muammoliSoni(), 1);
+
+    final muammoli = await OfflineKipNavbati.muammoliRoyxat();
+    expect(muammoli.length, 1);
+    expect((muammoli.single['tana'] as Map)['mijoz_id'], 'yomon-1');
+    expect(muammoli.single['muammoliXabari'], 'Partiya topilmadi');
+  });
+
+  test('muammoli yozuv KEYINGI sinxronlarda qayta yuborilmaydi', () async {
+    await OfflineKipNavbati.qoshish(tana: _tana('yomon-2'), token: 't');
+    await OfflineKipNavbati.sinxronla(_SoxtaApi()..serverQatiyRadEtadi = {'yomon-2'});
+    expect(await OfflineKipNavbati.muammoliSoni(), 1);
+
+    // Endi "server tuzaldi" deb faraz qilsak ham (muammoli belgisi olib
+    // tashlanmagani uchun) — qayta so'rov YUBORILMASLIGI kerak.
+    final api2 = _SoxtaApi();
+    final natija2 = await OfflineKipNavbati.sinxronla(api2);
+    expect(api2.postChaqirildi, 0, reason: 'muammoli yozuv uchun qayta so\'rov yuborilmasligi kerak');
+    expect(natija2.yuborilgan, 0);
+    expect(await OfflineKipNavbati.muammoliSoni(), 1); // hali ham saqlanib turibdi
+  });
+
+  test('muammoli yozuv boshqa yaxshi yozuvlar bilan aralash bo\'lakda ham to\'g\'ri ishlaydi', () async {
+    for (var i = 0; i < 5; i++) {
+      await OfflineKipNavbati.qoshish(tana: _tana('aralash-$i'), token: 't');
+    }
+    final api = _SoxtaApi()..serverQatiyRadEtadi = {'aralash-1', 'aralash-3'};
+    final natija = await OfflineKipNavbati.sinxronla(api);
+
+    expect(natija.yuborilgan, 3); // aralash-0,2,4
+    expect(await OfflineKipNavbati.muammoliSoni(), 2); // aralash-1,3
+    expect(await OfflineKipNavbati.uzunlik(), 2); // faqat muammolilar navbatda qoldi
   });
 
   // ---------------------------------------------------------------------

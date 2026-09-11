@@ -102,6 +102,11 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   bool _navbatSinxronlanmoqda = false;
   Timer? _navbatTaymeri;
 
+  // 5-QISM (audit topilmasi): backend QAT'IY rad etgan ("muammoli",
+  // dead-letter) yozuvlar soni — > 0 bo'lsa alohida (qizil) ogohlantirish
+  // banneri ko'rinadi, operator adminga murojaat qilishi kerakligini bilsin.
+  int _muammoliSoni = 0;
+
   // Offline surat uchun Stansiya Agenti (localhost) manzili — backend beradi,
   // kamera login/parol EMAS. null bo'lsa offline surat olinmaydi (kip suratsiz).
   String? _agentSuratUrl;
@@ -510,7 +515,13 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
 
   Future<void> _navbatUzunliginiYangilash() async {
     final n = await OfflineKipNavbati.uzunlik();
-    if (mounted && n != _navbatUzunligi) setState(() => _navbatUzunligi = n);
+    final m = await OfflineKipNavbati.muammoliSoni();
+    if (mounted && (n != _navbatUzunligi || m != _muammoliSoni)) {
+      setState(() {
+        _navbatUzunligi = n;
+        _muammoliSoni = m;
+      });
+    }
   }
 
   /// Fon jarayoni (har 10s) — navbatda kutilayotgan yozuvlarni backend'ga
@@ -678,6 +689,7 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
           ],
         ),
         actions: [
+          if (_muammoliSoni > 0) _navbatMuammoliIndikatori(lok),
           if (_navbatUzunligi > 0) _navbatIndikatori(lok),
           _ulanishIkonkasi(Icons.dns_rounded, lok.t('server'), lok),
           _ulanishIkonkasi(Icons.videocam_rounded, lok.t('kamera'), lok),
@@ -750,6 +762,37 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
               const SizedBox(width: 6),
               Text(
                 '$_navbatUzunligi ${lok.t('navbat_indikator')}',
+                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// AppBar'dagi qizil ogohlantirish — backend QAT'IY rad etgan ("muammoli")
+  /// offline yozuvlar bor bo'lsa ko'rinadi (5-QISM, audit topilmasi). Bular
+  /// endi avtomatik qayta yuborilmaydi — operator/admin qo'lda hal qilishi
+  /// kerak (masalan noto'g'ri partiyaga bog'langan bo'lishi mumkin).
+  Widget _navbatMuammoliIndikatori(dynamic lok) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Tooltip(
+        message: '$_muammoliSoni ${lok.t('navbat_muammoli_tooltip')}',
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: Colors.red.shade800,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.warning_amber_rounded, size: 16, color: Colors.white),
+              const SizedBox(width: 6),
+              Text(
+                '$_muammoliSoni ${lok.t('navbat_muammoli_indikator')}',
                 style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ],

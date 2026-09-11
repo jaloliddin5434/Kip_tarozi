@@ -22,7 +22,8 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.models.sozlama import Sozlama
 from app.services import advisory_lock, kamera_tasdiq, kip_togrilash
-from app.services.telegram import XATOLIK_TOKEN_KALITI, _sozlama_ol
+from app.services.kip_tahrirlash import KipTahrirlashTaqiqlangan
+from app.services.telegram import XATOLIK_TOKEN_KALITI, _sozlama_ol, surat_xabarini_yangila
 
 logger = logging.getLogger("telegram_polling")
 
@@ -171,6 +172,7 @@ def yangilanishni_qayta_ishla(db: Session, yangilanish: dict[str, Any]) -> None:
         return
 
     tasdiqlansinmi = amal == "tasdiqlash"
+    telegram_yangilash = None
 
     if turi == "kamera":
         sorov, _kip = kamera_tasdiq.sorovni_hal_qil(
@@ -178,9 +180,18 @@ def yangilanishni_qayta_ishla(db: Session, yangilanish: dict[str, Any]) -> None:
         )
         topilgan_holat = sorov.holati.value if sorov is not None else None
     elif turi == "zayavka":
-        zayavka, _kip = kip_togrilash.zayavkani_hal_qil(
-            db, obyekt_id, tasdiqlansinmi=tasdiqlansinmi, hal_qilgan_id=None, manba="telegram"
-        )
+        try:
+            zayavka, _kip, telegram_yangilash = kip_togrilash.zayavkani_hal_qil(
+                db, obyekt_id, tasdiqlansinmi=tasdiqlansinmi, hal_qilgan_id=None, manba="telegram"
+            )
+        except KipTahrirlashTaqiqlangan as exc:
+            # 1/2-QISM: zayavka yaratilgandan keyin, Telegram tugmasi
+            # bosilishidan OLDIN kip bekor qilingan yoki maqsad partiya
+            # sotilgan bo'lishi mumkin — bu holda tsiklni yiqitmasdan,
+            # foydalanuvchiga sababni ko'rsatib javob beramiz.
+            db.rollback()
+            _callback_javobi(token, callback_id, str(exc), ogohlantirish=True)
+            return
         topilgan_holat = zayavka.holati.value if zayavka is not None else None
     else:
         logger.warning("Noma'lum callback turi: %r", turi)
@@ -192,6 +203,9 @@ def yangilanishni_qayta_ishla(db: Session, yangilanish: dict[str, Any]) -> None:
         return
 
     db.commit()
+    # Telegram "surat boti" so'rovi COMMIT'dan KEYIN (4-QISM naqshi).
+    if telegram_yangilash is not None:
+        surat_xabarini_yangila(db, *telegram_yangilash)
 
     natija_matni = {
         "tasdiqlangan": "✅ Tasdiqlandi",

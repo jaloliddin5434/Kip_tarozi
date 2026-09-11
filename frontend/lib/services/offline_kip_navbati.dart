@@ -62,6 +62,17 @@ class OfflineKipNavbati {
 
   static Future<int> uzunlik() async => (await royxat()).length;
 
+  /// 5-QISM (audit topilmasi): backend qat'iy rad etgan ("poison", masalan
+  /// "Partiya topilmadi") yozuvlar SONI — bular navbatdan JIMGINA
+  /// o'chirilmaydi (avvalgidek), balki shu yerda "muammoli" deb qolib,
+  /// operator ekranida ko'rinadigan ogohlantirish banneri uchun ishlatiladi.
+  static Future<int> muammoliSoni() async => (await royxat()).where((y) => y['muammoli'] == true).length;
+
+  /// Muammoli (dead-letter) yozuvlarning to'liq ro'yxati — kerak bo'lsa
+  /// tafsilot ko'rsatish uchun.
+  static Future<List<Map<String, dynamic>>> muammoliRoyxat() async =>
+      (await royxat()).where((y) => y['muammoli'] == true).toList();
+
   static Future<void> _yoz(List<Map<String, dynamic>> yozuvlar) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kalit, jsonEncode(yozuvlar));
@@ -98,8 +109,9 @@ class OfflineKipNavbati {
   static Future<void> _navbatgaQollash({
     required Set<String> ochiriladigan,
     required Map<String, int> kipIdlar,
+    Map<String, String> muammoli = const {},
   }) {
-    if (ochiriladigan.isEmpty && kipIdlar.isEmpty) return Future.value();
+    if (ochiriladigan.isEmpty && kipIdlar.isEmpty && muammoli.isEmpty) return Future.value();
     return _qulflab(() async {
       final hozirgi = await royxat();
       final yangi = <Map<String, dynamic>>[];
@@ -108,6 +120,14 @@ class OfflineKipNavbati {
         if (mid != null && ochiriladigan.contains(mid)) continue;
         if (mid != null && kipIdlar.containsKey(mid) && y['kipId'] == null) {
           y['kipId'] = kipIdlar[mid];
+        }
+        // 5-QISM: backend qat'iy rad etgan yozuv navbatdan O'CHIRILMAYDI —
+        // "muammoli" deb belgilanadi (ma'lumot saqlanadi, operator ekranida
+        // ogohlantirish sifatida ko'rinadi), faqat KEYINGI sinxronlarda
+        // qayta yuborilmasligi uchun bekor qilingan kabi filtrlanadi.
+        if (mid != null && muammoli.containsKey(mid)) {
+          y['muammoli'] = true;
+          y['muammoliXabari'] = muammoli[mid];
         }
         yangi.add(y);
       }
@@ -131,7 +151,7 @@ class OfflineKipNavbati {
     // 1-BOSQICH — kip ma'lumotlari, TOKEN bo'yicha guruhlab, har guruhni
     // BO'LAKLARGA (_bolakHajmi) bo'lib, bitta so'rovda bir nechta yozuv.
     // =========================================================
-    final kutilayotgan = (await royxat()).where((y) => y['kipId'] == null).toList();
+    final kutilayotgan = (await royxat()).where((y) => y['kipId'] == null && y['muammoli'] != true).toList();
     final tokenBoyicha = <String?, List<Map<String, dynamic>>>{};
     for (final y in kutilayotgan) {
       tokenBoyicha.putIfAbsent(y['token'] as String?, () => []).add(y);
@@ -159,8 +179,8 @@ class OfflineKipNavbati {
           break;
         }
 
-        final ochiriladiganBolak = <String>{};
         final kipIdlarBolak = <String, int>{};
+        final muammoliBolak = <String, String>{};
         for (final natijaXom in natijalar) {
           final natija = natijaXom as Map<String, dynamic>;
           final mijozId = natija['mijoz_id'] as String;
@@ -170,14 +190,20 @@ class OfflineKipNavbati {
             if (kipId != null) kipIdlarBolak[mijozId] = kipId;
             if (holat == 'saqlandi') yuborilgan++;
           } else {
-            xatolar.add((natija['xabar'] as String?) ?? 'nomaʼlum xato');
-            ochiriladiganBolak.add(mijozId);
+            // 5-QISM (audit topilmasi): backend bu yozuvni QAT'IY rad etdi
+            // (masalan "Partiya topilmadi") — avval navbatdan JIMGINA
+            // o'chirilardi (ma'lumot yo'qolardi). Endi "muammoli" deb
+            // belgilanadi — qayta yuborilmaydi, LEKIN yo'qolmaydi, operator
+            // ekranida ko'rinadigan ogohlantirish orqali ma'lum bo'ladi.
+            final xabar = (natija['xabar'] as String?) ?? 'nomaʼlum xato';
+            xatolar.add(xabar);
+            muammoliBolak[mijozId] = xabar;
           }
         }
 
         // Shu BO'LAK darhol navbatdan olib tashlanadi/yangilanadi — keyingi
         // bo'lak muvaffaqiyatsiz bo'lib qolsa ham bu bo'lak yo'qolmaydi.
-        await _navbatgaQollash(ochiriladigan: ochiriladiganBolak, kipIdlar: kipIdlarBolak);
+        await _navbatgaQollash(ochiriladigan: const {}, kipIdlar: kipIdlarBolak, muammoli: muammoliBolak);
       }
     }
 

@@ -21,7 +21,7 @@ from app.schemas.smena import MahsulotBoyichaHolat, SmenaHolati, SmenaKipYozuvi
 from app.services import kamera, kamera_tasdiq, kip_tahrirlash
 from app.services.media import surat_ommaviy_url
 from app.services.storage.rasm import rasm_saqla
-from app.services.telegram import surat_yubor, xatolik_xabari_tugma_bilan
+from app.services.telegram import surat_xabarini_yangila, surat_yubor, xatolik_xabari_tugma_bilan
 
 router = APIRouter(prefix="/kiplar", tags=["kiplar"])
 
@@ -487,16 +487,23 @@ def tahrirlash(
         if yangi_partiya is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Partiya topilmadi")
 
-    kip_tahrirlash.kipni_tahrir_qil(
-        db,
-        kip,
-        yangi_ogirlik=malumot.ogirlik,
-        yangi_partiya=yangi_partiya,
-        sabab=malumot.sabab,
-        foydalanuvchi_id=foydalanuvchi.id,
-    )
+    try:
+        kip, telegram_yangilash = kip_tahrirlash.kipni_tahrir_qil(
+            db,
+            kip,
+            yangi_ogirlik=malumot.ogirlik,
+            yangi_partiya=yangi_partiya,
+            sabab=malumot.sabab,
+            foydalanuvchi_id=foydalanuvchi.id,
+        )
+    except kip_tahrirlash.KipTahrirlashTaqiqlangan as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     db.commit()
     db.refresh(kip)
+    # Telegram so'rovi COMMIT'dan KEYIN — partiya qatori endi qulflanmagan
+    # (4-QISM audit topilmasi, kiplar.py:saqlash()dagi naqsh bilan bir xil).
+    if telegram_yangilash is not None:
+        surat_xabarini_yangila(db, *telegram_yangilash)
     return kip
 
 

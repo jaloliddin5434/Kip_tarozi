@@ -15,7 +15,7 @@ from app.models.kip import Kip
 from app.models.kip_togrilash import KipTogrilashHolati, KipTogrilashZayavkasi
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya
-from app.services.kip_tahrirlash import kipni_tahrir_qil
+from app.services.kip_tahrirlash import TelegramSuratYangilash, kipni_tahrir_qil, tahrirlash_mumkinligini_tekshir
 
 logger = logging.getLogger("kip_togrilash")
 
@@ -32,7 +32,16 @@ def zayavka_yarat(
     """Yangi to'g'rilash zayavkasi yaratadi — eski_mahsulot/eski_partiya
     zayavka yaratilgan paytdagi holatning SNAPSHOT'i (keyinroq kip boshqa
     yo'l bilan o'zgarib ketsa ham, ro'yxatda "nimadan nimaga" ko'rinib
-    tursin uchun)."""
+    tursin uchun).
+
+    1/2-QISM (audit topilmasi): bekor qilingan kip yoki sotilgan MAQSAD
+    partiya uchun zayavka YARATISHNING O'ZI ham rad etiladi (nafaqat keyinroq
+    tasdiqlashda) — aks holda operator behuda so'rov yuboradi, admin uni
+    tasdiqlaganda keyin tasdiqlash bosqichida qulab tushadi. Bir xil
+    tekshiruv (`kip_tahrirlash.tahrirlash_mumkinligini_tekshir`) — tasdiqlash
+    bosqichida ham (`kipni_tahrir_qil()` ichida) ishlatiladi."""
+    tahrirlash_mumkinligini_tekshir(kip, yangi_partiya)
+
     eski_partiya = db.get(Partiya, kip.partiya_id)
     zayavka = KipTogrilashZayavkasi(
         kip_id=kip.id,
@@ -70,19 +79,26 @@ def zayavkani_hal_qil(
     hal_qilgan_id: int | None = None,
     manba: str = "panel",
     izoh: str | None = None,
-) -> tuple[KipTogrilashZayavkasi | None, Kip | None]:
+) -> tuple[KipTogrilashZayavkasi | None, Kip | None, TelegramSuratYangilash | None]:
     """So'rovni tasdiqlaydi yoki rad etadi. IDEMPOTENT — allaqachon hal
-    qilingan bo'lsa hech narsa o'zgarmay, mavjud (zayavka, kip) juftini
-    qaytaradi. Zayavka topilmasa (None, None)."""
+    qilingan bo'lsa hech narsa o'zgarmay, mavjud (zayavka, kip, None) uchligini
+    qaytaradi. Zayavka topilmasa (None, None, None).
+
+    Tasdiqlashda `kipni_tahrir_qil()` bekor qilingan kip / sotilgan partiya
+    uchun `KipTahrirlashTaqiqlangan` tashlashi mumkin (zayavka yaratilgandan
+    keyin, tasdiqlashdan oldin holat o'zgargan bo'lsa) — chaqiruvchi ushlaydi.
+    Uchinchi element (`TelegramSuratYangilash | None`) — chaqiruvchi
+    `db.commit()`dan KEYIN `surat_xabarini_yangila(db, *bu_qiymat)`
+    chaqirishi kerak (4-QISM, `kipni_tahrir_qil()` bilan bir xil naqsh)."""
     zayavka = db.execute(
         select(KipTogrilashZayavkasi).where(KipTogrilashZayavkasi.id == zayavka_id).with_for_update()
     ).scalar_one_or_none()
     if zayavka is None:
-        return None, None
+        return None, None, None
 
     if zayavka.holati != KipTogrilashHolati.kutilmoqda:
         kip = db.get(Kip, zayavka.kip_id)
-        return zayavka, kip
+        return zayavka, kip, None
 
     hozir = datetime.now(timezone.utc)
 
@@ -94,11 +110,11 @@ def zayavkani_hal_qil(
         zayavka.izoh = izoh
         db.flush()
         logger.info("Kip to'g'rilash zayavkasi #%s RAD ETILDI (%s)", zayavka.id, manba)
-        return zayavka, None
+        return zayavka, None, None
 
     kip = db.get(Kip, zayavka.kip_id)
     yangi_partiya = db.get(Partiya, zayavka.yangi_partiya_id)
-    kipni_tahrir_qil(
+    kip, telegram_yangilash = kipni_tahrir_qil(
         db,
         kip,
         yangi_ogirlik=None,
@@ -114,4 +130,4 @@ def zayavkani_hal_qil(
     zayavka.izoh = izoh
     db.flush()
     logger.info("Kip to'g'rilash zayavkasi #%s TASDIQLANDI (%s) -> kip #%s", zayavka.id, manba, kip.id)
-    return zayavka, kip
+    return zayavka, kip, telegram_yangilash

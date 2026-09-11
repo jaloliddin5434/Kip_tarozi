@@ -7,6 +7,7 @@ o'rnatiladi (mavjud tarozi-tizimidagi pattern bilan bir xil).
 
 Flutter operator ekrani shu agentga (localhost) ulanadi:
   GET  /holat            -> ulanish, og'irlik, anti-o'g'irlik holati, navbat uzunligi
+  GET  /navbat/muammoli  -> dead-letter (N marta muvaffaqiyatsiz) navbat yozuvlari
   WS   /oqim              -> real-vaqt oqim (0.3s)
   POST /agent/kontekst    -> Flutter tanlagan mahsulot/smenani agentga bildiradi
   POST /agent/kip         -> kip saqlash (backendga forward, aloqa yo'q bo'lsa offline navbatga)
@@ -81,6 +82,10 @@ def _joriy_holat() -> dict:
         "oxirgi_xato": watchdog.holat.oxirgi_xato,
         "anti_ogirlik_holati": anti_ogirlik.holat.value,
         "navbat_uzunligi": navbat.uzunlik(),
+        # 5-QISM (audit topilmasi): N marta muvaffaqiyatsiz (dead-letter)
+        # yozuvlar soni — admin shu maydon orqali "muammoli" holatni ko'radi
+        # (navbat.py:muammolilarni_olish() to'liq ro'yxat uchun).
+        "muammoli_navbat_soni": navbat.muammoli_soni(),
     }
 
 
@@ -133,6 +138,14 @@ def holat() -> dict:
         "joriy_ogirlik": barqarorlik.joriy_ogirlik,
         "barqarormi": barqarorlik.barqarormi(),
     }
+
+
+@app.get("/navbat/muammoli")
+def navbat_muammoli() -> dict:
+    """5-QISM (audit topilmasi): `_MAX_URINISH` marta muvaffaqiyatsiz
+    bo'lgan (dead-letter) offline-navbat yozuvlarining to'liq ro'yxati —
+    admin ko'rishi uchun oddiy hisoblash/tekshiruv endpointi."""
+    return {"soni": navbat.muammoli_soni(), "yozuvlar": navbat.muammolilarni_olish()}
 
 
 @app.websocket("/oqim")
