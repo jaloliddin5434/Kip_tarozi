@@ -19,10 +19,11 @@ Kunlik avtomatik backup uchun skript: [scripts/backup_yarat.ps1](../scripts/back
    ├── storage-xom\                         # XOM (hash nomli) to'liq nusxa
    │   ├── 2026-09\2026-09-10\Smena_A\Tola\d6d8e44f0a....jpg
    │   └── nakladnoy\N-00012.pdf
-   ├── KIP-Tarozi Rasm\                     # suratlar — tushunarli tuzilma
-   │   └── Sentabr\10.09.2026\Smena_A\Tola\Tola_Partiya55_Kip4_142.6kg.jpg
-   ├── KIP-Tarozi Excel\                    # har REAL kunlik smena+mahsulot Excel
-   │   └── Sentabr\10.09.2026\Smena_A\Tola\Smena_A_Tola_2026-09-10.xlsx
+   ├── Sentabr\                              # oy bo'yicha — ichida Rasm VA Excel
+   │   ├── KIP-Tarozi Rasm\                 # suratlar — tushunarli tuzilma
+   │   │   └── 10.09.2026\Smena_A\Tola\Tola_Partiya55_Kip4_142.6kg.jpg
+   │   └── KIP-Tarozi Excel\                # har REAL kunlik smena+mahsulot Excel
+   │       └── 10.09.2026\Smena_A\Tola\Smena_A_Tola_2026-09-10.xlsx
    └── KIP-Tarozi Nakladnoy\                # sotuv nakladnoy PDF'lari
        └── N-00012.pdf
    ```
@@ -32,13 +33,14 @@ Kunlik avtomatik backup uchun skript: [scripts/backup_yarat.ps1](../scripts/back
      SQLite navbati) o'tkazib yuboriladi, qolgan nusxa buzilmaydi. Ilovani
      tiklashda baza `surat_yoli` aynan shu hash nomlarga bog'langani uchun —
      **haqiqiy avariya tiklashida shu papka ishlatiladi** (pastga qarang).
-   - **`KIP-Tarozi Rasm\`** — har bir HISOBGA OLINADIGAN (aktiv + tahrirlangan;
-     bekor qilinganlar faqat `storage-xom\` da) kip surati
-     `<Oy>\<DD.MM.YYYY>\Smena_<X>\<Mahsulot>\` tuzilmasida, tushunarli nom bilan:
+   - **`<Oy>\KIP-Tarozi Rasm\`** — har bir HISOBGA OLINADIGAN (aktiv + tahrirlangan;
+     bekor qilinganlar faqat `storage-xom\` da) kip surati, endi AVVAL oy
+     papkasi ichida: `<Oy>\KIP-Tarozi Rasm\<DD.MM.YYYY>\Smena_<X>\<Mahsulot>\`
+     tuzilmasida, tushunarli nom bilan:
      `<Mahsulot>_Partiya<raqam>_Kip<raqam>_<ogirlik>kg.jpg` (masalan
      `Tola_Partiya55_Kip4_142.6kg.jpg`). Faqat o'sha kuni/smenada haqiqatan
      ishlagan `Smena_<X>` papkalari yaratiladi.
-   - **`KIP-Tarozi Excel\`** — smena Excel hisobotlari diskda saqlanmaydi
+   - **`<Oy>\KIP-Tarozi Excel\`** — smena Excel hisobotlari diskda saqlanmaydi
      (foydalanuvchiga real vaqtda yuklanadi), shuning uchun zaxira jarayoni
      har REAL kunlik `(sana, smena, mahsulot)` kombinatsiyasi uchun (kamida
      1 ta hisobga olinadigan kip) Excel'ni **shu yerda yangidan generatsiya

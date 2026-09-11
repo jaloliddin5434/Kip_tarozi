@@ -142,12 +142,12 @@ def test_suratlarni_joylashtir_tuzilma_va_nom(
     natija = backup_tuzilma.suratlarni_joylashtir(db, dest, storage)
 
     kun = _kun(db, k1.id).strftime("%d.%m.%Y")
-    kutilgan = dest / "KIP-Tarozi Rasm" / "Sentabr" / kun / "Smena_A" / "Tola" / "Tola_Partiya55_Kip4_142.6kg.jpg"
+    kutilgan = dest / "Sentabr" / "KIP-Tarozi Rasm" / kun / "Smena_A" / "Tola" / "Tola_Partiya55_Kip4_142.6kg.jpg"
     assert kutilgan.is_file()
     assert natija["nusxalandi"] == 1
     assert natija["topilmadi"] == 1
     # bekor qilingan kip surati nusxalanmadi
-    assert not (dest / "KIP-Tarozi Rasm" / "Sentabr" / kun / "Smena_A" / "Tola" / "Tola_Partiya55_Kip6_99kg.jpg").exists()
+    assert not (dest / "Sentabr" / "KIP-Tarozi Rasm" / kun / "Smena_A" / "Tola" / "Tola_Partiya55_Kip6_99kg.jpg").exists()
 
 
 def test_excellarni_yasa_fayl_va_mazmun(
@@ -169,7 +169,7 @@ def test_excellarni_yasa_fayl_va_mazmun(
     assert natija["xato"] == 0
 
     kun = _kun(db, k1.id)
-    papka = dest / "KIP-Tarozi Excel" / "Sentabr" / kun.strftime("%d.%m.%Y") / "Smena_A" / "Tola"
+    papka = dest / "Sentabr" / "KIP-Tarozi Excel" / kun.strftime("%d.%m.%Y") / "Smena_A" / "Tola"
     fayl = papka / f"Smena_A_Tola_{kun.isoformat()}.xlsx"
     assert fayl.is_file()
 
@@ -222,6 +222,6 @@ def test_tuzilma_yasa_smoke(db, operator, mahsulot_tola, tmp_path, monkeypatch):
     assert xulosa["rasm"]["nusxalandi"] == 1
     assert xulosa["excel"]["yasaldi"] == 1
     assert xulosa["nakladnoy"]["nusxalandi"] == 1
-    assert (dest / "KIP-Tarozi Rasm").is_dir()
-    assert (dest / "KIP-Tarozi Excel").is_dir()
+    assert (dest / "Sentabr" / "KIP-Tarozi Rasm").is_dir()
+    assert (dest / "Sentabr" / "KIP-Tarozi Excel").is_dir()
     assert (dest / "KIP-Tarozi Nakladnoy" / "N-9.pdf").is_file()

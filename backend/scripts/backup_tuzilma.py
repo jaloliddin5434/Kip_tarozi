@@ -4,8 +4,9 @@
 o'qib, berilgan `--dest` papkasi ichida quyidagini yaratadi:
 
     <dest>/
-    ├── KIP-Tarozi Rasm/<Oy>/<DD.MM.YYYY>/Smena_<X>/<Mahsulot>/<tushunarli nom>.jpg
-    ├── KIP-Tarozi Excel/<Oy>/<DD.MM.YYYY>/Smena_<X>/<Mahsulot>/Smena_<X>_<Mahsulot>_<YYYY-MM-DD>.xlsx
+    ├── <Oy>/
+    │   ├── KIP-Tarozi Rasm/<DD.MM.YYYY>/Smena_<X>/<Mahsulot>/<tushunarli nom>.jpg
+    │   └── KIP-Tarozi Excel/<DD.MM.YYYY>/Smena_<X>/<Mahsulot>/Smena_<X>_<Mahsulot>_<YYYY-MM-DD>.xlsx
     └── KIP-Tarozi Nakladnoy/<nakladnoy_raqami>.pdf
 
 - "KIP-Tarozi Rasm" — `storage/` ichidagi kip suratlari, tushunarli nom bilan
@@ -114,8 +115,8 @@ def suratlarni_joylashtir(db, dest: Path, storage_path: Path) -> dict:
         kengaytma = manba.suffix or ".jpg"
         papka = (
             dest
-            / RASM_PAPKA
             / _OY_NOMLARI[kun.month]
+            / RASM_PAPKA
             / _kun_papkasi(kun)
             / f"Smena_{smena.value}"
             / xavfsiz_nom(str(mahsulot_nomi))
@@ -163,8 +164,8 @@ def excellarni_yasa(db, dest: Path) -> dict:
             wb = smena_mahsulot_jadval(db, kun, smena, mahsulot)
             papka = (
                 dest
-                / EXCEL_PAPKA
                 / _OY_NOMLARI[kun.month]
+                / EXCEL_PAPKA
                 / _kun_papkasi(kun)
                 / f"Smena_{smena.value}"
                 / xavfsiz_nom(str(mahsulot.nomi))
