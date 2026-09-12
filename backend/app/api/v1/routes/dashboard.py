@@ -17,7 +17,7 @@ from app.models.shubhali_holat import ShubhaliHolat, ShubhaliHolatStatusi
 from app.models.sozlama import Sozlama
 from app.schemas.dashboard import AgentHolatJavob, DashboardJavob
 from app.schemas.statistika import MahsulotJamlanmasi, SmenaJamlanmasi
-from app.services.davr import davr_oraligi
+from app.services.davr import davr_oraligi, sargable_oraliq
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -57,6 +57,7 @@ def dashboard(
             detail=f"Noma'lum davr: {davr}. Ruxsat etilgan: {', '.join(DAVRLAR)}",
         )
     boshlanish, tugash = davr_oraligi(davr, date.today(), db)
+    pastki, yuqori = sargable_oraliq(boshlanish, tugash)
 
     qatorlar = db.execute(
         select(
@@ -69,8 +70,8 @@ def dashboard(
         .join(Kip, Kip.partiya_id == Partiya.id)
         .where(
             Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
-            func.date(Kip.vaqt) >= boshlanish,
-            func.date(Kip.vaqt) <= tugash,
+            Kip.vaqt >= pastki,
+            Kip.vaqt < yuqori,
         )
         .group_by(Mahsulot.kod, Mahsulot.nomi)
     ).all()
@@ -83,8 +84,8 @@ def dashboard(
         select(Kip.smena, func.count(Kip.id), func.coalesce(func.sum(Kip.ogirlik), 0))
         .where(
             Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
-            func.date(Kip.vaqt) >= boshlanish,
-            func.date(Kip.vaqt) <= tugash,
+            Kip.vaqt >= pastki,
+            Kip.vaqt < yuqori,
         )
         .group_by(Kip.smena)
         .order_by(Kip.smena)

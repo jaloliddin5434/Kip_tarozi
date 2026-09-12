@@ -49,9 +49,14 @@ class Kip(Base):
         # hisobotlar) uchun FUNKSIONAL indeks QASDDAN QO'SHILMAGAN — Postgres
         # `date(timestamptz)`ni STABLE (IMMUTABLE emas) deb hisoblaydi va
         # bunday indeks yaratishni rad etadi (migratsiya 68a051b132ed
-        # izohida batafsil). Bu joylar hozircha `Seq Scan` bilan qoladi —
-        # to'g'ri yechim so'rovlarni sargable oraliqqa o'tkazish (alohida,
-        # kattaroq vazifa).
+        # izohida batafsil). BU MUAMMO HAL QILINDI (keyingi "sargable
+        # refaktoring" vazifasida): butun loyiha bo'ylab sana-oralig'i
+        # filtrlari `func.date(ustun) >= X AND <= Y` o'rniga endi
+        # `ustun >= X_dt AND ustun < (Y+1kun)_dt` (sargable) ko'rinishida
+        # yozilgan — qarang `app/services/davr.py:sargable_oraliq()` va
+        # uning barcha chaqiruv joylari. Shu tufayli yuqoridagi oddiy
+        # `ix_kiplar_vaqt`/`ix_kiplar_vaqt_holati` indekslari endi
+        # to'g'ridan-to'g'ri ishlatiladi (EXPLAIN ANALYZE bilan tasdiqlangan).
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

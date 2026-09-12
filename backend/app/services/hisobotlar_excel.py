@@ -13,13 +13,14 @@ from datetime import date
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.foydalanuvchi import Smena
 from app.models.kip import HISOBLANADIGAN_HOLATLAR, Kip
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya
+from app.services.davr import sargable_oraliq
 
 _JAMI_FON = PatternFill("solid", fgColor="D6E4F0")
 
@@ -29,6 +30,7 @@ def smena_mahsulot_jadval(db: Session, sana: date, smena: Smena, mahsulot: Mahsu
     kombinatsiyada tortilgan har bir kip alohida qator (kip raqami, partiya,
     vaqt, kg) va oxirida JAMI qatori. Faqat HISOBLANADIGAN holatdagi kiplar
     (bekor qilinganlar chiqarib tashlanadi)."""
+    pastki, yuqori = sargable_oraliq(sana, sana)
     qatorlar = db.execute(
         select(Kip.kip_raqami, Kip.vaqt, Kip.ogirlik, Partiya.partiya_raqami)
         .join(Partiya, Partiya.id == Kip.partiya_id)
@@ -36,7 +38,8 @@ def smena_mahsulot_jadval(db: Session, sana: date, smena: Smena, mahsulot: Mahsu
             Partiya.mahsulot_id == mahsulot.id,
             Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
             Kip.smena == smena,
-            func.date(Kip.vaqt) == sana,
+            Kip.vaqt >= pastki,
+            Kip.vaqt < yuqori,
         )
         .order_by(Kip.vaqt, Kip.kip_raqami)
     ).all()

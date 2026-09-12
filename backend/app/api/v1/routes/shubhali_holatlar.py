@@ -15,6 +15,7 @@ from app.schemas.shubhali_holat import (
     ShubhaliHolatStatistika,
     ShubhaliOperatorSoni,
 )
+from app.services.davr import sargable_pastki, sargable_yuqori
 from app.services.storage.rasm import rasm_saqla
 from app.services.telegram import xatolik_xabari
 
@@ -79,9 +80,9 @@ def royxat(
         .outerjoin(operator, ShubhaliHolat.operator_id == operator.c.id)
     )
     if sana_dan is not None:
-        sorov = sorov.where(func.date(ShubhaliHolat.vaqt) >= sana_dan)
+        sorov = sorov.where(ShubhaliHolat.vaqt >= sargable_pastki(sana_dan))
     if sana_gacha is not None:
-        sorov = sorov.where(func.date(ShubhaliHolat.vaqt) <= sana_gacha)
+        sorov = sorov.where(ShubhaliHolat.vaqt < sargable_yuqori(sana_gacha))
     if smena is not None:
         sorov = sorov.where(ShubhaliHolat.smena == smena)
     if operator_id is not None:
@@ -132,9 +133,9 @@ def statistika(
     statistikaga kirmaydi."""
     shartlar = [ShubhaliHolat.holati == ShubhaliHolatStatusi.korib_chiqildi]
     if sana_dan is not None:
-        shartlar.append(func.date(ShubhaliHolat.vaqt) >= sana_dan)
+        shartlar.append(ShubhaliHolat.vaqt >= sargable_pastki(sana_dan))
     if sana_gacha is not None:
-        shartlar.append(func.date(ShubhaliHolat.vaqt) <= sana_gacha)
+        shartlar.append(ShubhaliHolat.vaqt < sargable_yuqori(sana_gacha))
 
     smena_soni = {smena.value: 0 for smena in Smena}
     smena_qatorlari = db.execute(

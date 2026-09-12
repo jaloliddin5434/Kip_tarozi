@@ -17,6 +17,7 @@ from app.schemas.kamera_tasdiq import (
 )
 from app.schemas.sahifalash import Sahifalangan
 from app.services import kamera_tasdiq
+from app.services.davr import sargable_pastki, sargable_yuqori
 
 router = APIRouter(prefix="/kamera-tasdiq", tags=["kamera-tasdiq"])
 
@@ -81,9 +82,9 @@ def royxat(
     if holati is not None:
         sorov = sorov.where(KameraTasdiqSorovi.holati == holati)
     if sana_dan is not None:
-        sorov = sorov.where(func.date(KameraTasdiqSorovi.vaqt) >= sana_dan)
+        sorov = sorov.where(KameraTasdiqSorovi.vaqt >= sargable_pastki(sana_dan))
     if sana_gacha is not None:
-        sorov = sorov.where(func.date(KameraTasdiqSorovi.vaqt) <= sana_gacha)
+        sorov = sorov.where(KameraTasdiqSorovi.vaqt < sargable_yuqori(sana_gacha))
 
     jami = db.scalar(select(func.count()).select_from(sorov.subquery())) or 0
 

@@ -13,6 +13,7 @@ from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya
 from app.schemas.hujjat import AuditLogJavob, HujjatKipJavob
 from app.schemas.sahifalash import Sahifalangan
+from app.services.davr import sargable_pastki, sargable_yuqori
 from app.services.media import surat_ommaviy_url
 
 router = APIRouter(prefix="/hujjatlar", tags=["hujjatlar"])
@@ -40,9 +41,9 @@ def kiplar_royxati(
         .join(Foydalanuvchi, Kip.operator_id == Foydalanuvchi.id)
     )
     if sana_dan is not None:
-        sorov = sorov.where(func.date(Kip.vaqt) >= sana_dan)
+        sorov = sorov.where(Kip.vaqt >= sargable_pastki(sana_dan))
     if sana_gacha is not None:
-        sorov = sorov.where(func.date(Kip.vaqt) <= sana_gacha)
+        sorov = sorov.where(Kip.vaqt < sargable_yuqori(sana_gacha))
     if smena is not None:
         sorov = sorov.where(Kip.smena == smena)
     if mahsulot_kodi is not None:
@@ -99,9 +100,9 @@ def audit_royxati(
     if jadval_nomi is not None:
         sorov = sorov.where(AuditLog.jadval_nomi == jadval_nomi)
     if sana_dan is not None:
-        sorov = sorov.where(func.date(AuditLog.vaqt) >= sana_dan)
+        sorov = sorov.where(AuditLog.vaqt >= sargable_pastki(sana_dan))
     if sana_gacha is not None:
-        sorov = sorov.where(func.date(AuditLog.vaqt) <= sana_gacha)
+        sorov = sorov.where(AuditLog.vaqt < sargable_yuqori(sana_gacha))
 
     jami = db.scalar(select(func.count()).select_from(sorov.subquery())) or 0
 

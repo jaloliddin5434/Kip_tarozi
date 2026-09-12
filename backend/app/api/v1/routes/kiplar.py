@@ -19,6 +19,7 @@ from app.schemas.kamera_tasdiq import KameraTasdiqKutilmoqda
 from app.schemas.kip import KipBatafsilJavob, KipJavob, KipSinxronNatija, KipTahrirlash, KipYaratish
 from app.schemas.smena import MahsulotBoyichaHolat, SmenaHolati, SmenaKipYozuvi
 from app.services import kamera, kamera_tasdiq, kip_tahrirlash
+from app.services.davr import sargable_oraliq
 from app.services.media import surat_ommaviy_url
 from app.services.storage.rasm import rasm_saqla
 from app.services.telegram import surat_xabarini_yangila, surat_yubor, xatolik_xabari_tugma_bilan
@@ -59,6 +60,7 @@ def _bloklovchi_hodisa(db: Session, smena) -> ShubhaliHolat | None:
 
 
 def _smena_kunlik_jamlanma(db: Session, smena, sana: date) -> SmenaHolati:
+    pastki, yuqori = sargable_oraliq(sana, sana)
     qatorlar = db.execute(
         select(
             Mahsulot.kod,
@@ -71,7 +73,8 @@ def _smena_kunlik_jamlanma(db: Session, smena, sana: date) -> SmenaHolati:
         .where(
             Kip.smena == smena,
             Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
-            func.date(Kip.vaqt) == sana,
+            Kip.vaqt >= pastki,
+            Kip.vaqt < yuqori,
         )
         .group_by(Mahsulot.kod, Mahsulot.nomi)
     ).all()
@@ -115,6 +118,7 @@ def smena_royxati(
     panelini to'ldirish uchun). /smena/holati kabi faqat joriy operatorning
     o'z smenasi va bugungi kuni bilan cheklangan."""
     bugun = date.today()
+    pastki, yuqori = sargable_oraliq(bugun, bugun)
     qatorlar = db.execute(
         select(Kip)
         .join(Partiya, Kip.partiya_id == Partiya.id)
@@ -122,7 +126,8 @@ def smena_royxati(
         .where(
             Mahsulot.kod == mahsulot_kodi,
             Kip.smena == foydalanuvchi.smena,
-            func.date(Kip.vaqt) == bugun,
+            Kip.vaqt >= pastki,
+            Kip.vaqt < yuqori,
         )
         .order_by(Kip.vaqt.desc(), Kip.id.desc())
     ).scalars().all()

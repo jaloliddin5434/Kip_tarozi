@@ -15,7 +15,7 @@ from app.models.foydalanuvchi import Foydalanuvchi, Rol, Smena
 from app.models.kip import HISOBLANADIGAN_HOLATLAR, Kip
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya
-from app.services.davr import mavsum_boshi_sozlamadan, mavsum_boshlanishi
+from app.services.davr import mavsum_boshi_sozlamadan, mavsum_boshlanishi, sargable_oraliq
 from app.services.hisobotlar_excel import smena_mahsulot_jadval
 
 router = APIRouter(prefix="/hisobotlar", tags=["hisobotlar"])
@@ -47,11 +47,12 @@ def smena_excel(
     mahsulotlar = db.execute(select(Mahsulot.kod, Mahsulot.nomi)).all()
     nomlar = {kod: nomi for kod, nomi in mahsulotlar}
 
+    pastki, yuqori = sargable_oraliq(sana, sana)
     qatorlar = db.execute(
         select(Mahsulot.kod, func.count(Kip.id), func.coalesce(func.sum(Kip.ogirlik), 0))
         .join(Partiya, Partiya.mahsulot_id == Mahsulot.id)
         .join(Kip, Kip.partiya_id == Partiya.id)
-        .where(Kip.holati.in_(HISOBLANADIGAN_HOLATLAR), Kip.smena == smena, func.date(Kip.vaqt) == sana)
+        .where(Kip.holati.in_(HISOBLANADIGAN_HOLATLAR), Kip.smena == smena, Kip.vaqt >= pastki, Kip.vaqt < yuqori)
         .group_by(Mahsulot.kod)
     ).all()
     jamlanma = {kod: (soni, float(kg)) for kod, soni, kg in qatorlar}
@@ -157,15 +158,22 @@ def mavsum_jurnali(
             detail="tugash sanasi boshlanish sanasidan oldin bo'lishi mumkin emas",
         )
 
+    # DIQQAT: `kun_ustuni` (func.date) SELECT/GROUP BY uchun SAQLANADI —
+    # kunlik qatorlar kerak, buni funksiyasiz olib bo'lmaydi. Lekin WHERE
+    # filtri (qaysi qatorlar UMUMAN qamrab olinishi) endi SARGABLE — asosiy
+    # (odatda mavsum uzunligidagi, ko'p oylik) chegaralash shu orqali indeks
+    # ishlatadi, faqat filtrlangan (ancha kichikroq) natija ustida func.date()
+    # kunlik guruhlash uchun ishlaydi.
     kun_ustuni = func.date(Kip.vaqt)
+    pastki, yuqori = sargable_oraliq(boshlanish, tugash)
     qatorlar = db.execute(
         select(kun_ustuni, func.count(Kip.id), func.coalesce(func.sum(Kip.ogirlik), 0))
         .join(Partiya, Partiya.id == Kip.partiya_id)
         .where(
             Partiya.mahsulot_id == mahsulot.id,
             Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
-            kun_ustuni >= boshlanish,
-            kun_ustuni <= tugash,
+            Kip.vaqt >= pastki,
+            Kip.vaqt < yuqori,
         )
         .group_by(kun_ustuni)
     ).all()

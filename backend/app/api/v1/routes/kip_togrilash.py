@@ -19,6 +19,7 @@ from app.schemas.kip_togrilash import (
 )
 from app.schemas.sahifalash import Sahifalangan
 from app.services import kip_togrilash
+from app.services.davr import sargable_pastki, sargable_yuqori
 from app.services.kip_tahrirlash import KipTahrirlashTaqiqlangan
 from app.services.telegram import surat_xabarini_yangila, xatolik_xabari_tugma_bilan
 
@@ -125,9 +126,9 @@ def royxat(
     if holati is not None:
         sorov = sorov.where(KipTogrilashZayavkasi.holati == holati)
     if sana_dan is not None:
-        sorov = sorov.where(func.date(KipTogrilashZayavkasi.vaqt) >= sana_dan)
+        sorov = sorov.where(KipTogrilashZayavkasi.vaqt >= sargable_pastki(sana_dan))
     if sana_gacha is not None:
-        sorov = sorov.where(func.date(KipTogrilashZayavkasi.vaqt) <= sana_gacha)
+        sorov = sorov.where(KipTogrilashZayavkasi.vaqt < sargable_yuqori(sana_gacha))
 
     jami = db.scalar(select(func.count()).select_from(sorov.subquery())) or 0
 

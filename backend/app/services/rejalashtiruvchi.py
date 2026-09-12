@@ -12,6 +12,7 @@ from app.models.kip import HISOBLANADIGAN_HOLATLAR, Kip
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya
 from app.services import advisory_lock
+from app.services.davr import sargable_oraliq
 from app.services.telegram import statistika_xabari
 
 logger = logging.getLogger("rejalashtiruvchi")
@@ -30,11 +31,12 @@ def _kunlik_hisobot_yubor() -> None:
     db = SessionLocal()
     try:
         bugun = date.today()
+        pastki, yuqori = sargable_oraliq(bugun, bugun)
         qatorlar = db.execute(
             select(Mahsulot.nomi, func.count(Kip.id), func.coalesce(func.sum(Kip.ogirlik), 0))
             .join(Partiya, Partiya.mahsulot_id == Mahsulot.id)
             .join(Kip, Kip.partiya_id == Partiya.id)
-            .where(Kip.holati.in_(HISOBLANADIGAN_HOLATLAR), func.date(Kip.vaqt) == bugun)
+            .where(Kip.holati.in_(HISOBLANADIGAN_HOLATLAR), Kip.vaqt >= pastki, Kip.vaqt < yuqori)
             .group_by(Mahsulot.nomi)
         ).all()
 

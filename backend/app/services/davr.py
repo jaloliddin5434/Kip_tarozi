@@ -1,5 +1,5 @@
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -75,3 +75,50 @@ def davr_oraligi(davr: DavrTuri, sana: date, db: Session | None = None) -> tuple
         return mavsum_boshi(db, sana), sana
 
     raise ValueError(f"Noma'lum davr turi: {davr}")
+
+
+def sargable_oraliq(boshlanish: date, tugash: date) -> tuple[datetime, datetime]:
+    """AUDIT TOPILMASI TUZATISHI: butun loyiha bo'ylab sana-oralig'i filtrlari
+    `func.date(ustun) >= boshlanish AND func.date(ustun) <= tugash`
+    ko'rinishida yozilgan edi — `date()` funksiyasi ustunga qo'llangani
+    uchun PostgreSQL bu yerda B-tree indeksni ISHLATA OLMAYDI (funksional
+    indeks ham `date(timestamptz)` IMMUTABLE emasligi sababli yaratib
+    bo'lmaydi — qarang `app/models/kip.py`, migratsiya 68a051b132ed).
+
+    Bu funksiya o'rniga SARGABLE (indeks ishlata oladigan) chegaralarni
+    qaytaradi: `ustun >= pastki AND ustun < yuqori` (E'TIBOR: `tugash`dan
+    KEYINGI kunning boshigacha, QAT'IY `<` bilan — shunda `tugash` sanasining
+    O'ZI TO'LIQ (24 soatning oxirigacha) qamrab olinadi, lekin bitta ortiqcha
+    kun QO'SHILMAYDI).
+
+    MUHIM (vaqt zonasi): natija ATAYLAB **naiv** (tzinfo'siz) `datetime`
+    obyektlari — bu ASOSIY xavfsizlik: agar bu yerda aniq UTC yoki boshqa
+    tzinfo biriktirilsa, natija DB sessiyasining joriy `TimeZone`
+    sozlamasidan (hozir server "Asia/Tashkent"ga yaqin, amalda
+    "Asia/Yekaterinburg" — ikkalasi ham doim UTC+5, DST yo'q) MUSTAQIL bo'lib
+    qolib, eski `func.date()` xatti-harakatidan farqlanib qolardi — chunki
+    `func.date(timestamptz_ustun)`NING O'ZI ustunni (UTC'da saqlangan)
+    sessiya TimeZone'i bo'yicha mahalliy sanaga aylantiradi. Naiv Python
+    `datetime` psycopg2/SQLAlchemy orqali "timestamp without time zone"
+    literali sifatida yuboriladi, Postgres esa uni `timestamptz` ustun bilan
+    solishtirishda XUDDI o'sha sessiya TimeZone'i bo'yicha `timestamptz`ga
+    aylantiradi — natijada `func.date()` bilan ANIQ bir xil chegara olinadi
+    (real DB'da bir nechta chegara holati — kun boshi/oxiri instansiyalari —
+    qo'lda tekshirilib tasdiqlangan, qarang PR/vazifa tavsifi)."""
+    return sargable_pastki(boshlanish), sargable_yuqori(tugash)
+
+
+def sargable_pastki(sana: date) -> datetime:
+    """`sana`ning o'zidan (kun boshidan) boshlab qamrab oluvchi pastki
+    chegara — `func.date(ustun) >= sana`ga teng. `sana_dan`/`sana_gacha`
+    kabi IKKALASI HAM IXTIYORIY (bir-biridan mustaqil) filtrlar uchun,
+    `sargable_oraliq()` ikkalasi ham berilishini talab qilgani uchun mos
+    kelmaydigan joylarda ishlatiladi."""
+    return datetime.combine(sana, time.min)
+
+
+def sargable_yuqori(sana: date) -> datetime:
+    """`sana`ning o'zini to'liq (kun oxirigacha) qamrab oluvchi, lekin
+    ERTASI kundan QAT'IY OLDIN to'xtaydigan yuqori chegara (`<` bilan
+    solishtiriladi) — `func.date(ustun) <= sana`ga teng."""
+    return datetime.combine(sana + timedelta(days=1), time.min)

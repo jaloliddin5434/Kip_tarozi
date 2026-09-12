@@ -20,7 +20,7 @@ from app.schemas.statistika import (
     RekordSmena,
     SmenaJamlanmasi,
 )
-from app.services.davr import davr_oraligi
+from app.services.davr import davr_oraligi, sargable_oraliq
 
 router = APIRouter(prefix="/statistika", tags=["statistika"])
 
@@ -45,6 +45,7 @@ def jamlanma(
 ) -> DavrJamlanmasi:
     _davrni_tekshir(davr)
     boshlanish, tugash = davr_oraligi(davr, sana, db)
+    pastki, yuqori = sargable_oraliq(boshlanish, tugash)
 
     qatorlar = db.execute(
         select(
@@ -57,8 +58,8 @@ def jamlanma(
         .join(Kip, Kip.partiya_id == Partiya.id)
         .where(
             Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
-            func.date(Kip.vaqt) >= boshlanish,
-            func.date(Kip.vaqt) <= tugash,
+            Kip.vaqt >= pastki,
+            Kip.vaqt < yuqori,
             *([Kip.smena == smena] if smena is not None else []),
         )
         .group_by(Mahsulot.kod, Mahsulot.nomi)
@@ -88,14 +89,15 @@ def smena_boyicha(
 ) -> list[SmenaJamlanmasi]:
     _davrni_tekshir(davr)
     boshlanish, tugash = davr_oraligi(davr, sana, db)
+    pastki, yuqori = sargable_oraliq(boshlanish, tugash)
 
     sorov = select(Kip.smena, func.count(Kip.id), func.coalesce(func.sum(Kip.ogirlik), 0))
     if mahsulot_kodi is not None:
         sorov = sorov.join(Partiya, Partiya.id == Kip.partiya_id).join(Mahsulot, Mahsulot.id == Partiya.mahsulot_id)
     sorov = sorov.where(
         Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
-        func.date(Kip.vaqt) >= boshlanish,
-        func.date(Kip.vaqt) <= tugash,
+        Kip.vaqt >= pastki,
+        Kip.vaqt < yuqori,
         *([Mahsulot.kod == mahsulot_kodi] if mahsulot_kodi is not None else []),
     ).group_by(Kip.smena).order_by(Kip.smena)
 
@@ -113,6 +115,7 @@ def operator_boyicha(
 ) -> list[OperatorJamlanmasi]:
     _davrni_tekshir(davr)
     boshlanish, tugash = davr_oraligi(davr, sana, db)
+    pastki, yuqori = sargable_oraliq(boshlanish, tugash)
 
     qatorlar = db.execute(
         select(
@@ -126,8 +129,8 @@ def operator_boyicha(
         .join(Kip, Kip.operator_id == Foydalanuvchi.id)
         .where(
             Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
-            func.date(Kip.vaqt) >= boshlanish,
-            func.date(Kip.vaqt) <= tugash,
+            Kip.vaqt >= pastki,
+            Kip.vaqt < yuqori,
         )
         .group_by(Foydalanuvchi.id, Foydalanuvchi.ism, Foydalanuvchi.login, Foydalanuvchi.smena)
         .order_by(func.sum(Kip.ogirlik).desc())
@@ -158,11 +161,12 @@ def rekordlar(
     bir kundagi eng yuqori jami kg. Ma'lumot bo'lmasa tegishli maydon null."""
     _davrni_tekshir(davr)
     boshlanish, tugash = davr_oraligi(davr, sana, db)
+    pastki, yuqori = sargable_oraliq(boshlanish, tugash)
 
     davr_sharti = (
         Kip.holati.in_(HISOBLANADIGAN_HOLATLAR),
-        func.date(Kip.vaqt) >= boshlanish,
-        func.date(Kip.vaqt) <= tugash,
+        Kip.vaqt >= pastki,
+        Kip.vaqt < yuqori,
     )
 
     smena_qatori = db.execute(
