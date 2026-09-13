@@ -11,9 +11,11 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.kamera_tasdiq import KameraTasdiqHolati, KameraTasdiqSorovi
 from app.models.kip import Kip
 from app.models.partiya import Partiya
+from app.services import dublikat
 
 logger = logging.getLogger("kamera_tasdiq")
 
@@ -49,6 +51,49 @@ def sorov_yarat(
     db.add(sorov)
     db.flush()
     return sorov
+
+
+def dublikat_shubhasi_bormi(db: Session, sorov: KameraTasdiqSorovi) -> bool:
+    """AUDIT TUZATISHI: oddiy (kamera ishlayotgan) saqlash oqimida
+    `POST /kiplar` operatorni "bu haqiqatan yangi kipmi?" deb ogohlantiradi
+    (`app/services/dublikat.py`) — kamera ISHLAMAGAN payt esa kip darhol
+    yaratilmaydi (avval "kutilmoqda" so'rov, keyin Admin tasdiqlaydi), shuning
+    uchun o'sha tekshiruv HECH QACHON chaqirilmagan. Natijada bir necha
+    soniya ichida bir xil partiyaga ikkita deyarli bir xil og'irlik yuborilsa
+    (masalan operator ketma-ket ikki marta bossa), Admin ikkalasini ham
+    hech qanday ogohlantirishsiz tasdiqlab, IKKITA alohida kip yaratib
+    qo'yishi mumkin edi (real sinovda tasdiqlangan).
+
+    Bu funksiya kipni AVTOMATIK bloklamaydi/rad etmaydi — operator (oddiy
+    oqimdagi "majburiy" bayrog'i orqali) buni tasdiqlash imkoniyatiga bu
+    yerda ega emas, shuning uchun qaror har doim ADMINga qoldiriladi; faqat
+    admin panelidagi ro'yxatda ko'rinadigan (sariq) ogohlantirish sifatida
+    ishlatiladi (`KameraTasdiqRoyxatJavob.dublikat_shubhasi`).
+
+    Ikki xil manba tekshiriladi:
+      1. Partiyada allaqachon SAQLANGAN (aktiv) kip — xuddi oddiy oqimdagi
+         kabi (`dublikat.topish`).
+      2. Partiyada hali "kutilmoqda"/"tasdiqlangan" BOSHQA kamera-tasdiq
+         so'rovi — chunki bu holatda ikkala tomon ham hali Kip bo'lmasligi
+         mumkin (ikkalasi ham hali admin tasdig'ini kutayotgan bo'lishi
+         mumkin, xuddi audit stsenariysida bo'lgani kabi).
+    """
+    if dublikat.topish(db, sorov.partiya_id, float(sorov.ogirlik), sorov.vaqt) is not None:
+        return True
+
+    boshqa_sorovlar = db.scalars(
+        select(KameraTasdiqSorovi).where(
+            KameraTasdiqSorovi.partiya_id == sorov.partiya_id,
+            KameraTasdiqSorovi.id != sorov.id,
+            KameraTasdiqSorovi.holati != KameraTasdiqHolati.rad_etilgan,
+        )
+    ).all()
+    for boshqa in boshqa_sorovlar:
+        vaqt_farqi = abs((sorov.vaqt - boshqa.vaqt).total_seconds())
+        ogirlik_farqi = abs(float(sorov.ogirlik) - float(boshqa.ogirlik))
+        if vaqt_farqi <= settings.DUPLIKAT_VAQT_OYNASI_SONIYA and ogirlik_farqi <= settings.DUPLIKAT_OGIRLIK_TOLERANSI_KG:
+            return True
+    return False
 
 
 def _keyingi_kip_raqami(db: Session, partiya_id: int) -> int:

@@ -15,6 +15,10 @@ class KameraTasdiqSorovi {
   final String? halQilganIsm;
   final String? halQilishManbasi;
   final String? izoh;
+  // AUDIT TUZATISHI: shu partiyada yaqin vaqtda/og'irlikda BOSHQA (saqlangan
+  // kip yoki hal qilinmagan/tasdiqlangan boshqa so'rov) mavjudligi haqida
+  // ogohlantirish — faqat vizual, hech narsani avtomatik bloklamaydi.
+  final bool dublikatShubhasi;
 
   KameraTasdiqSorovi({
     required this.id,
@@ -30,6 +34,7 @@ class KameraTasdiqSorovi {
     this.halQilganIsm,
     this.halQilishManbasi,
     this.izoh,
+    this.dublikatShubhasi = false,
   });
 
   bool get kutilmoqda => holati == 'kutilmoqda';
@@ -48,6 +53,7 @@ class KameraTasdiqSorovi {
         halQilganIsm: j['hal_qilgan_ism'],
         halQilishManbasi: j['hal_qilish_manbasi'],
         izoh: j['izoh'],
+        dublikatShubhasi: j['dublikat_shubhasi'] == true,
       );
 }
 

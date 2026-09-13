@@ -72,6 +72,11 @@ const Map<String, Map<Til, String>> _matnlar = {
     Til.uz: 'Navbatdagi yozuv yuborilmadi',
     Til.ru: 'Запись из очереди не отправлена',
   },
+  // AUDIT TUZATISHI: kamera-tasdiq ro'yxatida "dublikat shubhasi" ogohlantirishi.
+  'dublikat_shubhasi_tooltip': {
+    Til.uz: 'Shu partiyada yaqinda o\'xshash og\'irlikdagi boshqa yozuv topildi — diqqat bilan tekshiring',
+    Til.ru: 'В этой партии недавно найдена другая запись с похожим весом — проверьте внимательно',
+  },
   // 5-QISM (audit topilmasi): backend qat'iy rad etgan ("muammoli",
   // dead-letter) offline yozuvlar uchun ko'rinadigan ogohlantirish banneri.
   'navbat_muammoli_indikator': {Til.uz: 'sinxronlanmadi', Til.ru: 'не синхронизировано'},

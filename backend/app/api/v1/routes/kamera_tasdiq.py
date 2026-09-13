@@ -109,6 +109,12 @@ def royxat(
             hal_qilgan_ism=hal_qilgan_ism,
             hal_qilish_manbasi=s.hal_qilish_manbasi,
             izoh=s.izoh,
+            # Faqat hali HAL QILINMAGAN so'rovlar uchun hisoblanadi — admin
+            # ko'rib, hali qaror qabul qilishi mumkin bo'lgan qatorlarda
+            # foydali; hal qilingan (tarixiy) yozuvlar uchun shart emas.
+            dublikat_shubhasi=(
+                kamera_tasdiq.dublikat_shubhasi_bormi(db, s) if s.holati == KameraTasdiqHolati.kutilmoqda else False
+            ),
         )
         for s, mahsulot_nomi, partiya_raqami, operator_ism, hal_qilgan_ism in qatorlar
     ]

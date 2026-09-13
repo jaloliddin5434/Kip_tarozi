@@ -18,7 +18,7 @@ from app.schemas.hujjat import AuditLogJavob
 from app.schemas.kamera_tasdiq import KameraTasdiqKutilmoqda
 from app.schemas.kip import KipBatafsilJavob, KipJavob, KipSinxronNatija, KipTahrirlash, KipYaratish
 from app.schemas.smena import MahsulotBoyichaHolat, SmenaHolati, SmenaKipYozuvi
-from app.services import kamera, kamera_tasdiq, kip_tahrirlash
+from app.services import dublikat, kamera, kamera_tasdiq, kip_tahrirlash
 from app.services.davr import sargable_oraliq
 from app.services.media import surat_ommaviy_url
 from app.services.storage.rasm import rasm_saqla
@@ -32,22 +32,6 @@ def _keyingi_kip_raqami(db: Session, partiya_id: int) -> int:
     db.execute(select(Partiya.id).where(Partiya.id == partiya_id).with_for_update())
     oxirgi = db.scalar(select(func.max(Kip.kip_raqami)).where(Kip.partiya_id == partiya_id))
     return (oxirgi or 0) + 1
-
-
-def _dublikat_topish(db: Session, partiya_id: int, ogirlik: float, hozir: datetime) -> Kip | None:
-    songi = db.scalar(
-        select(Kip)
-        .where(Kip.partiya_id == partiya_id, Kip.holati == KipHolati.aktiv)
-        .order_by(Kip.vaqt.desc())
-        .limit(1)
-    )
-    if songi is None:
-        return None
-    if (hozir - songi.vaqt).total_seconds() > settings.DUPLIKAT_VAQT_OYNASI_SONIYA:
-        return None
-    if abs(float(songi.ogirlik) - ogirlik) > settings.DUPLIKAT_OGIRLIK_TOLERANSI_KG:
-        return None
-    return songi
 
 
 def _bloklovchi_hodisa(db: Session, smena) -> ShubhaliHolat | None:
@@ -246,15 +230,15 @@ def saqlash(
 
     hozir = datetime.now(timezone.utc)
     if not malumot.majburiy:
-        dublikat = _dublikat_topish(db, partiya.id, malumot.ogirlik, hozir)
-        if dublikat is not None:
+        mavjud_dublikat = dublikat.topish(db, partiya.id, malumot.ogirlik, hozir)
+        if mavjud_dublikat is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "xabar": "Shunga o'xshash og'irlikdagi kip bir necha soniya oldin saqlangan. Bu haqiqatan ham yangi kipmi?",
-                    "avvalgi_kip_id": dublikat.id,
-                    "avvalgi_ogirlik": float(dublikat.ogirlik),
-                    "avvalgi_vaqt": dublikat.vaqt.isoformat(),
+                    "avvalgi_kip_id": mavjud_dublikat.id,
+                    "avvalgi_ogirlik": float(mavjud_dublikat.ogirlik),
+                    "avvalgi_vaqt": mavjud_dublikat.vaqt.isoformat(),
                 },
             )
 

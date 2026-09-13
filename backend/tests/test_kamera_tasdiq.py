@@ -270,6 +270,121 @@ def test_rad_etilgan_sorovni_tasdiqlab_bolmaydi(
     assert db.query(Kip).filter_by(partiya_id=partiya["id"]).count() == 0
 
 
+# --- AUDIT TUZATISHI: ro'yxatdagi "dublikat shubhasi" ogohlantirishi ---
+# (oddiy oqimdagi dedup-tekshiruvi kamera ISHLAMAGAN payt chaqirilmasligi —
+# real sinovda tasdiqlangan audit topilmasi)
+
+
+def test_royxatda_dublikat_shubhasi_ikkita_yaqin_sorov(
+    client, db, operator_headers, admin_headers, mahsulot_tola, kamera_surat_bermaydi
+):
+    """Bitta partiyaga bir necha soniya farq bilan deyarli bir xil og'irlikda
+    ikkita so'rov kelsa — ikkalasi ham ro'yxatda `dublikat_shubhasi=True`
+    bilan ko'rinishi kerak (ADMIN hali qaror qabul qilmagan, kutilmoqda)."""
+    partiya = _partiya(client, operator_headers, 320)
+
+    j1 = client.post("/api/v1/kiplar", json=_payload(partiya["id"], ogirlik=77.0), headers=operator_headers)
+    sorov1_id = j1.json()["sorov_id"]
+    j2 = client.post("/api/v1/kiplar", json=_payload(partiya["id"], ogirlik=77.2), headers=operator_headers)
+    sorov2_id = j2.json()["sorov_id"]
+
+    javob = client.get("/api/v1/kamera-tasdiq", params={"holati": "kutilmoqda"}, headers=admin_headers)
+    assert javob.status_code == 200
+    items_by_id = {i["id"]: i for i in javob.json()["items"]}
+
+    assert items_by_id[sorov1_id]["dublikat_shubhasi"] is True
+    assert items_by_id[sorov2_id]["dublikat_shubhasi"] is True
+
+    # Admin ikkalasini ham baribir TASDIQLASHI mumkin (avtomatik bloklanmaydi) —
+    # ogohlantirish faqat ko'rinadigan, majburiy emas.
+    t1 = client.post(f"/api/v1/kamera-tasdiq/{sorov1_id}/tasdiqlash", headers=admin_headers)
+    t2 = client.post(f"/api/v1/kamera-tasdiq/{sorov2_id}/tasdiqlash", headers=admin_headers)
+    assert t1.status_code == t2.status_code == 200
+    assert t1.json()["kip_id"] != t2.json()["kip_id"]
+
+
+def test_royxatda_dublikat_shubhasi_yolgiz_sorov_uchun_yoq(
+    client, admin_headers, operator_headers, mahsulot_tola, kamera_surat_bermaydi
+):
+    """Boshqa yaqin yozuv bo'lmasa — ogohlantirish chiqmasligi kerak."""
+    partiya = _partiya(client, operator_headers, 321)
+    sorov_id = client.post(
+        "/api/v1/kiplar", json=_payload(partiya["id"], ogirlik=90.0), headers=operator_headers
+    ).json()["sorov_id"]
+
+    javob = client.get("/api/v1/kamera-tasdiq", params={"holati": "kutilmoqda"}, headers=admin_headers)
+    yozuv = next(i for i in javob.json()["items"] if i["id"] == sorov_id)
+    assert yozuv["dublikat_shubhasi"] is False
+
+
+def test_royxatda_dublikat_shubhasi_uzoq_ogirlik_farqida_yoq(
+    client, admin_headers, operator_headers, mahsulot_tola, kamera_surat_bermaydi
+):
+    """Bir xil partiya, yaqin vaqt, LEKIN og'irlik farqi tolerantlikdan katta
+    bo'lsa — ogohlantirish chiqmasligi kerak (haqiqiy ikkita alohida kip)."""
+    partiya = _partiya(client, operator_headers, 322)
+    client.post("/api/v1/kiplar", json=_payload(partiya["id"], ogirlik=100.0), headers=operator_headers)
+    sorov2_id = client.post(
+        "/api/v1/kiplar", json=_payload(partiya["id"], ogirlik=150.0), headers=operator_headers
+    ).json()["sorov_id"]
+
+    javob = client.get("/api/v1/kamera-tasdiq", params={"holati": "kutilmoqda"}, headers=admin_headers)
+    yozuv = next(i for i in javob.json()["items"] if i["id"] == sorov2_id)
+    assert yozuv["dublikat_shubhasi"] is False
+
+
+def test_royxatda_dublikat_shubhasi_rad_etilgan_sorov_bilan_solishtirilmaydi(
+    client, admin_headers, operator_headers, mahsulot_tola, kamera_surat_bermaydi
+):
+    """Avval RAD ETILGAN so'rov (masalan operatorning xato urinishi) yangi,
+    yaqin og'irlikdagi so'rovni "shubhali" deb belgilamasligi kerak — rad
+    etilgan allaqachon hal qilingan, endi ahamiyatsiz."""
+    partiya = _partiya(client, operator_headers, 323)
+    eski_sorov_id = client.post(
+        "/api/v1/kiplar", json=_payload(partiya["id"], ogirlik=60.0), headers=operator_headers
+    ).json()["sorov_id"]
+    client.post(f"/api/v1/kamera-tasdiq/{eski_sorov_id}/rad-etish", headers=admin_headers)
+
+    yangi_sorov_id = client.post(
+        "/api/v1/kiplar", json=_payload(partiya["id"], ogirlik=60.1), headers=operator_headers
+    ).json()["sorov_id"]
+
+    javob = client.get("/api/v1/kamera-tasdiq", params={"holati": "kutilmoqda"}, headers=admin_headers)
+    yozuv = next(i for i in javob.json()["items"] if i["id"] == yangi_sorov_id)
+    assert yozuv["dublikat_shubhasi"] is False
+
+
+def test_royxatda_dublikat_shubhasi_mavjud_kip_bilan_ham_ishlaydi(
+    client, admin_headers, operator_headers, mahsulot_tola, kamera_surat_bermaydi, monkeypatch
+):
+    """Partiyada ALLAQACHON (oddiy oqimda, kamera ishlaganda) saqlangan kip
+    bo'lsa, va endi kamera ishlamay qolib yaqin og'irlikdagi so'rov kelsa —
+    bu ham (sorov-sorov emas, sorov-Kip solishtiruvi orqali) shubhali deb
+    belgilanishi kerak."""
+    partiya = _partiya(client, operator_headers, 324)
+
+    # Kamera hali ISHLAYOTGAN payt (`kamera_surat_bermaydi` fixture sozlagan
+    # qiymatlarni shu bitta so'rov uchun vaqtincha bekor qilamiz) oddiy
+    # oqimda bitta kip saqlanadi.
+    monkeypatch.setattr(settings, "KAMERA_IP", None)
+    birinchi = client.post("/api/v1/kiplar", json=_payload(partiya["id"], ogirlik=70.0), headers=operator_headers)
+    assert birinchi.status_code == 201
+    monkeypatch.setattr(settings, "KAMERA_IP", "10.0.0.9")  # fixture qiymatiga qaytaramiz
+
+    # Endi kamera yana "ishlamay qoladi". Yaqin og'irlikdagi ikkinchi urinish
+    # ODDIY oqimdagi dedup-tekshiruvining o'ziga (409) uchrab qolmasligi uchun
+    # `majburiy=True` bilan yuboriladi (operator "ha, bu haqiqatan yangi
+    # kip" deb tasdiqlagan holatni simulyatsiya qiladi) — shunda so'rov
+    # kamera bosqichigacha yetib boradi va "kutilmoqda" so'rov yaratadi.
+    ikkinchi_tana = _payload(partiya["id"], ogirlik=70.3)
+    ikkinchi_tana["majburiy"] = True
+    ikkinchi_sorov_id = client.post("/api/v1/kiplar", json=ikkinchi_tana, headers=operator_headers).json()["sorov_id"]
+
+    javob = client.get("/api/v1/kamera-tasdiq", params={"holati": "kutilmoqda"}, headers=admin_headers)
+    yozuv = next(i for i in javob.json()["items"] if i["id"] == ikkinchi_sorov_id)
+    assert yozuv["dublikat_shubhasi"] is True
+
+
 # --- Kamera ISHLAGANDA — oqim o'zgarmaydi ---
 
 

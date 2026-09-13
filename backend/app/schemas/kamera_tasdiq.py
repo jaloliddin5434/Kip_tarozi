@@ -44,6 +44,11 @@ class KameraTasdiqRoyxatJavob(BaseModel):
     hal_qilgan_ism: str | None
     hal_qilish_manbasi: str | None
     izoh: str | None
+    # AUDIT TUZATISHI: shu partiyada yaqin vaqtda/og'irlikda BOSHQA (saqlangan
+    # kip yoki hal qilinmagan/tasdiqlangan boshqa so'rov) mavjudligi haqida
+    # ogohlantirish — admin panelida ko'rinadi, LEKIN hech narsani avtomatik
+    # bloklamaydi (qarang app/services/kamera_tasdiq.py:dublikat_shubhasi_bormi).
+    dublikat_shubhasi: bool = False
 
 
 class KameraTasdiqRadEtish(BaseModel):

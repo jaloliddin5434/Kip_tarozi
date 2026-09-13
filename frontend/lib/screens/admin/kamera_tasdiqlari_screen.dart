@@ -179,38 +179,66 @@ class _KameraTasdiqlariEkraniState extends State<KameraTasdiqlariEkrani> {
   }
 
   DataRow _qator(dynamic lok, KameraTasdiqSorovi s) {
-    return DataRow(cells: [
-      DataCell(Text('${s.vaqt.toLocal()}'.substring(0, 16))),
-      DataCell(Text(s.smena)),
-      DataCell(Text(s.operatorIsm)),
-      DataCell(Text(s.mahsulotNomi)),
-      DataCell(Text('#${s.partiyaRaqami}')),
-      DataCell(Text(s.ogirlik.toStringAsFixed(1))),
-      DataCell(_holatChip(lok, s)),
-      DataCell(
-        s.kutilmoqda
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  FilledButton(
-                    onPressed: _amalBajarilmoqda ? null : () => _tasdiqlash(s),
-                    child: Text(lok.t('tasdiqlash')),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
-                    onPressed: _amalBajarilmoqda ? null : () => _radEtish(s),
-                    child: Text(lok.t('rad_etish')),
-                  ),
-                ],
-              )
-            : Text(
-                [s.halQilganIsm, s.halQilishManbasi == 'telegram' ? 'Telegram' : null]
-                    .where((e) => e != null)
-                    .join(' · '),
-                style: const TextStyle(color: Colors.grey),
-              ),
-      ),
-    ]);
+    return DataRow(
+      // AUDIT TUZATISHI: shu partiyada yaqinda o'xshash og'irlik topilgan
+      // bo'lsa — butun qatorni yengil sariq fon bilan ajratib ko'rsatamiz
+      // (faqat DIQQATni tortish uchun, hech narsa avtomatik bloklanmaydi —
+      // admin baribir tasdiqlashi yoki rad etishi mumkin).
+      color: s.dublikatShubhasi
+          ? WidgetStateProperty.all(Colors.amber.withValues(alpha: 0.12))
+          : null,
+      cells: [
+        DataCell(Text('${s.vaqt.toLocal()}'.substring(0, 16))),
+        DataCell(Text(s.smena)),
+        DataCell(Text(s.operatorIsm)),
+        DataCell(Text(s.mahsulotNomi)),
+        DataCell(Text('#${s.partiyaRaqami}')),
+        DataCell(_ogirlikXujayrasi(lok, s)),
+        DataCell(_holatChip(lok, s)),
+        DataCell(
+          s.kutilmoqda
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FilledButton(
+                      onPressed: _amalBajarilmoqda ? null : () => _tasdiqlash(s),
+                      child: Text(lok.t('tasdiqlash')),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      onPressed: _amalBajarilmoqda ? null : () => _radEtish(s),
+                      child: Text(lok.t('rad_etish')),
+                    ),
+                  ],
+                )
+              : Text(
+                  [s.halQilganIsm, s.halQilishManbasi == 'telegram' ? 'Telegram' : null]
+                      .where((e) => e != null)
+                      .join(' · '),
+                  style: const TextStyle(color: Colors.grey),
+                ),
+        ),
+      ],
+    );
+  }
+
+  /// Og'irlik matni — dublikat shubhasi bo'lsa yoniga sariq ogohlantirish
+  /// belgisi (tooltip bilan) qo'shiladi. FAQAT vizual — admin baribir
+  /// tasdiqlashi yoki rad etishi mumkin, hech narsa avtomatik bloklanmaydi.
+  Widget _ogirlikXujayrasi(dynamic lok, KameraTasdiqSorovi s) {
+    final matn = Text(s.ogirlik.toStringAsFixed(1));
+    if (!s.dublikatShubhasi) return matn;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        matn,
+        const SizedBox(width: 6),
+        Tooltip(
+          message: lok.t('dublikat_shubhasi_tooltip'),
+          child: const Icon(Icons.warning_amber_rounded, size: 18, color: Colors.orange),
+        ),
+      ],
+    );
   }
 
   Widget _holatChip(dynamic lok, KameraTasdiqSorovi s) {
