@@ -1,7 +1,10 @@
+import 'tasdiq_yozuvi.dart';
+
 /// "Kamera ishlamasa — Admin ruxsati" oqimi. Kamera sozlangan-u surat ololmaganda
 /// backend kipni saqlamaydi; shu so'rov yaratiladi va Admin (panel yoki Telegram
 /// tugmasi orqali) tasdiqlaguncha operator bloklanadi.
-class KameraTasdiqSorovi {
+class KameraTasdiqSorovi implements TasdiqYozuvi {
+  @override
   final int id;
   final DateTime vaqt;
   final String smena;
@@ -9,10 +12,13 @@ class KameraTasdiqSorovi {
   final String mahsulotNomi;
   final int partiyaRaqami;
   final String operatorIsm;
+  @override
   final String holati; // kutilmoqda | tasdiqlangan | rad_etilgan
   final int? kipId;
   final DateTime? halQilinganVaqt;
+  @override
   final String? halQilganIsm;
+  @override
   final String? halQilishManbasi;
   final String? izoh;
   // AUDIT TUZATISHI: shu partiyada yaqin vaqtda/og'irlikda BOSHQA (saqlangan
@@ -37,6 +43,7 @@ class KameraTasdiqSorovi {
     this.dublikatShubhasi = false,
   });
 
+  @override
   bool get kutilmoqda => holati == 'kutilmoqda';
 
   factory KameraTasdiqSorovi.fromJson(Map<String, dynamic> j) => KameraTasdiqSorovi(

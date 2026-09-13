@@ -1,7 +1,10 @@
+import 'tasdiq_yozuvi.dart';
+
 /// Operator "Smena tarixi" ro'yxatidagi bir kip uchun mahsulot/partiya
 /// noto'g'ri tanlanganini bildirib, to'g'rilash so'ragan zayavka. Admin
 /// (panel yoki Telegram tugmasi orqali) tasdiqlaguncha kip o'zgarishsiz qoladi.
-class KipTogrilashZayavkasi {
+class KipTogrilashZayavkasi implements TasdiqYozuvi {
+  @override
   final int id;
   final DateTime vaqt;
   final int kipId;
@@ -12,9 +15,12 @@ class KipTogrilashZayavkasi {
   final String yangiMahsulotNomi;
   final int yangiPartiyaRaqami;
   final String sabab;
+  @override
   final String holati; // kutilmoqda | tasdiqlangan | rad_etilgan
   final DateTime? halQilinganVaqt;
+  @override
   final String? halQilganIsm;
+  @override
   final String? halQilishManbasi;
   final String? izoh;
 
@@ -36,6 +42,7 @@ class KipTogrilashZayavkasi {
     this.izoh,
   });
 
+  @override
   bool get kutilmoqda => holati == 'kutilmoqda';
 
   factory KipTogrilashZayavkasi.fromJson(Map<String, dynamic> j) => KipTogrilashZayavkasi(
