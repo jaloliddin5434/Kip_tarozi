@@ -373,7 +373,9 @@ class _LoginEkraniState extends State<LoginEkrani> {
         TextField(
           controller: _loginKontrolleri,
           decoration: InputDecoration(labelText: lok.t('login_belgi'), border: const OutlineInputBorder()),
-          onSubmitted: (_) => _kirish(),
+          // AUDIT TUZATISHI: "Kirish" tugmasi ishlatadigan xuddi shu "band"
+          // sharti — Enter tez-tez bosilsa ham parallel so'rov ketmasin.
+          onSubmitted: (_) => _yuklanmoqda ? null : _kirish(),
           autofocus: true,
         ),
         const SizedBox(height: 12),
@@ -383,7 +385,7 @@ class _LoginEkraniState extends State<LoginEkrani> {
         decoration: InputDecoration(labelText: lok.t('parol_belgi'), border: const OutlineInputBorder()),
         obscureText: true,
         autofocus: operatorMi,
-        onSubmitted: (_) => _kirish(),
+        onSubmitted: (_) => _yuklanmoqda ? null : _kirish(),
       ),
       if (_xato != null) ...[
         const SizedBox(height: 12),

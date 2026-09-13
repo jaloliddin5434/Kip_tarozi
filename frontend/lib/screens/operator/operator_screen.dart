@@ -1210,7 +1210,10 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
               border: InputBorder.none,
               isCollapsed: true,
             ),
-            onSubmitted: (_) => _saqlashYuklanmoqda ? null : _saqlash(),
+            // AUDIT TUZATISHI: "Saqlash" tugmasi ishlatadigan xuddi shu "band"
+            // sharti (_saqlashTugmasiFaol) — 3s sovish davrida Enter bosilsa
+            // ham qayta chaqirilmasin.
+            onSubmitted: (_) => (_saqlashYuklanmoqda || _saqlashVaqtinchaNofaol) ? null : _saqlash(),
           ),
         ],
       ),
