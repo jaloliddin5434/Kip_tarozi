@@ -19,6 +19,12 @@ const Map<String, Map<Til, String>> _matnlar = {
     Til.uz: 'Login yoki parol noto\'g\'ri',
     Til.ru: 'Неверный логин или пароль',
   },
+  // AUDIT TUZATISHI: markazlashgan "401 = avtomatik logout" xabari —
+  // ApiClient.bir401SodirBoldi orqali (AppState._sessiyaMajburiyTugadi).
+  'sessiya_tugadi_qayta_kiring': {
+    Til.uz: 'Sessiyangiz tugadi — qaytadan kiring',
+    Til.ru: 'Ваша сессия истекла — войдите снова',
+  },
 
   'smena': {Til.uz: 'Smena', Til.ru: 'Смена'},
   'smena_holati': {

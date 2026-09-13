@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'navigasiya_kalitlari.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/login_screen.dart';
 import 'screens/operator/operator_screen.dart';
@@ -20,6 +21,8 @@ class KipTaroziApp extends StatelessWidget {
       child: Consumer<AppState>(
         builder: (context, holat, _) {
           return MaterialApp(
+            navigatorKey: navigatorKaliti,
+            scaffoldMessengerKey: xabarKaliti,
             title: 'Kip Tarozi',
             debugShowCheckedModeBanner: false,
             theme: yorugRejim(),

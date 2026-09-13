@@ -1,11 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api/api_client.dart';
 import '../api/api_exception.dart';
 import '../i18n/strings.dart';
 import '../models/foydalanuvchi.dart';
+import '../navigasiya_kalitlari.dart';
+import '../services/offline_kip_navbati.dart';
 
 class AppState extends ChangeNotifier {
+  AppState() {
+    // AUDIT TUZATISHI: markazlashgan "401 = avtomatik logout" — ApiClient
+    // qaysi so'rovdan (istisnosiz) 401 olsa ham shu chaqiriladi.
+    api.bir401SodirBoldi = _sessiyaMajburiyTugadi;
+  }
+
   final ApiClient api = ApiClient();
 
   Foydalanuvchi? foydalanuvchi;
@@ -51,6 +61,14 @@ class AppState extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('token', api.token!);
+    // AUDIT TUZATISHI: navbatda shu FOYDALANUVCHIga tegishli (eski, endi
+    // bekor qilingan/eskirgan tokenli) kutilayotgan offline yozuvlar bo'lsa —
+    // yangi token bilan yangilaymiz, aks holda ular qayta login qilingandan
+    // keyin ham abadiy eski (o'lik) token bilan 401 olib hech qachon
+    // yuborilmay qolardi. Boshqa foydalanuvchiga tegishli yozuvlarga
+    // tegilmaydi (JWT "sub" solishtiriladi) — smena almashinuvida noto'g'ri
+    // operatorga bog'lanib qolmasligi uchun.
+    await OfflineKipNavbati.yangiTokenBilanYangilash(api.token!);
     notifyListeners();
   }
 
@@ -59,7 +77,11 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> moliyaviyKirish(String parol) async {
-    final javob = await api.post('/moliyaviy/kirish', tana: {'parol': parol});
+    // sessiyaTekshiruvi:false — bu endpointda 401 "moliyaviy parol
+    // noto'g'ri" degani, asosiy sessiya tugashini ANGLATMAYDI (ekranning
+    // o'zi buni alohida, maxsus xabar bilan ko'rsatadi — pastga qarang
+    // moliyaviy_kirish_screen.dart). Global logout ishga tushmasligi kerak.
+    final javob = await api.post('/moliyaviy/kirish', tana: {'parol': parol}, sessiyaTekshiruvi: false);
     moliyaviyToken = javob['access_token'];
     moliyaviyTokenMuddati = DateTime.now().add(Duration(minutes: javob['muddat_daqiqa']));
     notifyListeners();
@@ -76,7 +98,10 @@ class AppState extends ChangeNotifier {
   /// uloqtiradi — chaqiruvchi ekran shu orqali kirish ekraniga qaytishi kerak.
   Future<dynamic> moliyaviyGet(String yol, {Map<String, dynamic>? query}) async {
     try {
-      return await api.get(yol, query: query, tokenOverride: moliyaviyToken);
+      // sessiyaTekshiruvi:false — moliyaviy QO'SHIMCHA sessiyaning tugashi
+      // asosiy login sessiyasini bekor qilmasligi kerak (pastda faqat
+      // moliyaviyChiqish() chaqiriladi — to'liq logout emas).
+      return await api.get(yol, query: query, tokenOverride: moliyaviyToken, sessiyaTekshiruvi: false);
     } on ApiException catch (e) {
       if (e.statusCode == 401) moliyaviyChiqish();
       rethrow;
@@ -91,6 +116,38 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
     notifyListeners();
+  }
+
+  /// AUDIT TUZATISHI: `ApiClient`dan istisnosiz har qanday so'rovda 401
+  /// kelganda (masalan admin operatorning tokenini bekor qilsa, yoki parol
+  /// o'zgarsa) chaqiriladi. Joriy ekran nima bo'lishidan qat'i nazar — hatto
+  /// "Kamera tasdiqlanmoqda" kabi ATAYLAB chiqish yo'lisiz
+  /// (`PopScope(canPop: false)`) blokловчи dialog ochiq bo'lsa ham — uni
+  /// yopib, sessiyani tozalab, login ekraniga qaytaradi va tushunarli xabar
+  /// ko'rsatadi.
+  void _sessiyaMajburiyTugadi() {
+    if (!kirilgan) return;
+
+    // Ochiq har qanday dialog (kamera-tasdiq kutish, "yuk saqlanmadi"
+    // blokловчи oynasi va h.k.) — bular alohida Navigator route sifatida
+    // asosiy ekran ustida turadi; ildiz marshrutgacha yopib tashlaymiz.
+    navigatorKaliti.currentState?.popUntil((route) => route.isFirst);
+
+    foydalanuvchi = null;
+    api.token = null;
+    moliyaviyToken = null;
+    moliyaviyTokenMuddati = null;
+    notifyListeners();
+
+    unawaited(SharedPreferences.getInstance().then((prefs) => prefs.remove('token')));
+
+    xabarKaliti.currentState?.showSnackBar(
+      SnackBar(
+        content: Text(lok.t('sessiya_tugadi_qayta_kiring')),
+        backgroundColor: Colors.red.shade700,
+        duration: const Duration(seconds: 6),
+      ),
+    );
   }
 
   Future<void> temaniAlmashtirish() async {

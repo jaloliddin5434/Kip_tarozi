@@ -24,7 +24,7 @@ class _SoxtaApi extends ApiClient {
   Set<String> serverQatiyRadEtadi = const {}; // shu mijoz_id'lar "xato" holat bilan qaytadi
 
   @override
-  Future<dynamic> post(String yol, {Object? tana, String? tokenOverride}) async {
+  Future<dynamic> post(String yol, {Object? tana, String? tokenOverride, bool sessiyaTekshiruvi = true}) async {
     if (postChaqirildi == 0 && oldindan != null) await oldindan!();
     postChaqirildi++;
     if (xatoBerishSorovRaqami != null && postChaqirildi == xatoBerishSorovRaqami) {

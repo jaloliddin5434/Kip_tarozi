@@ -80,6 +80,57 @@ class OfflineKipNavbati {
 
   static String? _mid(Map<String, dynamic> y) => (y['tana'] as Map?)?['mijoz_id'] as String?;
 
+  /// JWT'ning ikkinchi (payload) qismini IMZOSIZ o'qib "sub" (foydalanuvchi
+  /// id) claimini qaytaradi — faqat lokal bog'lash (qaysi navbat yozuvi qaysi
+  /// foydalanuvchiga tegishli) uchun, xavfsizlik tekshiruvi EMAS (buni
+  /// backend har doim o'zi, imzo bilan tekshiradi). Token shakli buzilgan
+  /// bo'lsa jimgina `null` qaytaradi.
+  static int? _tokenFoydalanuvchiId(String token) {
+    try {
+      final qismlar = token.split('.');
+      if (qismlar.length != 3) return null;
+      var yuk = qismlar[1].replaceAll('-', '+').replaceAll('_', '/');
+      yuk += '=' * ((4 - yuk.length % 4) % 4);
+      final malumot = jsonDecode(utf8.decode(base64.decode(yuk))) as Map<String, dynamic>;
+      final sub = malumot['sub'];
+      if (sub is int) return sub;
+      if (sub is String) return int.tryParse(sub);
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// AUDIT TUZATISHI: muvaffaqiyatli (qayta) login qilingandan keyin
+  /// chaqiriladi — navbatda ushbu FOYDALANUVCHIGA tegishli, lekin hali
+  /// sinxronlanmagan (`kipId == null`, `muammoli != true`) yozuvlarning eski
+  /// (endi bekor qilingan/eskirgan) tokenini YANGI token bilan almashtiradi.
+  /// Aks holda ular qayta login qilingandan keyin ham abadiy eski (o'lik)
+  /// token bilan 401 olib, hech qachon yuborilmay qolardi (5-QISM "muammoli"
+  /// deb belgilanmaydi ham, chunki bu network-emas-ApiException filtri
+  /// `sinxronla()`da ishlamaydi — global 401-signal chaqirilib, keyingi
+  /// tsiklga qoladi). Boshqa foydalanuvchiga tegishli (hali sinxronlanmagan)
+  /// yozuvlarga TEGILMAYDI — shu bilan smena almashinuvida bir operatorning
+  /// yozuvi boshqasiga bog'lanib qolishining oldi olinadi.
+  static Future<void> yangiTokenBilanYangilash(String yangiToken) {
+    final yangiFoydalanuvchiId = _tokenFoydalanuvchiId(yangiToken);
+    if (yangiFoydalanuvchiId == null) return Future.value();
+    return _qulflab(() async {
+      final yozuvlar = await royxat();
+      var ozgardimi = false;
+      for (final y in yozuvlar) {
+        if (y['kipId'] != null || y['muammoli'] == true) continue;
+        final eskiToken = y['token'] as String?;
+        if (eskiToken == null || eskiToken == yangiToken) continue;
+        if (_tokenFoydalanuvchiId(eskiToken) == yangiFoydalanuvchiId) {
+          y['token'] = yangiToken;
+          ozgardimi = true;
+        }
+      }
+      if (ozgardimi) await _yoz(yozuvlar);
+    });
+  }
+
   /// Yozuvni navbatga qo'shadi. Bir xil `mijoz_id` ikki marta qo'shilmaydi.
   /// [suratYoli] — offline olingan surat lokal fayl yo'li (ixtiyoriy).
   static Future<void> qoshish({

@@ -15,6 +15,13 @@ class ApiClient {
 
   String? token;
 
+  /// AUDIT TUZATISHI: markazlashgan "sessiya tugadi" signali — istisnosiz
+  /// BARCHA so'rovlardan (oddiy chaqiruv, offline-navbat sinxroni, kamera-tasdiq
+  /// poll va h.k.) 401 kelsa shu chaqiriladi (`sessiyaTekshiruvi: false` bilan
+  /// yuborilgan alohida so'rovlar bundan mustasno — pastga qarang). `AppState`
+  /// buni o'rnatib, global logout + login ekraniga qaytarishni bajaradi.
+  void Function()? bir401SodirBoldi;
+
   Map<String, String> _sarlavhalar([String? tokenOverride]) {
     final amaldagiToken = tokenOverride ?? token;
     return {
@@ -51,17 +58,29 @@ class ApiClient {
     throw ApiException(javob.statusCode, xabar, tafsilot: detail);
   }
 
-  dynamic _javobniQayta(http.Response javob) {
+  dynamic _javobniQayta(http.Response javob, {bool sessiyaTekshiruvi = true}) {
     if (javob.statusCode >= 200 && javob.statusCode < 300) {
       if (javob.body.isEmpty) return null;
       return jsonDecode(utf8.decode(javob.bodyBytes));
     }
+    // AUDIT TUZATISHI: 401 kelsa (va shu so'rov uchun sessiya-tekshiruvi
+    // o'chirilmagan bo'lsa) — global "sessiya tugadi" signalini ishga
+    // tushiramiz, SO'NG odatdagidek ApiException otamiz (chaqiruvchi
+    // ekranning o'z xato-ko'rsatish mantig'i o'zgarmasdan davom etadi).
+    if (javob.statusCode == 401 && sessiyaTekshiruvi) {
+      bir401SodirBoldi?.call();
+    }
     _xatoTashla(javob);
   }
 
-  Future<dynamic> get(String yol, {Map<String, dynamic>? query, String? tokenOverride}) async {
+  Future<dynamic> get(
+    String yol, {
+    Map<String, dynamic>? query,
+    String? tokenOverride,
+    bool sessiyaTekshiruvi = true,
+  }) async {
     final javob = await http.get(_uri(yol, query), headers: _sarlavhalar(tokenOverride));
-    return _javobniQayta(javob);
+    return _javobniQayta(javob, sessiyaTekshiruvi: sessiyaTekshiruvi);
   }
 
   /// JSON emas, xom bayt oqimi qaytaradigan endpointlar uchun (masalan
@@ -72,20 +91,25 @@ class ApiClient {
     if (javob.statusCode >= 200 && javob.statusCode < 300) {
       return javob.bodyBytes;
     }
+    if (javob.statusCode == 401) bir401SodirBoldi?.call();
     _xatoTashla(javob);
   }
 
   /// [tana] Map yoki List (JSON-kodlanadigan har qanday qiymat) bo'lishi mumkin —
   /// masalan `/kiplar/sinxron` ro'yxat qabul qiladi. [tokenOverride] berilsa,
   /// joriy sessiya tokeni o'rniga o'sha ishlatiladi (offline navbatni saqlagan
-  /// operator tokeni bilan yuborish uchun).
-  Future<dynamic> post(String yol, {Object? tana, String? tokenOverride}) async {
+  /// operator tokeni bilan yuborish uchun). [sessiyaTekshiruvi] `false` bo'lsa,
+  /// 401 kelganda global logout ISHGA TUSHMAYDI — faqat 401'ning o'zi boshqa
+  /// (sessiya tugashidan farqli) ma'noni anglatadigan endpointlar uchun,
+  /// masalan `/moliyaviy/kirish` (401 = "moliyaviy parol noto'g'ri", asosiy
+  /// sessiya emas) — bu holatda ekranning o'zi 401'ni alohida ushlaydi.
+  Future<dynamic> post(String yol, {Object? tana, String? tokenOverride, bool sessiyaTekshiruvi = true}) async {
     final javob = await http.post(
       _uri(yol),
       headers: _sarlavhalar(tokenOverride),
       body: tana == null ? null : jsonEncode(tana),
     );
-    return _javobniQayta(javob);
+    return _javobniQayta(javob, sessiyaTekshiruvi: sessiyaTekshiruvi);
   }
 
   /// Multipart (fayl) yuklash — masalan offline navbatdan kelgan kip suratini
