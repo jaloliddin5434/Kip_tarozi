@@ -80,7 +80,12 @@ class Settings(BaseSettings):
 
     # Kunlik Telegram hisoboti (F.3)
     VAQT_ZONASI: str = "Asia/Tashkent"
-    KUNLIK_HISOBOT_VAQTI: str = "20:00"
+    # Ertalab 08:30 — kecha TO'LIQ tugagan bo'ladi, shuning uchun hisobot
+    # "bugungi kun" emas, "kechagi to'liq kun" ma'lumotini yuboradi (qarang
+    # rejalashtiruvchi.py: _kunlik_hisobot_yubor). Ilgari 20:00 edi — amalda
+    # dev kompyuter kechqurun uzluksiz ishlab turmagani sababli hisobot HECH
+    # QACHON yetib bormagan (audit topilmasi).
+    KUNLIK_HISOBOT_VAQTI: str = "08:30"
 
     # Moliyaviy bo'lim — qo'shimcha parol bilan himoyalangan qisqa muddatli sessiya
     MOLIYAVIY_TOKEN_MUDDATI_DAQIQA: int = 30
