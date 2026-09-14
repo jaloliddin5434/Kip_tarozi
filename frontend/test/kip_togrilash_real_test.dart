@@ -1,9 +1,12 @@
 // Bu test HAQIQIY, jonli backendga ulanadi (mock emas) — qarang:
 // operator_oqimi_test.dart va kamera_dublikat_shubhasi_real_test.dart
-// izohlari (bir xil naqsh). AUDIT TUZATISHI (refaktoring): kip_togrilash_screen.dart
-// endi umumiy `TasdiqRoyxatiEkrani<T>` widgetidan foydalanadi — bu test REAL
-// backend orqali ro'yxat/tasdiqlash/avto-yangilanish avvalgidek ishlashini
-// tasdiqlaydi.
+// izohlari (bir xil naqsh). AUDIT TUZATISHI (UX birlashtirish): "Kamera
+// tasdiqlari" va "Kip to'g'irlash so'rovlari" endi BITTA "Tasdiqlash tarixi"
+// ekraniga (`tasdiqlash_tarixi_screen.dart`, GET /tasdiqlash-tarixi) birlashgan
+// — bu test REAL backend orqali ro'yxat/tasdiqlash/avto-yangilanish shu
+// birlashtirilgan ekranda ham avvalgidek ishlashini tasdiqlaydi. Merged
+// ro'yxatda boshqa turdagi (kamera) qatorlar ham bo'lishi mumkinligi uchun
+// "Tasdiqlash" tugmasi aynan SHU zayavka qatoridan qidiriladi (global emas).
 //
 // Ishga tushirish:
 //   1. Ajratilgan test bazasida migratsiya bajarilgan, admin
@@ -142,16 +145,22 @@ void main() {
         await tester.tap(find.text('Kirish'));
         await _kut(tester, marta: 8);
 
-        // --- "Kip to'g'rilash so'rovlari" bo'limiga o'tamiz ---
-        await tester.tap(find.text('Kip to\'g\'rilash so\'rovlari').first);
+        // --- "Tasdiqlash tarixi" (birlashtirilgan) bo'limiga o'tamiz ---
+        await tester.tap(find.text('Tasdiqlash tarixi').first);
         await _kut(tester, marta: 10);
 
-        // Ro'yxatda eski/yangi partiya raqamlari va sabab ko'rinishi kerak.
+        // Ro'yxatda eski/yangi partiya raqamlari va sabab ko'rinishi kerak
+        // (ikkalasi ham BITTA "tavsif" katakchasida — qarang tasdiqlash_tarixi_screen.dart).
         expect(find.textContaining('#$eskiPartiya'), findsOneWidget, reason: 'Eski partiya ro\'yxatda ko\'rinishi kerak');
         expect(find.textContaining('#$yangiPartiya'), findsOneWidget, reason: 'Yangi partiya ro\'yxatda ko\'rinishi kerak');
         expect(find.text(sabab), findsOneWidget, reason: 'Sabab matni to\'liq ko\'rinishi kerak');
 
-        final tasdiqlashTugmasi = find.text('Tasdiqlash');
+        // Merged ro'yxatda boshqa turdagi (kamera) qatorlar ham bo'lishi
+        // mumkin — "Tasdiqlash" tugmasini GLOBAL emas, aynan shu zayavka
+        // qatori (sabab matni orqali topilgan DataRow) ICHIDAN qidiramiz.
+        final buQator = find.ancestor(of: find.text(sabab), matching: find.byType(DataRow));
+        expect(buQator, findsOneWidget);
+        final tasdiqlashTugmasi = find.descendant(of: buQator, matching: find.text('Tasdiqlash'));
         expect(tasdiqlashTugmasi, findsOneWidget);
 
         // --- Tasdiqlaymiz --- (jadval keng — gorizontal scroll ichida

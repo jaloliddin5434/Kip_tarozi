@@ -275,14 +275,6 @@ const Map<String, Map<Til, String>> _matnlar = {
   'vaqt': {Til.uz: 'Vaqt', Til.ru: 'Время'},
 
   // Kamera tasdiqlari bo'limi ("Kamera ishlamasa — Admin ruxsati")
-  'kamera_tasdiqlari': {
-    Til.uz: 'Kamera tasdiqlari',
-    Til.ru: 'Подтверждения камеры',
-  },
-  'kamera_tasdiqlari_yoq': {
-    Til.uz: 'Kutilayotgan tasdiq yo\'q',
-    Til.ru: 'Нет ожидающих подтверждений',
-  },
   'tasdiqlash': {Til.uz: 'Tasdiqlash', Til.ru: 'Подтвердить'},
   'rad_etish': {Til.uz: 'Rad etish', Til.ru: 'Отклонить'},
   'tasdiqlangan': {Til.uz: 'Tasdiqlangan', Til.ru: 'Подтверждено'},
@@ -320,14 +312,24 @@ const Map<String, Map<Til, String>> _matnlar = {
     Til.ru: 'Администратор отклонил — кип не сохранён, попробуйте снова',
   },
 
-  // Kip to'g'rilash zayavkasi bo'limi (operator so'raydi, admin tasdiqlaydi)
-  'kip_togrilash_sorovlari': {
-    Til.uz: 'Kip to\'g\'rilash so\'rovlari',
-    Til.ru: 'Заявки на исправление кипа',
+  // Tasdiqlash tarixi — Kamera tasdiqlari + Kip to'g'irlash so'rovlarini
+  // birlashtirgan admin ekrani (kalendar bilan).
+  'tasdiqlash_tarixi': {
+    Til.uz: 'Tasdiqlash tarixi',
+    Til.ru: 'История подтверждений',
   },
-  'kip_togrilash_sorovlari_yoq': {
-    Til.uz: 'Kutilayotgan so\'rov yo\'q',
-    Til.ru: 'Нет ожидающих заявок',
+  'tasdiqlash_tarixi_yoq': {
+    Til.uz: 'Hech qanday so\'rov yo\'q',
+    Til.ru: 'Нет заявок',
+  },
+  'turi': {Til.uz: 'Turi', Til.ru: 'Тип'},
+  'tavsif': {Til.uz: 'Tavsif', Til.ru: 'Описание'},
+  'togrilash': {Til.uz: 'To\'g\'irlash', Til.ru: 'Исправление'},
+  'izoh': {Til.uz: 'Izoh', Til.ru: 'Комментарий'},
+  'hal_qildi': {Til.uz: 'Kim hal qildi', Til.ru: 'Кто решил'},
+  'kun_uchun_sorov_yoq': {
+    Til.uz: 'Bu kunda hal qilingan so\'rov yo\'q',
+    Til.ru: 'В этот день нет решённых заявок',
   },
   'kip_togrilash_dialog_sarlavha': {
     Til.uz: 'Kipni to\'g\'rilash',

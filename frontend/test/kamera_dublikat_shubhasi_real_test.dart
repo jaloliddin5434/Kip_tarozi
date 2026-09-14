@@ -1,10 +1,13 @@
 // Bu test HAQIQIY, jonli backendga ulanadi (mock emas) — qarang:
 // operator_oqimi_test.dart izohi (bir xil naqsh). AUDIT TUZATISHI: kamera
 // ishlamay qolganda (POST /kiplar -> 202) dublikat-og'irlik ogohlantirishi
-// ENDI admin panelida ("Kamera tasdiqlari" ro'yxati) ko'rinishini REAL
-// backend + REAL admin ekrani orqali tasdiqlaydi — aynan avvalgi audit
-// stsenariysini (bitta partiyaga 2 soniya farq bilan bir xil og'irlik,
-// kamera o'chirilgan) qayta takrorlab.
+// ENDI admin panelida ("Tasdiqlash tarixi" — "Kamera tasdiqlari" bilan "Kip
+// to'g'irlash so'rovlari"ni birlashtirgan ekran) ko'rinishini REAL backend +
+// REAL admin ekrani orqali tasdiqlaydi — aynan avvalgi audit stsenariysini
+// (bitta partiyaga 2 soniya farq bilan bir xil og'irlik, kamera o'chirilgan)
+// qayta takrorlab. Merged ro'yxatda boshqa turdagi (kip-to'g'irlash)
+// qatorlar ham bo'lishi mumkinligi uchun barcha tekshiruvlar aynan shu
+// partiya raqami ko'rinadigan qatorlar bilan CHEGARALANGAN.
 //
 // Ishga tushirish:
 //   1. Ajratilgan test bazasida migratsiya bajarilgan, admin
@@ -88,7 +91,7 @@ Future<int> _ikkitaYaqinSorovYaratish() async {
 
 void main() {
   testWidgets(
-    'REAL: Admin panelida "Kamera tasdiqlari" ro\'yxatida dublikat-shubhasi ogohlantirishi (sariq belgi) ko\'rinadi',
+    'REAL: Admin panelida "Tasdiqlash tarixi" ro\'yxatida dublikat-shubhasi ogohlantirishi (sariq belgi) ko\'rinadi',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
       tester.view.physicalSize = const Size(1600, 1000);
@@ -118,9 +121,8 @@ void main() {
         await tester.tap(find.text('Kirish'));
         await _kut(tester, marta: 6);
 
-        // --- "Kamera tasdiqlari" bo'limiga o'tamiz (nav ustunidagi
-        // birinchisi — sarlavha matni sahifa ichida ham takrorlanadi) ---
-        await tester.tap(find.text('Kamera tasdiqlari').first);
+        // --- "Tasdiqlash tarixi" (birlashtirilgan) bo'limiga o'tamiz ---
+        await tester.tap(find.text('Tasdiqlash tarixi').first);
         await _kut(tester, marta: 10);
 
         if (find.textContaining('#$partiyaRaqami').evaluate().isEmpty) {
@@ -130,18 +132,22 @@ void main() {
         }
 
         // Kutilayotgan (yangi yaratilgan) ikkita qatorni topamiz.
+        final buPartiyaMatni = find.textContaining('#$partiyaRaqami');
         expect(
-          find.textContaining('#$partiyaRaqami'),
+          buPartiyaMatni,
           findsNWidgets(2),
           reason: 'Ikkala yaqinda yaratilgan so\'rov ham ro\'yxatda ko\'rinishi kerak',
         );
 
+        // Merged ro'yxatda boshqa turdagi (kip-to'g'irlash) qatorlar ham
+        // bo'lishi mumkin — qolgan tekshiruvlarni aynan shu ikkita qator
+        // (partiya raqami orqali topilgan DataRow'lar) bilan chegaralaymiz.
+        final buPartiyaQatorlari = find.ancestor(of: buPartiyaMatni, matching: find.byType(DataRow));
+        expect(buPartiyaQatorlari, findsNWidgets(2));
+
         // --- ASOSIY TASDIQ: ikkala qatorda ham sariq ogohlantirish belgisi ---
-        // (faqat JADVAL ICHIDA qidiramiz — xuddi shu ikonka NavigationRail'da
-        // "Shubhali holatlar" uchun ham doimiy ishlatiladi, u bilan aralashib
-        // ketmasin uchun).
         final ogohlantirishBelgisi = find.descendant(
-          of: find.byType(DataTable),
+          of: buPartiyaQatorlari,
           matching: find.byIcon(Icons.warning_amber_rounded),
         );
         expect(
@@ -152,7 +158,7 @@ void main() {
 
         // Admin BARIBIR tasdiqlashi mumkinligini ham tasdiqlaymiz (avtomatik
         // bloklanmagan — faqat ko'rinadigan ogohlantirish).
-        final tasdiqlashTugmalari = find.text('Tasdiqlash');
+        final tasdiqlashTugmalari = find.descendant(of: buPartiyaQatorlari, matching: find.text('Tasdiqlash'));
         expect(tasdiqlashTugmalari, findsNWidgets(2));
       });
     },

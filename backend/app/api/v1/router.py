@@ -16,6 +16,7 @@ from app.api.v1.routes import (
     shubhali_holatlar,
     sozlamalar,
     statistika,
+    tasdiqlash_tarixi,
 )
 
 api_router = APIRouter()
@@ -25,6 +26,7 @@ api_router.include_router(partiyalar.router)
 api_router.include_router(kiplar.router)
 api_router.include_router(kamera_tasdiq.router)
 api_router.include_router(kip_togrilash.router)
+api_router.include_router(tasdiqlash_tarixi.router)
 api_router.include_router(shubhali_holatlar.router)
 api_router.include_router(hujjatlar.router)
 api_router.include_router(statistika.router)

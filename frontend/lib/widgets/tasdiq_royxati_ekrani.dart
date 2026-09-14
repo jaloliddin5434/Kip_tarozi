@@ -20,10 +20,21 @@ import '../state/app_state.dart';
 /// barchasi shu widgetga parametr sifatida uzatiladi.
 class TasdiqRoyxatiEkrani<T extends TasdiqYozuvi> extends StatefulWidget {
   /// Backend endpoint prefiksi, masalan `/kamera-tasdiq` yoki `/kip-togrilash`.
-  /// Ro'yxat shu manzildan (`GET`), amallar `$endpointYoli/{id}/tasdiqlash`
-  /// va `$endpointYoli/{id}/rad-etish` (`POST`) orqali bajariladi.
+  /// Ro'yxat shu manzildan (`GET`) yuklanadi. Amallar (`tasdiqlash`/
+  /// `rad-etish`) ham standart holda shu prefiksdan foydalanadi — qarang
+  /// [amalEndpointi].
   final String endpointYoli;
   final T Function(Map<String, dynamic>) itemFromJson;
+
+  /// Ixtiyoriy: har bir QATOR uchun amal (`tasdiqlash`/`rad-etish`) qaysi
+  /// backend prefiksiga borishi kerakligini aniqlaydi. Berilmasa
+  /// [endpointYoli] ishlatiladi (bitta turdagi ro'yxat ekranlari uchun
+  /// standart xatti-harakat). Bir nechta ASL manbadan (masalan kamera-tasdiq
+  /// + kip-to'g'irlash) birlashtirilgan ro'yxatda — bu yerda id'lar ikkala
+  /// jadval bo'yicha MUSTAQIL (bir xil qiymat ikki xil yozuvga tegishli
+  /// bo'lishi mumkin) — shuning uchun har bir qator o'zining haqiqiy
+  /// manbasiga (masalan `item.tur`ga qarab) yo'naltirilishi SHART.
+  final String Function(T item)? amalEndpointi;
 
   /// Sahifa sarlavhasi va "ro'yxat bo'sh" matnlari uchun i18n kalitlari.
   final String sarlavhaKaliti;
@@ -50,6 +61,7 @@ class TasdiqRoyxatiEkrani<T extends TasdiqYozuvi> extends StatefulWidget {
     required this.ustunlarQurish,
     required this.katakchalarQurish,
     this.qatorRangi,
+    this.amalEndpointi,
   });
 
   @override
@@ -100,8 +112,10 @@ class _TasdiqRoyxatiEkraniState<T extends TasdiqYozuvi> extends State<TasdiqRoyx
     }
   }
 
+  String _amalUchunEndpoint(T item) => widget.amalEndpointi?.call(item) ?? widget.endpointYoli;
+
   Future<void> _tasdiqlash(T item) async {
-    await _amal(() => context.read<AppState>().api.post('${widget.endpointYoli}/${item.id}/tasdiqlash'));
+    await _amal(() => context.read<AppState>().api.post('${_amalUchunEndpoint(item)}/${item.id}/tasdiqlash'));
   }
 
   Future<void> _radEtish(T item) async {
@@ -125,7 +139,7 @@ class _TasdiqRoyxatiEkraniState<T extends TasdiqYozuvi> extends State<TasdiqRoyx
     if (tasdiq != true) return;
     await _amal(
       () => context.read<AppState>().api.post(
-            '${widget.endpointYoli}/${item.id}/rad-etish',
+            '${_amalUchunEndpoint(item)}/${item.id}/rad-etish',
             tana: {'izoh': kontroller.text.trim().isEmpty ? null : kontroller.text.trim()},
           ),
     );

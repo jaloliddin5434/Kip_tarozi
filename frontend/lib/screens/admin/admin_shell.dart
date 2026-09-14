@@ -4,13 +4,12 @@ import '../../state/app_state.dart';
 import '../../widgets/clock_widget.dart';
 import 'dashboard_screen.dart';
 import 'hujjatlar_screen.dart';
-import 'kamera_tasdiqlari_screen.dart';
-import 'kip_togrilash_screen.dart';
 import 'moliyaviy_kirish_screen.dart';
 import 'partiyalar_screen.dart';
 import 'shubhali_holatlar_screen.dart';
 import 'sozlamalar_screen.dart';
 import 'statistika_screen.dart';
+import 'tasdiqlash_tarixi_screen.dart';
 
 class AdminShell extends StatefulWidget {
   const AdminShell({super.key});
@@ -35,8 +34,7 @@ class _AdminShellState extends State<AdminShell> {
       if (!tayyorMahsulotRoli) const StatistikaEkrani(),
       const PartiyalarEkrani(),
       if (!tayyorMahsulotRoli) const ShubhaliHolatlarEkrani(),
-      if (adminRoli) const KameraTasdiqlariEkrani(),
-      if (adminRoli) const KipTogrilashEkrani(),
+      if (adminRoli) const TasdiqlashTarixiEkrani(),
       if (adminRoli) const MoliyaviyKirishEkrani(),
       if (adminRoli) const SozlamalarEkrani(),
     ];
@@ -66,13 +64,8 @@ class _AdminShellState extends State<AdminShell> {
         ),
       if (adminRoli)
         NavigationRailDestination(
-          icon: const Icon(Icons.photo_camera_front_outlined),
-          label: Text(lok.t('kamera_tasdiqlari')),
-        ),
-      if (adminRoli)
-        NavigationRailDestination(
-          icon: const Icon(Icons.edit_note),
-          label: Text(lok.t('kip_togrilash_sorovlari')),
+          icon: const Icon(Icons.fact_check_outlined),
+          label: Text(lok.t('tasdiqlash_tarixi')),
         ),
       if (adminRoli)
         NavigationRailDestination(
