@@ -50,37 +50,37 @@ def _mahsulot_boyicha_qatorlar(db: Session, boshlanish: date, tugash: date) -> l
     ).all()
 
 
-def _jami_soni_va_ogirlik(db: Session, boshlanish: date, tugash: date) -> tuple[int, float]:
-    """`[boshlanish, tugash]` oralig'idagi hisoblanadigan kiplarning jami
-    soni va og'irligi (mahsulot bo'yicha ajratmasdan)."""
-    pastki, yuqori = sargable_oraliq(boshlanish, tugash)
-    soni, kg = db.execute(
-        select(func.count(Kip.id), func.coalesce(func.sum(Kip.ogirlik), 0)).where(
-            Kip.holati.in_(HISOBLANADIGAN_HOLATLAR), Kip.vaqt >= pastki, Kip.vaqt < yuqori
-        )
-    ).one()
-    return soni, float(kg)
+def _qatorlar_matni(qatorlar: list[tuple[str, int, float]]) -> str:
+    """Mahsulot bo'yicha guruhlangan qatorlarni "  Nomi: N ta, X kg" ko'rinishida,
+    har biri alohida qatorda chiqaradi."""
+    return "\n".join(f"  {nomi}: {soni} ta, {float(kg):.1f} kg" for nomi, soni, kg in qatorlar)
 
 
 def _hisobot_matni(
     kecha: date,
-    qatorlar: list[tuple[str, int, float]],
+    kecha_qatorlari: list[tuple[str, int, float]],
     mavsum_boshlanish: date,
-    mavsum_soni: int,
-    mavsum_kg: float,
+    mavsum_qatorlari: list[tuple[str, int, float]],
 ) -> str:
-    """Ikki bo'limli xabar matni: kechagi kun (mahsulot bo'yicha ajratilgan)
-    va mavsum boshidan hozirgacha jamlanma (ajratmasdan, jami son/og'irlik)."""
-    if not qatorlar:
+    """Ikki bo'limli xabar matni — IKKALASI HAM mahsulot bo'yicha ajratilgan:
+    kechagi kun va mavsum boshidan hozirgacha. Mavsum bo'limi oxirida,
+    qulaylik uchun, umumiy jamlanma qatori ham qo'shiladi."""
+    if not kecha_qatorlari:
         kecha_matni = f"📅 Kecha ({kecha.isoformat()}): hech narsa tortilmadi."
     else:
-        qatorlar_matni = "\n".join(f"  {nomi}: {soni} ta, {float(kg):.1f} kg" for nomi, soni, kg in qatorlar)
-        kecha_matni = f"📅 Kecha ({kecha.isoformat()}):\n{qatorlar_matni}"
+        kecha_matni = f"📅 Kecha ({kecha.isoformat()}):\n{_qatorlar_matni(kecha_qatorlari)}"
 
-    mavsum_matni = (
-        f"📊 Mavsum boshidan ({mavsum_boshlanish.isoformat()} — {kecha.isoformat()}):\n"
-        f"  Jami: {mavsum_soni} ta, {mavsum_kg:.1f} kg"
-    )
+    mavsum_sarlavha = f"📊 Mavsum boshidan ({mavsum_boshlanish.isoformat()} — {kecha.isoformat()})"
+    if not mavsum_qatorlari:
+        mavsum_matni = f"{mavsum_sarlavha}: hech narsa tortilmadi."
+    else:
+        jami_soni = sum(soni for _nomi, soni, _kg in mavsum_qatorlari)
+        jami_kg = sum(float(kg) for _nomi, _soni, kg in mavsum_qatorlari)
+        mavsum_matni = (
+            f"{mavsum_sarlavha}:\n"
+            f"{_qatorlar_matni(mavsum_qatorlari)}\n"
+            f"  (jami: {jami_soni} ta, {jami_kg:.1f} kg)"
+        )
 
     return f"{kecha_matni}\n\n{mavsum_matni}"
 
@@ -89,10 +89,10 @@ def _kunlik_hisobot_yubor() -> None:
     db = SessionLocal()
     try:
         kecha = kecha_sanasi()
-        qatorlar = _mahsulot_boyicha_qatorlar(db, kecha, kecha)
+        kecha_qatorlari = _mahsulot_boyicha_qatorlar(db, kecha, kecha)
         mavsum_boshlanish = mavsum_boshi(db, kecha)
-        mavsum_soni, mavsum_kg = _jami_soni_va_ogirlik(db, mavsum_boshlanish, kecha)
-        matn = _hisobot_matni(kecha, qatorlar, mavsum_boshlanish, mavsum_soni, mavsum_kg)
+        mavsum_qatorlari = _mahsulot_boyicha_qatorlar(db, mavsum_boshlanish, kecha)
+        matn = _hisobot_matni(kecha, kecha_qatorlari, mavsum_boshlanish, mavsum_qatorlari)
 
         statistika_xabari(db, matn)
     except Exception:

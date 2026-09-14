@@ -7,10 +7,16 @@ xabar VAQTI 08:30'ga va MAZMUNI "kechagi to'liq kun + mavsum jamlanmasi"ga
 o'zgartirildi — shu ikkalasini quyidagi testlar tekshiradi.
 
 Har bir qism ALOHIDA sinaladi: vaqt hisoblash (`kecha_sanasi`), kechagi kun
-ma'lumotini olish (`_mahsulot_boyicha_qatorlar`), mavsum jamlanmasi
-(`_jami_soni_va_ogirlik`), xabar matnini qurish (`_hisobot_matni`, DB
-shart emas) va to'liq oqim (`_kunlik_hisobot_yubor`, real Telegramga
-CHIQMAYDI — `statistika_xabari` monkeypatch qilinadi)."""
+va mavsum ma'lumotini olish (`_mahsulot_boyicha_qatorlar` — IKKALASI HAM
+shu bitta funksiya orqali, mahsulot bo'yicha guruhlab), xabar matnini
+qurish (`_hisobot_matni`, DB shart emas) va to'liq oqim
+(`_kunlik_hisobot_yubor`, real Telegramga CHIQMAYDI — `statistika_xabari`
+monkeypatch qilinadi).
+
+TUZATISH: "Mavsum boshidan" bo'limi ilgari faqat bitta jamlanma
+"Jami: N ta, X kg" qatorini ko'rsatardi — endi "Kecha" bo'limidagi kabi
+HAR BIR MAHSULOT uchun alohida qator beradi (oxirida ixtiyoriy umumiy
+jamlanma bilan)."""
 
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -18,6 +24,7 @@ from datetime import date, datetime, timedelta, timezone
 from app.core.config import settings
 from app.models.foydalanuvchi import Smena
 from app.models.kip import Kip, KipHolati
+from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya, PartiyaHolati
 from app.models.sozlama import Sozlama
 from app.services import rejalashtiruvchi
@@ -108,96 +115,128 @@ def test_mahsulot_boyicha_qatorlar_malumot_yoq_bolsa_bosh_royxat(db):
     assert rejalashtiruvchi._mahsulot_boyicha_qatorlar(db, kecha, kecha) == []
 
 
-# --- 8-QISM: mavsum jamlanmasi — guruhlamasdan JAMI son/og'irlik ---
+# --- 8-QISM: mavsum bo'limi — endi HAM mahsulot bo'yicha guruhlangan ---
+# (bir xil `_mahsulot_boyicha_qatorlar` funksiyasi, faqat oraliq boshqacha)
 
 
-def test_jami_soni_va_ogirlik_faqat_oraliq_ichidagilarni_qamraydi(db, operator, mahsulot_tola):
-    partiya = _partiya_yarat(db, mahsulot_tola.id, 9003)
+def test_mahsulot_boyicha_qatorlar_mavsum_oraligida_har_mahsulot_alohida(db, operator, mahsulot_tola):
+    lint = Mahsulot(kod="lint", nomi="Lint")
+    db.add(lint)
+    db.commit()
+
+    tola_partiya = _partiya_yarat(db, mahsulot_tola.id, 9003)
+    lint_partiya = _partiya_yarat(db, lint.id, 9013)
+
     mavsum_boshi = date.today() - timedelta(days=10)
     kecha = date.today() - timedelta(days=1)
     mavsumdan_oldin = date.today() - timedelta(days=20)
 
-    _kip_yarat(db, partiya.id, 1, 100.0, mavsum_boshi, operator.id)
-    _kip_yarat(db, partiya.id, 2, 50.0, kecha, operator.id)
-    _kip_yarat(db, partiya.id, 3, 999.0, mavsumdan_oldin, operator.id)  # mavsumdan oldin — hisoblanmasin
+    _kip_yarat(db, tola_partiya.id, 1, 100.0, mavsum_boshi, operator.id)
+    _kip_yarat(db, tola_partiya.id, 2, 50.0, kecha, operator.id)
+    _kip_yarat(db, lint_partiya.id, 1, 30.0, kecha, operator.id)
+    _kip_yarat(db, tola_partiya.id, 3, 999.0, mavsumdan_oldin, operator.id)  # mavsumdan oldin — hisoblanmasin
 
-    soni, kg = rejalashtiruvchi._jami_soni_va_ogirlik(db, mavsum_boshi, kecha)
+    qatorlar = dict((nomi, (soni, float(kg))) for nomi, soni, kg in rejalashtiruvchi._mahsulot_boyicha_qatorlar(
+        db, mavsum_boshi, kecha
+    ))
 
-    assert soni == 2
-    assert kg == 150.0
-
-
-def test_jami_soni_va_ogirlik_malumot_yoq_bolsa_nolga_teng(db):
-    soni, kg = rejalashtiruvchi._jami_soni_va_ogirlik(db, date(2020, 1, 1), date(2020, 1, 1))
-    assert soni == 0
-    assert kg == 0.0
+    assert qatorlar["Tola"] == (2, 150.0)
+    assert qatorlar["Lint"] == (1, 30.0)
 
 
-def test_jami_soni_va_ogirlik_bekor_qilingan_hisoblanmaydi(db, operator, mahsulot_tola):
+def test_mahsulot_boyicha_qatorlar_mavsumda_malumot_yoq_bolsa_bosh_royxat(db):
+    assert rejalashtiruvchi._mahsulot_boyicha_qatorlar(db, date(2020, 1, 1), date(2020, 1, 1)) == []
+
+
+def test_mahsulot_boyicha_qatorlar_mavsumda_bekor_qilingan_hisoblanmaydi(db, operator, mahsulot_tola):
     partiya = _partiya_yarat(db, mahsulot_tola.id, 9004)
     sana = date.today() - timedelta(days=1)
     kip = _kip_yarat(db, partiya.id, 1, 500.0, sana, operator.id)
     kip.holati = KipHolati.bekor_qilingan
     db.commit()
 
-    soni, kg = rejalashtiruvchi._jami_soni_va_ogirlik(db, sana, sana)
-    assert soni == 0
-    assert kg == 0.0
+    assert rejalashtiruvchi._mahsulot_boyicha_qatorlar(db, sana, sana) == []
 
 
 # --- 7+8-QISM: xabar matnini qurish — sof mantiq, DB shart emas ---
 
 
-def test_hisobot_matni_ikkala_bolim_ham_mavjud():
+def test_hisobot_matni_ikkala_bolim_ham_mahsulot_boyicha_ajratilgan():
     matn = rejalashtiruvchi._hisobot_matni(
         kecha=date(2026, 9, 13),
-        qatorlar=[("Tola", 3, 450.0)],
+        kecha_qatorlari=[("Tola", 2, 411.1), ("Lint", 1, 213.8), ("Pux", 1, 214.5)],
         mavsum_boshlanish=date(2025, 9, 1),
-        mavsum_soni=120,
-        mavsum_kg=45000.0,
+        mavsum_qatorlari=[("Tola", 43, 9056.3), ("Lint", 15, 3200.5), ("Pux", 20, 4500.0)],
     )
 
     assert "📅 Kecha (2026-09-13)" in matn
-    assert "Tola: 3 ta, 450.0 kg" in matn
+    assert "Tola: 2 ta, 411.1 kg" in matn
+    assert "Lint: 1 ta, 213.8 kg" in matn
+    assert "Pux: 1 ta, 214.5 kg" in matn
+
     assert "📊 Mavsum boshidan (2025-09-01 — 2026-09-13)" in matn
-    assert "Jami: 120 ta, 45000.0 kg" in matn
+    assert "Tola: 43 ta, 9056.3 kg" in matn
+    assert "Lint: 15 ta, 3200.5 kg" in matn
+    assert "Pux: 20 ta, 4500.0 kg" in matn
+    # Ixtiyoriy umumiy jamlanma — mavsum bo'limi oxirida
+    assert "(jami: 78 ta, 16756.8 kg)" in matn
 
 
-def test_hisobot_matni_bir_nechta_mahsulot_qatorga_ajratiladi():
+def test_hisobot_matni_mavsum_qatorlari_kecha_bolimidan_MUSTAQIL():
+    """Mavsum bo'limidagi mahsulotlar to'plami kechagi kundan farq qilishi
+    mumkin (masalan kecha faqat Tola tortilgan bo'lsa-yu, mavsum davomida
+    Lint ham bo'lgan) — ikkala bo'lim bir-biriga bog'liq emas."""
     matn = rejalashtiruvchi._hisobot_matni(
         kecha=date(2026, 9, 13),
-        qatorlar=[("Tola", 2, 300.0), ("Lint", 1, 40.0)],
+        kecha_qatorlari=[("Tola", 2, 300.0)],
         mavsum_boshlanish=date(2025, 9, 1),
-        mavsum_soni=3,
-        mavsum_kg=340.0,
+        mavsum_qatorlari=[("Tola", 40, 8000.0), ("Lint", 10, 2000.0)],
     )
-    assert "Tola: 2 ta, 300.0 kg" in matn
-    assert "Lint: 1 ta, 40.0 kg" in matn
+    assert "Lint" not in matn.split("📊")[0]  # kecha bo'limida Lint yo'q
+    assert "Lint: 10 ta, 2000.0 kg" in matn  # lekin mavsum bo'limida bor
 
 
 def test_hisobot_matni_kecha_bosh_bolsa_maxsus_xabar_lekin_mavsum_bolimi_qoladi():
     matn = rejalashtiruvchi._hisobot_matni(
         kecha=date(2026, 9, 13),
-        qatorlar=[],
+        kecha_qatorlari=[],
         mavsum_boshlanish=date(2025, 9, 1),
-        mavsum_soni=0,
-        mavsum_kg=0.0,
+        mavsum_qatorlari=[("Tola", 5, 500.0)],
     )
 
-    assert "hech narsa tortilmadi" in matn
+    assert "📅 Kecha (2026-09-13): hech narsa tortilmadi." in matn
     assert "📊 Mavsum boshidan" in matn
-    assert "Jami: 0 ta, 0.0 kg" in matn
+    assert "Tola: 5 ta, 500.0 kg" in matn
+
+
+def test_hisobot_matni_mavsum_bosh_bolsa_ham_maxsus_xabar_beradi():
+    matn = rejalashtiruvchi._hisobot_matni(
+        kecha=date(2026, 9, 13),
+        kecha_qatorlari=[("Tola", 1, 100.0)],
+        mavsum_boshlanish=date(2025, 9, 1),
+        mavsum_qatorlari=[],
+    )
+    assert "📊 Mavsum boshidan (2025-09-01 — 2026-09-13): hech narsa tortilmadi." in matn
 
 
 # --- To'liq oqim: _kunlik_hisobot_yubor() — real Telegramga CHIQMAYDI ---
 
 
 def test_kunlik_hisobot_yubor_togri_matn_bilan_yuboradi(db, monkeypatch, operator, mahsulot_tola):
-    partiya = _partiya_yarat(db, mahsulot_tola.id, 9005)
-    kecha = date.today() - timedelta(days=1)
-    _kip_yarat(db, partiya.id, 1, 200.0, kecha, operator.id)
+    lint = Mahsulot(kod="lint", nomi="Lint")
+    db.add(lint)
+    db.commit()
 
+    tola_partiya = _partiya_yarat(db, mahsulot_tola.id, 9005)
+    lint_partiya = _partiya_yarat(db, lint.id, 9015)
+
+    kecha = date.today() - timedelta(days=1)
     mavsum_boshlanish = date.today() - timedelta(days=30)
+    ichkarida = date.today() - timedelta(days=15)
+
+    _kip_yarat(db, tola_partiya.id, 1, 200.0, kecha, operator.id)  # kecha — faqat Tola
+    _kip_yarat(db, lint_partiya.id, 1, 80.0, ichkarida, operator.id)  # mavsum ichida, lekin kecha emas
+
     db.add(Sozlama(kalit="mavsum_boshlanish_sanasi", qiymat=mavsum_boshlanish.isoformat()))
     db.commit()
 
@@ -215,10 +254,17 @@ def test_kunlik_hisobot_yubor_togri_matn_bilan_yuboradi(db, monkeypatch, operato
 
     rejalashtiruvchi._kunlik_hisobot_yubor()
 
-    assert "matn" in yuborilgan
-    assert f"📅 Kecha ({kecha.isoformat()})" in yuborilgan["matn"]
-    assert "200.0 kg" in yuborilgan["matn"]
-    assert f"📊 Mavsum boshidan ({mavsum_boshlanish.isoformat()}" in yuborilgan["matn"]
+    matn = yuborilgan["matn"]
+    kecha_bolimi, mavsum_bolimi = matn.split("📊")
+
+    assert f"📅 Kecha ({kecha.isoformat()})" in kecha_bolimi
+    assert "Tola: 1 ta, 200.0 kg" in kecha_bolimi
+    assert "Lint" not in kecha_bolimi  # kecha faqat Tola tortilgan
+
+    assert f"Mavsum boshidan ({mavsum_boshlanish.isoformat()}" in mavsum_bolimi
+    assert "Tola: 1 ta, 200.0 kg" in mavsum_bolimi  # mavsum ichida — Tola ham bor
+    assert "Lint: 1 ta, 80.0 kg" in mavsum_bolimi  # mavsum ichida — Lint HAM bor (kecha bo'limida yo'q edi)
+    assert "(jami: 2 ta, 280.0 kg)" in mavsum_bolimi
 
 
 def test_kunlik_hisobot_yubor_malumot_olishda_xato_bolsa_statistika_xabari_chaqirilmaydi(db, monkeypatch):
