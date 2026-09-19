@@ -50,6 +50,10 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 $EnvFile = Join-Path $ProjectRoot "backend\.env"
 
+# Umumiy funksiyalar (Write-BackupLog, Invoke-BackupTuzilma, Copy-ToRemoteFolder) -
+# scripts\tezkor_yangilash.ps1 bilan baham ko'riladi, qarang backup_common.ps1.
+. (Join-Path $ScriptDir "backup_common.ps1")
+
 # --- Sozlamalarni yuklash (config fayl bo'lmasa standart qiymatlar) ---
 $BackupLocalDir = "C:\Kip_tarozi\backups"
 $BackupRemoteDir = ""
@@ -71,10 +75,11 @@ New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $LogFile = Join-Path $LogDir "backup.log"
 
 function Write-Log {
+    # Yupqa moslashtiruvchi (adapter) - haqiqiy logika Write-BackupLog'da
+    # (backup_common.ps1), $LogFile shu skriptga xos bo'lgani uchun shu
+    # yerda avtomatik biriktiriladi.
     param([string]$Message, [string]$Level = "INFO")
-    $line = "[{0}] [{1}] {2}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $Level, $Message
-    Write-Host $line
-    Add-Content -Path $LogFile -Value $line
+    Write-BackupLog -LogFile $LogFile -Message $Message -Level $Level
 }
 
 function Find-PgBin {
@@ -127,38 +132,6 @@ function Get-StorageDir {
         }
     }
     return (Join-Path $ProjectRoot "storage")
-}
-
-function Invoke-BackupTuzilma {
-    <#
-        backend\scripts\backup_tuzilma.py'ni chaqiradi - u bazadan REAL O'QIB,
-        $Dest ichida "KIP-Tarozi Rasm", "KIP-Tarozi Excel" va
-        "KIP-Tarozi Nakladnoy" papkalarini yaratadi (tushunarli tuzilma).
-
-        MUHIM: bu skript bazadan FAQAT O'QIYDI, asl storage/ papkasiga
-        tegmaydi. Xato bo'lsa - throw qiladi (chaqiruvchi WARN bilan davom etadi,
-        xom nusxa baribir saqlangan bo'ladi).
-    #>
-    param([string]$Root, [string]$Dest)
-
-    $py = Join-Path $Root "backend\.venv\Scripts\python.exe"
-    if (-not (Test-Path $py)) { $py = "python" }
-    $backendDir = Join-Path $Root "backend"
-
-    Push-Location $backendDir
-    # Native stderr'ni $ErrorActionPreference='Stop' bilan qo'shganda PS 5.1
-    # "NativeCommandError" tashlashi mumkin - shu blokda vaqtincha yumshatamiz.
-    $eskiEAP = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try {
-        $chiqish = & $py -m scripts.backup_tuzilma --dest $Dest 2>&1
-        $exit = $LASTEXITCODE
-    } finally {
-        $ErrorActionPreference = $eskiEAP
-        Pop-Location
-    }
-    foreach ($qator in $chiqish) { Write-Log "  [tuzilma] $qator" }
-    if ($exit -ne 0) { throw "backup_tuzilma.py exit code $exit" }
 }
 
 function Copy-StorageFolder {
@@ -349,7 +322,7 @@ try {
                     # 2) Tushunarli tuzilma (KIP-Tarozi Rasm / Excel / Nakladnoy) -
                     # bazadan real o'qib. Xato bo'lsa xom nusxa baribir saqlangan.
                     try {
-                        Invoke-BackupTuzilma -Root $ProjectRoot -Dest $storageBackupLocal
+                        Invoke-BackupTuzilma -Root $ProjectRoot -Dest $storageBackupLocal -LogFile $LogFile
                         Write-Log "Tushunarli tuzilma tayyor: $storageBackupLocal (KIP-Tarozi Rasm / Excel / Nakladnoy)"
                     } catch {
                         Write-Log "Tushunarli tuzilma yasashda xato: $($_.Exception.Message) - xom nusxa saqlandi, keyingi safar qayta uriniladi." "WARN"
@@ -358,21 +331,7 @@ try {
                         Write-Log ("OGOHLANTIRISH: storage hajmi ~{0} GB. Har kuni to'liq nusxa olish disk joyini tez to'ldirishi mumkin - docs\BACKUP.md 'Katta storage papkasi' bo'limiga qarang." -f $srcGb) "WARN"
                     }
 
-                    if ($BackupRemoteDir) {
-                        try {
-                            if (-not (Test-Path $BackupRemoteDir)) {
-                                New-Item -ItemType Directory -Force -Path $BackupRemoteDir | Out-Null
-                            }
-                            $storageRemote = Join-Path $BackupRemoteDir $storageBackupName
-                            if (Test-Path -LiteralPath $storageRemote) {
-                                Remove-Item -LiteralPath $storageRemote -Recurse -Force
-                            }
-                            Copy-Item -LiteralPath $storageBackupLocal -Destination $storageRemote -Recurse -Force
-                            Write-Log "Storage nusxasi tashqi joyga ko'chirildi: $storageRemote"
-                        } catch {
-                            Write-Log "Storage nusxasini tashqi joyga ko'chirishda xato: $($_.Exception.Message)" "WARN"
-                        }
-                    }
+                    Copy-ToRemoteFolder -LocalDir $storageBackupLocal -RemoteDir $BackupRemoteDir -Name $storageBackupName -LogFile $LogFile | Out-Null
                     $storageMuvaffaqiyat = $true
                 }
             }

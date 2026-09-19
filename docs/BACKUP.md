@@ -2,6 +2,11 @@
 
 Kunlik avtomatik backup uchun skript: [scripts/backup_yarat.ps1](../scripts/backup_yarat.ps1)
 
+Bundan tashqari, kuniga uch marta ishlaydigan **tezkor, engil** qo'shimcha
+yangilanish ham bor (baza dumpsiz, faqat Excel+surat) — qarang pastdagi
+["Tezkor (kuniga 3 marta) Excel+surat yangilanishi"](#tezkor-kuniga-3-marta-excelsurat-yangilanishi)
+bo'limi.
+
 ## Nima qiladi
 
 1. `backend\.env` dagi `DATABASE_URL`'ni o'qiydi (host, port, foydalanuvchi,
@@ -295,3 +300,99 @@ Vazifa `/RU SYSTEM` yoki boshqa xizmat hisobi ostida ishlasa va
 tarmoq papkasiga yozish huquqi borligini alohida tekshiring — SYSTEM hisobi
 odatda tarmoq resurslariga kira olmaydi. Bunday holatda alohida xizmat
 hisobi (`/RU domain\backup_user /RP ...`) yarating.
+
+## Tezkor (kuniga 3 marta) Excel+surat yangilanishi
+
+Yuqoridagi to'liq backup (`backup_yarat.ps1`) — kuniga **bir marta**,
+kechasi (03:00), baza dump'i bilan birga. Bundan tashqari, smena davomida
+tez-tez (kuniga **uch marta**, aniq vaqtda) faqat **Excel+surat** qismini
+yangilab, tashqi zaxira kompyuterga yuboruvchi engil, tezkor skript ham bor:
+[scripts/tezkor_yangilash.ps1](../scripts/tezkor_yangilash.ps1).
+
+Bu — to'liq backup'ning **o'RNIGA EMAS**, unga **qo'shimcha**: kechqurungi
+vazifa o'zgarishsiz, xuddi avvalgidek 03:00'da baza dump'i + storage xom
+nusxa + tarixiy (`storage_YYYY-MM-DD_HHmm\`) nusxalar bilan davom etadi.
+
+### Nima qiladi (va nima qilMAYdi)
+
+- Baza **HECH QACHON dump qilinmaydi** — bu qadam butunlay o'tkazib
+  yuboriladi (to'liq backup bilan bir xil `--dest` mantig'idan foydalansa
+  ham, faqat baza qismisiz).
+- Storage'ning **"xom" (hash nomli) to'liq nusxasi ham olinmaydi** — faqat
+  "tushunarli tuzilma" (KIP-Tarozi Rasm / Excel / Nakladnoy),
+  [backend\scripts\backup_tuzilma.py](../backend/scripts/backup_tuzilma.py)
+  orqali bazadan **real vaqtda o'qib** qayta yasaladi (to'liq backup ham
+  aynan shu skriptdan foydalanadi — kod takrorlanmasligi uchun umumiy
+  [scripts/backup_common.ps1](../scripts/backup_common.ps1) funksiyalari
+  orqali).
+- Har safar **yangi vaqt-belgili papka YARATILMAYDI**. Buning o'rniga,
+  bitta YAGONA mahalliy papka —
+
+  ```
+  C:\Kip_tarozi\backups\tezkor_yangilanish\
+  ```
+
+  — har ishga tushishda **avval butunlay o'chirilib**, keyin qaytadan
+  to'ldiriladi (eski holat qoldirilmaydi, faqat eng so'nggi holat
+  saqlanadi). Bu — **backup emas** (tarixiy nusxalar to'planmaydi,
+  `$RetentionDays` bu papkaga aloqasi yo'q); operatorlar/menejerlar smena
+  davomida tashqi kompyuterda eng so'nggi suratlar/Excel hisobotlarni tez
+  ko'rishi uchun tezkor "ko'zgu" (mirror) papkasi.
+- Shu yagona papka `scripts\backup_config.ps1`'dagi (to'liq backup bilan
+  BIR XIL fayl) `$BackupRemoteDir` sozlangan bo'lsa, o'sha yerga ham
+  `tezkor_yangilanish\` nomi bilan (xuddi shunday — eskisi o'chirilib,
+  ustidan yozilib) ko'chiriladi.
+- Tashqi kompyuter/tarmoq papkasi ayni damda mavjud bo'lmasa (masalan
+  o'chirilgan yoki tarmoqdan uzilgan) — skript **xato bilan to'xtamaydi**:
+  `backup.log`'dagi kabi bu yerda ham `backups\logs\tezkor_yangilash.log`'ga
+  ko'zga tashlanadigan `WARN` yoziladi, mahalliy nusxa baribir saqlangan
+  bo'ladi, keyingi ishga tushishda (taxminan 8 soatdan keyin) qayta
+  uriniladi.
+
+### Qo'lda ishga tushirish / sinash
+
+```
+powershell -ExecutionPolicy Bypass -File scripts\tezkor_yangilash.ps1
+```
+
+Muvaffaqiyatli bo'lsa `backups\tezkor_yangilanish\` papkasida `KIP-Tarozi
+Rasm\`/`KIP-Tarozi Excel\`/`KIP-Tarozi Nakladnoy\` (oy papkalari ichida)
+paydo bo'ladi va `backups\logs\tezkor_yangilash.log`'da "Tezkor yangilash
+muvaffaqiyatli yakunlandi" deb chiqadi.
+
+### Har kuni 3 marta avtomatik ishga tushirish — Task Scheduler
+
+Xuddi to'liq backup kabi, lekin **uchta trigger** bilan (08:10, 16:10,
+00:10 — smena almashinuvlaridan ~10 daqiqa keyin). Administrator sifatida
+PowerShell'da:
+
+```
+schtasks /Create /TN "KipTaroziTezkorYangilash-0810" /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\Kip_tarozi\scripts\tezkor_yangilash.ps1\"" /SC DAILY /ST 08:10 /RU SYSTEM /RL HIGHEST
+schtasks /Create /TN "KipTaroziTezkorYangilash-1610" /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\Kip_tarozi\scripts\tezkor_yangilash.ps1\"" /SC DAILY /ST 16:10 /RU SYSTEM /RL HIGHEST
+schtasks /Create /TN "KipTaroziTezkorYangilash-0010" /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\Kip_tarozi\scripts\tezkor_yangilash.ps1\"" /SC DAILY /ST 00:10 /RU SYSTEM /RL HIGHEST
+```
+
+- Uchta **alohida** vazifa (bitta vazifa + uchta trigger o'rniga) — har
+  birining o'z ishga tushish tarixi/natijasi alohida ko'rinishi uchun
+  (Task Scheduler GUI'da ham, `schtasks /Query`'da ham osonroq kuzatiladi).
+- Sinash: `schtasks /Run /TN "KipTaroziTezkorYangilash-0810"`, keyin
+  `backups\logs\tezkor_yangilash.log`'ni tekshiring.
+- O'chirish (kerak bo'lsa):
+  ```
+  schtasks /Delete /TN "KipTaroziTezkorYangilash-0810" /F
+  schtasks /Delete /TN "KipTaroziTezkorYangilash-1610" /F
+  schtasks /Delete /TN "KipTaroziTezkorYangilash-0010" /F
+  ```
+
+> Yuqoridagi buyruqlar `/RU SYSTEM` ishlatadi (parolsiz, to'liq avtomatik
+> ishlaydi) — lekin **yuqoridagi "Muhim eslatma"da aytilganidek, SYSTEM
+> odatda tarmoq papkasiga (`$BackupRemoteDir`) kira olmaydi**. Haqiqiy
+> `KipTaroziBackup` vazifasi (03:00) bu muammoni **Task Scheduler GUI**
+> orqali "Zavod" foydalanuvchisi (parol bilan, "Run whether user is logged
+> on or not") ostida ishga tushirib hal qilgan — tezkor vazifalarni ham
+> xuddi shu hisob ostida ishlashini xohlasangiz, uchalasini ham GUI orqali
+> ochib (**Properties → General → "Change User or Group..."**) shu hisobga
+> almashtiring va parolni kiriting. `/RU SYSTEM` bilan ham skript o'zi xato
+> bilan to'xtamaydi (yuqoriga qarang) — faqat tashqi nusxalash qadami
+> doimiy WARN beradi, mahalliy `tezkor_yangilanish\` papkasi baribir har
+> safar yangilanadi.
