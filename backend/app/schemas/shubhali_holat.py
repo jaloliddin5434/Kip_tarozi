@@ -26,6 +26,15 @@ class ShubhaliHolatRoyxatJavob(ShubhaliHolatJavob):
     tasdiqlangan: bool
 
 
+class ShubhaliHolatKipSifatidaSaqlash(BaseModel):
+    """`POST /shubhali-holatlar/{id}/saqlash` so'rov tanasi — admin hodisani
+    HAQIQIY Kip sifatida saqlash uchun mahsulot/partiyani qo'lda tanlaydi
+    (kip-to'g'irlash zayavkasi yaratishdagi bilan bir xil naqsh)."""
+
+    mahsulot_kodi: str
+    partiya_raqami: int
+
+
 class ShubhaliOperatorSoni(BaseModel):
     operator_id: int
     ism: str

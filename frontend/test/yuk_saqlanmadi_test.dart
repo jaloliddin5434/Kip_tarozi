@@ -1,7 +1,14 @@
-// Haqiqiy backendga ulanadi — qarang: operator_oqimi_test.dart izohi.
-// Bu test anti-o'g'irlik hodisasini backendga to'g'ridan-to'g'ri (agent kaliti
-// bilan) yozadi va operator ekranidagi bloklovchi modal 5s polling orqali
-// avtomatik chiqishini, "Tushundim" bosgach yopilishini tekshiradi.
+// Bu test HAQIQIY, jonli backendga ulanadi (mock emas) — qarang:
+// operator_oqimi_test.dart izohi.
+//
+// AUDIT TUZATISHI (UX yangilash): "Shubhali holatlar" (anti-o'g'irlik)
+// hodisasi ENDI operatorni BLOKLAMAYDI (ilgari bu test aynan qarama-qarshi —
+// bloklovchi modal chiqishini — tekshirar edi). Endi bu test hodisani
+// backendga to'g'ridan-to'g'ri (agent kaliti bilan) yozib, operator ekranida
+// HECH QANDAY bloklovchi modal chiqmasligini VA oddiy kip saqlash odatdagidek
+// ishlashini tasdiqlaydi. Hodisaning o'zi endi admin panelida
+// ("Shubhali holatlar" ekrani, "Saqlash"/"Ko'rdim" tugmalari) hal qilinadi —
+// qarang backend/tests/test_shubhali_holatlar.py.
 
 import 'dart:io';
 
@@ -39,7 +46,9 @@ Future<void> _shubhaliHodisaYarat() async {
 }
 
 void main() {
-  testWidgets('Yuk saqlanmadi: bloklovchi modal chiqadi va Tushundim bilan yopiladi', (tester) async {
+  testWidgets('Yuk saqlanmadi: hodisa yaratilsa ham operator ENDI bloklanmaydi, kip odatdagidek saqlanadi', (
+    tester,
+  ) async {
     ApiClient.bazaUrl = _backendUrl;
     SharedPreferences.setMockInitialValues({});
 
@@ -64,16 +73,48 @@ void main() {
       await tester.tap(find.text('Kirish'));
       await _tarmoqniKut(tester);
 
-      // Blok-tekshiruvchi Timer 5s oralig'ida ishlaydi — shuncha kutamiz
+      expect(find.text('Tola'), findsOneWidget, reason: 'Operator ekraniga to\'g\'ridan-to\'g\'ri o\'tishi kerak');
+
+      // Blok-tekshiruvchi Timer avvalgi 5s oralig'ida ishlar edi — endi
+      // shubhali-holat uchun HECH NARSA tekshirmaydi, lekin shuncha vaqt
+      // kutib, HECH QANDAY bloklovchi modal chiqmasligini tasdiqlaymiz.
       await _tarmoqniKut(tester, marta: 30); // ~6 soniya real vaqt
 
-      expect(find.text('⚠️ YUK SAQLANMADI!'), findsOneWidget, reason: 'Bloklovchi modal avtomatik chiqishi kerak');
+      expect(find.byType(AlertDialog), findsNothing, reason: 'Hech qanday bloklovchi modal chiqmasligi kerak');
+      expect(find.text('Tola'), findsOneWidget, reason: 'Operator ekrani hali ham normal ishlatilishi mumkin');
 
-      // Saqlash tugmasi hali ham ekranda, lekin modal uni bloklaydi (PopScope + barrier)
-      await tester.tap(find.text('Tushundim'));
+      // --- Oddiy kip saqlash oqimi ODATDAGIDEK ishlashini tasdiqlaymiz ---
+      await tester.tap(find.text('Tola'));
+      await _tarmoqniKut(tester, marta: 4);
+
+      final partiyaRaqami = 800000 + DateTime.now().millisecondsSinceEpoch % 90000;
+      final partiyaMaydoni = find.widgetWithText(TextField, 'Partiya raqami');
+      await tester.ensureVisible(partiyaMaydoni);
+      await tester.enterText(partiyaMaydoni, '$partiyaRaqami');
+      await tester.pump();
+
+      final ochishTugmasi = find.text('Partiyani tanlash');
+      await tester.ensureVisible(ochishTugmasi);
+      await tester.tap(ochishTugmasi);
       await _tarmoqniKut(tester, marta: 6);
 
-      expect(find.text('⚠️ YUK SAQLANMADI!'), findsNothing, reason: 'Tushundim bosilgach modal yopilishi kerak');
+      expect(find.textContaining('#$partiyaRaqami'), findsWidgets, reason: 'Partiya ochilgan bo\'lishi kerak');
+
+      final ogirlikMaydoni = find.widgetWithText(TextField, "Og'irlik (kg)");
+      await tester.ensureVisible(ogirlikMaydoni);
+      await tester.enterText(ogirlikMaydoni, '112.0');
+      await tester.pump();
+
+      final saqlashTugmasi = find.text('Saqlash');
+      await tester.ensureVisible(saqlashTugmasi);
+      await tester.tap(saqlashTugmasi);
+      await _tarmoqniKut(tester, marta: 6);
+
+      expect(
+        find.text('Kip saqlandi'),
+        findsOneWidget,
+        reason: 'Hal qilinmagan shubhali holat bo\'lsa ham kip ODATDAGIDEK saqlanishi kerak (409 YO\'Q)',
+      );
     });
   });
 }

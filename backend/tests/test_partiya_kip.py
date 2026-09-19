@@ -2,7 +2,9 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from app.core.config import settings
+from app.models.foydalanuvchi import Smena
 from app.models.kip import Kip
+from app.models.shubhali_holat import ShubhaliHolat, ShubhaliHolatStatusi
 
 
 def _kip_yaratish_payload(partiya_id: int, ogirlik: float = 135.5) -> dict:
@@ -77,6 +79,48 @@ def test_dublikat_ogohlantirish(client, operator_headers, mahsulot_tola):
     ikkinchi["majburiy"] = True
     javob3 = client.post("/api/v1/kiplar", json=ikkinchi, headers=operator_headers)
     assert javob3.status_code == 201
+
+
+# --- AUDIT TUZATISHI (UX yangilash): "Shubhali holatlar" (anti-o'g'irlik)
+# hodisasi endi operator SAQLASHINI bloklamaydi — admin panel orqali
+# alohida ("Saqlash"/"Ko'rdim") hal qilinadi. Qarang test_shubhali_holatlar.py.
+# ---------------------------------------------------------------------
+
+
+def test_hal_qilinmagan_shubhali_holat_operatorni_ENDI_bloklamaydi(client, db, operator, operator_headers, mahsulot_tola):
+    """Ilgari (audit topilmasi) hal qilinmagan 'yuk saqlanmadi' hodisasi
+    bo'lsa, POST /kiplar 409 qaytarib operatorni bloklardi. Bu xatti-harakat
+    ATAYLAB olib tashlandi — operator endi erkin ishlashda davom etadi,
+    hodisani admin panel orqali hal qiladi."""
+    db.add(ShubhaliHolat(vaqt=datetime.now(timezone.utc), smena=operator.smena, ogirlik=5.0))
+    db.commit()
+
+    partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 550}, headers=operator_headers
+    ).json()
+    javob = client.post("/api/v1/kiplar", json=_kip_yaratish_payload(partiya["id"], 100.0), headers=operator_headers)
+
+    assert javob.status_code == 201
+
+
+def test_boshqa_smenadagi_shubhali_holat_ham_bloklamaydi(client, db, operator, operator_headers, mahsulot_tola):
+    """Hatto operatorning O'Z smenasidagi hal qilinmagan hodisa bo'lsa ham
+    (eng kuchli avvalgi-bloklash stsenariysi) — endi bloklanmasligini
+    alohida tasdiqlaydi (yuqoridagi test bilan bir xil, aniqlik uchun
+    operator.smena'ni ATAYLAB ishlatadi)."""
+    assert operator.smena == Smena.A
+    db.add(ShubhaliHolat(vaqt=datetime.now(timezone.utc), smena=Smena.A, ogirlik=999.0))
+    db.commit()
+
+    hodisa = db.query(ShubhaliHolat).filter_by(ogirlik=999.0).first()
+    assert hodisa.holati == ShubhaliHolatStatusi.yangi  # sog'lomlik tekshiruvi — hali "yangi"
+
+    partiya = client.post(
+        "/api/v1/partiyalar", json={"mahsulot_kodi": "tola", "partiya_raqami": 551}, headers=operator_headers
+    ).json()
+    javob = client.post("/api/v1/kiplar", json=_kip_yaratish_payload(partiya["id"], 110.0), headers=operator_headers)
+
+    assert javob.status_code == 201
 
 
 def test_partiya_kip_soni_tahrirlangan_kipni_hisoblaydi(client, operator_headers, admin_headers, mahsulot_tola):

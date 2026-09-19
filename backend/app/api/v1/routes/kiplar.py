@@ -13,7 +13,6 @@ from app.models.foydalanuvchi import Foydalanuvchi, Rol
 from app.models.kip import HISOBLANADIGAN_HOLATLAR, Kip, KipHolati
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya, PartiyaHolati
-from app.models.shubhali_holat import ShubhaliHolat, ShubhaliHolatStatusi
 from app.schemas.hujjat import AuditLogJavob
 from app.schemas.kamera_tasdiq import KameraTasdiqKutilmoqda
 from app.schemas.kip import KipBatafsilJavob, KipJavob, KipSinxronNatija, KipTahrirlash, KipYaratish
@@ -32,15 +31,6 @@ def _keyingi_kip_raqami(db: Session, partiya_id: int) -> int:
     db.execute(select(Partiya.id).where(Partiya.id == partiya_id).with_for_update())
     oxirgi = db.scalar(select(func.max(Kip.kip_raqami)).where(Kip.partiya_id == partiya_id))
     return (oxirgi or 0) + 1
-
-
-def _bloklovchi_hodisa(db: Session, smena) -> ShubhaliHolat | None:
-    return db.scalar(
-        select(ShubhaliHolat)
-        .where(ShubhaliHolat.holati == ShubhaliHolatStatusi.yangi, ShubhaliHolat.smena == smena)
-        .order_by(ShubhaliHolat.vaqt.desc())
-        .limit(1)
-    )
 
 
 def _smena_kunlik_jamlanma(db: Session, smena, sana: date) -> SmenaHolati:
@@ -220,13 +210,6 @@ def saqlash(
     partiya = db.get(Partiya, malumot.partiya_id)
     if partiya is None or partiya.holati != PartiyaHolati.ochiq:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Partiya topilmadi yoki ochiq emas")
-
-    bloklovchi = _bloklovchi_hodisa(db, foydalanuvchi.smena)
-    if bloklovchi is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Tasdiqlanmagan 'yuk saqlanmadi' ogohlantirishi bor — avval uni tasdiqlang",
-        )
 
     hozir = datetime.now(timezone.utc)
     if not malumot.majburiy:

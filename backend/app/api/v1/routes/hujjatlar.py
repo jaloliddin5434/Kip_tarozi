@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -11,12 +11,36 @@ from app.models.foydalanuvchi import Foydalanuvchi, Rol, Smena
 from app.models.kip import Kip, KipHolati
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya
-from app.schemas.hujjat import AuditLogJavob, HujjatKipJavob
+from app.schemas.hujjat import AuditLogJavob, DavrOraligiJavob, HujjatKipJavob
 from app.schemas.sahifalash import Sahifalangan
-from app.services.davr import sargable_pastki, sargable_yuqori
+from app.services.davr import davr_oraligi, sargable_pastki, sargable_yuqori
 from app.services.media import surat_ommaviy_url
 
 router = APIRouter(prefix="/hujjatlar", tags=["hujjatlar"])
+
+# Statistika/Dashboard ekranlarida ishlatiladigan xuddi shu 4 ta davr turi —
+# Hujjatlar ekranidagi tezkor davr tugmalari shu ro'yxat bilan izchil.
+_DAVRLAR = ("kunlik", "haftalik", "oylik", "mavsum")
+
+
+@router.get("/davr-oraligi", response_model=DavrOraligiJavob)
+def davr_oraligi_royxati(
+    davr: str = Query(...),
+    sana: date = Query(default_factory=date.today),
+    db: Session = Depends(get_db),
+    _: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.admin, Rol.tayyor_mahsulotlar)),
+) -> DavrOraligiJavob:
+    """Hujjatlar ekranidagi "Kunlik/Haftalik/Oylik/Mavsum" tugmasi bosilganda
+    chaqiriladi — natijadagi `sana_dan`/`sana_gacha` keyin `/hujjatlar/kiplar`
+    so'roviga uzatiladi. Sana oralig'ini frontend hisoblamaydi — bu yerda
+    Statistika/Dashboard bilan bir xil `davr_oraligi()` xizmatidan olinadi."""
+    if davr not in _DAVRLAR:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Noma'lum davr: {davr}. Ruxsat etilgan: {', '.join(_DAVRLAR)}",
+        )
+    boshlanish, tugash = davr_oraligi(davr, sana, db)
+    return DavrOraligiJavob(davr=davr, sana_dan=boshlanish, sana_gacha=tugash)
 
 
 @router.get("/kiplar", response_model=Sahifalangan[HujjatKipJavob])

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../api/api_exception.dart';
 import '../../models/hujjat.dart';
+import '../../models/mahsulot.dart';
 import '../../models/shubhali_holat.dart';
 import '../../state/app_state.dart';
+import '../../widgets/shubhali_holat_saqlash_dialogi.dart';
 
 class ShubhaliHolatlarEkrani extends StatefulWidget {
   const ShubhaliHolatlarEkrani({super.key});
@@ -23,10 +26,30 @@ class _ShubhaliHolatlarEkraniState extends State<ShubhaliHolatlarEkrani> {
   DateTime? _sanaGacha;
   int _joriySahifa = 1;
 
+  // "Saqlash" dialogida mahsulot tugmalarini ko'rsatish uchun — kip_togrilash
+  // bilan bir xil naqsh (operator_screen.dart ham shu ro'yxatni bir marta
+  // yuklab, dialogga uzatadi).
+  List<Mahsulot> _mahsulotlar = [];
+  int? _amalBajarilayotganId;
+
   @override
   void initState() {
     super.initState();
+    _mahsulotlarniYuklash();
     _yuklash();
+  }
+
+  Future<void> _mahsulotlarniYuklash() async {
+    try {
+      final javob = await context.read<AppState>().api.get('/mahsulotlar');
+      if (!mounted) return;
+      setState(() => _mahsulotlar = (javob as List).map((e) => Mahsulot.fromJson(e)).toList());
+    } catch (_) {
+      // Ro'yxat yuklanmasa "Saqlash" tugmasi bosilganda qayta uriniladi
+      // (dialog bo'sh mahsulot ro'yxati bilan ochilib qolmasligi uchun) —
+      // shu holatda oddiy tarzda hech narsa qilinmaydi, admin "Yangilash"ni
+      // bossa qayta yuklanadi.
+    }
   }
 
   Map<String, dynamic> _filtrQuery() {
@@ -59,6 +82,40 @@ class _ShubhaliHolatlarEkraniState extends State<ShubhaliHolatlarEkrani> {
       setState(() => _xato = e.toString());
     } finally {
       if (mounted) setState(() => _yuklanmoqda = false);
+    }
+  }
+
+  /// "Ko'rdim" — hodisa soxta signal, hech qanday Kip yaratilmaydi.
+  Future<void> _kordim(ShubhaliHolat hodisa) async {
+    setState(() => _amalBajarilayotganId = hodisa.id);
+    try {
+      await context.read<AppState>().api.patch('/shubhali-holatlar/${hodisa.id}/tasdiqla');
+      await _yuklash();
+    } catch (e) {
+      if (mounted) {
+        final xabar = e is ApiException ? e.xabar : e.toString();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(xabar)));
+      }
+    } finally {
+      if (mounted) setState(() => _amalBajarilayotganId = null);
+    }
+  }
+
+  /// "Saqlash" — mahsulot/partiya tanlab, hodisani HAQIQIY Kip sifatida saqlaydi.
+  Future<void> _saqlashDialoginiOch(ShubhaliHolat hodisa) async {
+    final lok = context.read<AppState>().lok;
+    final natija = await shubhaliHolatSaqlashDialogniKorsat(
+      context: context,
+      holat: context.read<AppState>(),
+      mahsulotlar: _mahsulotlar,
+      hodisaId: hodisa.id,
+      ogirlik: hodisa.ogirlik,
+    );
+    if (natija == true) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(lok.t('shubhali_holat_saqlandi'))));
+      }
+      await _yuklash();
     }
   }
 
@@ -152,6 +209,27 @@ class _ShubhaliHolatlarEkraniState extends State<ShubhaliHolatlarEkrani> {
     );
   }
 
+  Widget _amalXujayrasi(dynamic lok, ShubhaliHolat h) {
+    if (h.tasdiqlangan) {
+      return Text(h.koribChiqqanIsm ?? '—', style: const TextStyle(color: Colors.grey));
+    }
+    final bandmi = _amalBajarilayotganId == h.id;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FilledButton(
+          onPressed: bandmi ? null : () => _saqlashDialoginiOch(h),
+          child: Text(lok.t('saqlash')),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton(
+          onPressed: bandmi ? null : () => _kordim(h),
+          child: Text(lok.t('kordim')),
+        ),
+      ],
+    );
+  }
+
   Widget _statKartasi(String smena, String qiymat) {
     return SizedBox(
       width: 140,
@@ -185,6 +263,7 @@ class _ShubhaliHolatlarEkraniState extends State<ShubhaliHolatlarEkrani> {
                   DataColumn(label: Text(lok.t('operator'))),
                   DataColumn(label: Text(lok.t('kg'))),
                   DataColumn(label: Text(lok.t('holati'))),
+                  DataColumn(label: Text('')),
                 ],
                 rows: sahifa.items
                     .map(
@@ -199,6 +278,7 @@ class _ShubhaliHolatlarEkraniState extends State<ShubhaliHolatlarEkrani> {
                             backgroundColor: h.tasdiqlangan ? Colors.green.shade100 : Colors.red.shade100,
                           ),
                         ),
+                        DataCell(_amalXujayrasi(lok, h)),
                       ]),
                     )
                     .toList(),

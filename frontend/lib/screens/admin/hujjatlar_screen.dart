@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import '../../api/api_exception.dart';
@@ -27,14 +28,22 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
   int _joriySahifa = 1;
 
   final _kipRaqamiKontrolleri = TextEditingController();
+  final _partiyaRaqamiKontrolleri = TextEditingController();
   final _qidiruvKontrolleri = TextEditingController();
   Timer? _qidiruvTaymer;
   Timer? _kipRaqamiTaymer;
+  Timer? _partiyaRaqamiTaymer;
   String? _smenaFiltri;
   String? _holatiFiltri;
   String? _mahsulotFiltri;
   DateTime? _sanaDan;
   DateTime? _sanaGacha;
+
+  // Statistika ekranidagi bilan bir xil tezkor davr tanlovi — bosilgan
+  // tugma (agar bo'lsa). Foydalanuvchi kalendar/qo'lda sana tanlasa `null`ga
+  // qaytadi (bu holda hech qaysi davr tugmasi belgilangan ko'rinmaydi).
+  String? _tanlanganDavr;
+  bool _davrYuklanmoqda = false;
 
   @override
   void initState() {
@@ -50,8 +59,10 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
   void dispose() {
     _qidiruvTaymer?.cancel();
     _kipRaqamiTaymer?.cancel();
+    _partiyaRaqamiTaymer?.cancel();
     _qidiruvKontrolleri.dispose();
     _kipRaqamiKontrolleri.dispose();
+    _partiyaRaqamiKontrolleri.dispose();
     super.dispose();
   }
 
@@ -66,6 +77,14 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
   void _kipRaqamiOzgardi(String qiymat) {
     _kipRaqamiTaymer?.cancel();
     _kipRaqamiTaymer = Timer(const Duration(milliseconds: 500), () {
+      _joriySahifa = 1;
+      _yuklash();
+    });
+  }
+
+  void _partiyaRaqamiOzgardi(String qiymat) {
+    _partiyaRaqamiTaymer?.cancel();
+    _partiyaRaqamiTaymer = Timer(const Duration(milliseconds: 500), () {
       _joriySahifa = 1;
       _yuklash();
     });
@@ -90,6 +109,8 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
       if (_mahsulotFiltri != null) query['mahsulot_kodi'] = _mahsulotFiltri;
       final kipRaqami = int.tryParse(_kipRaqamiKontrolleri.text.trim());
       if (kipRaqami != null) query['kip_raqami'] = kipRaqami;
+      final partiyaRaqami = int.tryParse(_partiyaRaqamiKontrolleri.text.trim());
+      if (partiyaRaqami != null) query['partiya_raqami'] = partiyaRaqami;
       if (_qidiruvKontrolleri.text.trim().isNotEmpty) query['qidiruv'] = _qidiruvKontrolleri.text.trim();
       if (_smenaFiltri != null) query['smena'] = _smenaFiltri;
       if (_holatiFiltri != null) query['holati'] = _holatiFiltri;
@@ -124,6 +145,7 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
       } else {
         _sanaGacha = tanlangan;
       }
+      _tanlanganDavr = null;
       _joriySahifa = 1;
     });
     _yuklash();
@@ -134,9 +156,34 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
     setState(() {
       _sanaDan = bugun;
       _sanaGacha = bugun;
+      _tanlanganDavr = null;
       _joriySahifa = 1;
     });
     _yuklash();
+  }
+
+  /// Statistika/Dashboard ekranlaridagi "Kunlik/Haftalik/Oylik/Mavsum" tezkor
+  /// davr tugmalari — bosilganda sana oralig'i frontendda hisoblanmaydi,
+  /// backenddagi `davr_oraligi()` xizmatidan (`mavsum_boshlanish_sanasi`
+  /// sozlamasidan foydalanadigan, Statistika bilan bir xil) olinadi.
+  Future<void> _davrTanlash(String davr) async {
+    setState(() => _davrYuklanmoqda = true);
+    try {
+      final javob = await context.read<AppState>().api.get('/hujjatlar/davr-oraligi', query: {'davr': davr});
+      if (!mounted) return;
+      setState(() {
+        _sanaDan = DateTime.parse(javob['sana_dan'] as String);
+        _sanaGacha = DateTime.parse(javob['sana_gacha'] as String);
+        _tanlanganDavr = davr;
+        _joriySahifa = 1;
+      });
+      await _yuklash();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _xato = e.toString());
+    } finally {
+      if (mounted) setState(() => _davrYuklanmoqda = false);
+    }
   }
 
   /// Kalendarda faqat "sana_dan" va "sana_gacha" bitta xil kunga o'rnatilgan
@@ -154,6 +201,7 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
     setState(() {
       _sanaDan = kun;
       _sanaGacha = kun;
+      _tanlanganDavr = null;
       _joriySahifa = 1;
     });
     _yuklash();
@@ -282,14 +330,41 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
     );
   }
 
+  /// Tezkor davr tugmasi (Kunlik/Haftalik/Oylik/Mavsum) — Statistika
+  /// ekranidagi tanlangan/tanlanmagan uslub bilan bir xil.
+  Widget _davrTugmasi(String matn, String davr) {
+    final tanlanganmi = _tanlanganDavr == davr;
+    void tanlash() {
+      if (_davrYuklanmoqda) return;
+      _davrTanlash(davr);
+    }
+
+    return SizedBox(
+      height: 36,
+      child: tanlanganmi
+          ? ElevatedButton(
+              onPressed: tanlash,
+              style: ElevatedButton.styleFrom(backgroundColor: kipTaroziYashil, foregroundColor: Colors.white),
+              child: Text(matn, overflow: TextOverflow.ellipsis),
+            )
+          : OutlinedButton(
+              onPressed: tanlash,
+              style: OutlinedButton.styleFrom(side: const BorderSide(color: kipTaroziYashil)),
+              child: Text(matn, overflow: TextOverflow.ellipsis),
+            ),
+    );
+  }
+
   void _filtrniTozalash() {
     _kipRaqamiKontrolleri.clear();
+    _partiyaRaqamiKontrolleri.clear();
     _qidiruvKontrolleri.clear();
     _smenaFiltri = null;
     _holatiFiltri = null;
     _mahsulotFiltri = null;
     _sanaDan = null;
     _sanaGacha = null;
+    _tanlanganDavr = null;
     _joriySahifa = 1;
     _yuklash();
   }
@@ -303,6 +378,25 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 0-qator: tezkor davr tanlovi (Statistika ekranidagi bilan bir xil
+          // Kunlik/Haftalik/Oylik/Mavsum mantig'i — sana_dan/sana_gacha shu
+          // orqali hisoblanadi). Bu ALOHIDA sana tanlashni ALMASHTIRMAYDI —
+          // pastdagi kalendar/"sana dan"-"sana gacha" hamon ishlaydi.
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              for (final davr in const ['kunlik', 'haftalik', 'oylik', 'mavsum'])
+                _davrTugmasi(lok.t('davr_$davr'), davr),
+              if (_davrYuklanmoqda)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
           // 1-qator: asosiy qidiruv / filtrlash maydonlari
           Wrap(
             spacing: 12,
@@ -326,9 +420,24 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
               SizedBox(
                 width: 140,
                 child: TextField(
+                  controller: _partiyaRaqamiKontrolleri,
+                  onChanged: _partiyaRaqamiOzgardi,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: lok.t('partiya_raqami'),
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 140,
+                child: TextField(
                   controller: _kipRaqamiKontrolleri,
                   onChanged: _kipRaqamiOzgardi,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   decoration: InputDecoration(labelText: lok.t('kip_qisqa'), border: const OutlineInputBorder(), isDense: true),
                 ),
               ),

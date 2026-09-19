@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -23,6 +23,17 @@ class HujjatKipJavob(BaseModel):
     vaqt: datetime
     surat_yoli: str | None
     holati: KipHolati
+
+
+class DavrOraligiJavob(BaseModel):
+    """Hujjatlar ekranidagi "Kunlik/Haftalik/Oylik/Mavsum" tezkor davr
+    tugmalari uchun — `sana_dan`/`sana_gacha`ni frontend o'zi hisoblamasdan,
+    backenddagi `davr_oraligi()` (mavsum_boshlanish_sanasi sozlamasidan
+    foydalanadigan) mantig'idan oladi — Statistika/Dashboard bilan izchil."""
+
+    davr: str
+    sana_dan: date
+    sana_gacha: date
 
 
 class AuditLogJavob(BaseModel):

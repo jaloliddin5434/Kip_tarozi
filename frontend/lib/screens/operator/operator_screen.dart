@@ -20,7 +20,6 @@ import '../../widgets/clock_widget.dart';
 import '../../widgets/kamera_tasdiq_kutish_dialog.dart';
 import '../../widgets/kip_togrilash_dialogi.dart';
 import '../../widgets/smena_kalendar_dialogi.dart';
-import '../../widgets/yuk_saqlanmadi_dialog.dart';
 
 const _uuid = Uuid();
 
@@ -82,8 +81,13 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   // teng bo'lmasa — bu eskirgan (stale) javob, e'tiborsiz qoldiriladi.
   int _partiyaOchishSorovId = 0;
 
+  // AUDIT TUZATISHI (UX yangilash): "Shubhali holatlar" (anti-o'g'irlik)
+  // hodisasi ENDI operatorni bloklamaydi (avval shu Timer + `bloklovchi`
+  // so'rovi orqali bloklovchi modal ko'rsatilar edi — bu olib tashlandi;
+  // hodisa endi admin panelida "Saqlash"/"Ko'rdim" bilan hal qilinadi).
+  // Timer hamon KAMERA-tasdiq blokini (mustaqil, ALOHIDA mexanizm — pastda
+  // qarang) tekshirish uchun ishlatiladi.
   Timer? _blokTimer;
-  bool _blokDialogiKorinmoqda = false;
 
   // Kamera ishlamasa — Admin ruxsatini kutish (POST /kiplar -> 202).
   bool _kameraTasdiqKutilmoqda = false;
@@ -182,27 +186,6 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
   }
 
   Future<void> _blokniTekshirish() async {
-    try {
-      final javob = await _holat.api.get('/shubhali-holatlar/bloklovchi');
-      if (javob != null && !_blokDialogiKorinmoqda && mounted) {
-        _blokDialogiKorinmoqda = true;
-        await yukSaqlanmadiDialogniKorsat(
-          context: context,
-          lok: _holat.lok,
-          onTushundim: () async {
-            try {
-              await _holat.api.patch('/shubhali-holatlar/${javob['id']}/tasdiqla');
-            } catch (e) {
-              _xatoKorsat(e.toString());
-            }
-          },
-        );
-        _blokDialogiKorinmoqda = false;
-      }
-    } catch (_) {
-      // Aloqa muammosi — keyingi tsiklda qayta uriniladi
-    }
-
     // Kamera tasdiq so'rovi (kutilayotgan) bo'lsa — operatorni qayta bloklaymiz.
     // Ilova qayta ochilsa yoki dialog qandaydir yo'l bilan yopilsa ham blok
     // shu tekshiruv orqali tiklanadi.

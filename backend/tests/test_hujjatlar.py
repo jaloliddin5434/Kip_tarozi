@@ -1,11 +1,13 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from app.core.security import parolni_hash
 from app.models.foydalanuvchi import Foydalanuvchi, Rol, Smena
 from app.models.kip import Kip, KipHolati
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya, PartiyaHolati
+from app.models.sozlama import Sozlama
+from app.services.davr import davr_oraligi
 
 
 def _partiya_yarat(db, mahsulot_id, raqami):
@@ -156,3 +158,71 @@ def test_kiplar_royxati_kip_raqami_filtri_bir_nechta_partiyada(client, db, admin
     javob_2 = client.get("/api/v1/hujjatlar/kiplar", params={"kip_raqami": 2}, headers=admin_headers).json()
     assert javob_2["jami"] == 1
     assert javob_2["items"][0]["partiya_raqami"] == 840
+
+
+def test_kiplar_royxati_mahsulot_partiya_kip_kombinatsiyasi_aynan_bitta_natija(
+    client, db, admin_headers, operator, mahsulot_tola
+):
+    """Mahsulot + partiya raqami + kip raqami birgalikda berilsa — AYNAN
+    o'sha bitta kip qaytishi kerak, boshqa mos kelmaydigan yozuvlar emas."""
+    lint = Mahsulot(kod="lint", nomi="Lint")
+    db.add(lint)
+    db.commit()
+    db.refresh(lint)
+
+    tola_55 = _partiya_yarat(db, mahsulot_tola.id, 55)
+    tola_56 = _partiya_yarat(db, mahsulot_tola.id, 56)
+    lint_55 = _partiya_yarat(db, lint.id, 55)
+    _kip_yarat(db, tola_55.id, 11, 100.0, Smena.A, operator.id)
+    _kip_yarat(db, tola_55.id, 12, 101.0, Smena.A, operator.id)
+    _kip_yarat(db, tola_56.id, 11, 102.0, Smena.A, operator.id)
+    _kip_yarat(db, lint_55.id, 11, 103.0, Smena.A, operator.id)
+
+    javob = client.get(
+        "/api/v1/hujjatlar/kiplar",
+        params={"mahsulot_kodi": "tola", "partiya_raqami": 55, "kip_raqami": 11},
+        headers=admin_headers,
+    ).json()
+
+    assert javob["jami"] == 1
+    natija = javob["items"][0]
+    assert natija["mahsulot_kodi"] == "tola"
+    assert natija["partiya_raqami"] == 55
+    assert natija["kip_raqami"] == 11
+    assert natija["ogirlik"] == 100.0
+
+
+def test_davr_oraligi_kunlik_va_oylik(client, admin_headers):
+    bugun = date.today()
+
+    kunlik = client.get(
+        "/api/v1/hujjatlar/davr-oraligi", params={"davr": "kunlik"}, headers=admin_headers
+    ).json()
+    assert kunlik["sana_dan"] == kunlik["sana_gacha"] == bugun.isoformat()
+
+    kutilgan_boshlanish, kutilgan_tugash = davr_oraligi("oylik", bugun)
+    oylik = client.get(
+        "/api/v1/hujjatlar/davr-oraligi", params={"davr": "oylik"}, headers=admin_headers
+    ).json()
+    assert oylik["sana_dan"] == kutilgan_boshlanish.isoformat()
+    assert oylik["sana_gacha"] == kutilgan_tugash.isoformat()
+
+
+def test_davr_oraligi_mavsum_sozlamadan_olinadi(client, db, admin_headers):
+    """`davr=mavsum` — qattiq kodlangan 1-sentyabr emas, `mavsum_boshlanish_sanasi`
+    sozlamasidan olinishi kerak (Statistika/Dashboard bilan bir xil mantiq)."""
+    db.add(Sozlama(kalit="mavsum_boshlanish_sanasi", qiymat="2025-09-01"))
+    db.commit()
+
+    javob = client.get(
+        "/api/v1/hujjatlar/davr-oraligi", params={"davr": "mavsum"}, headers=admin_headers
+    ).json()
+    assert javob["sana_dan"] == "2025-09-01"
+    assert javob["sana_gacha"] == date.today().isoformat()
+
+
+def test_davr_oraligi_notogri_davr_400(client, admin_headers):
+    javob = client.get(
+        "/api/v1/hujjatlar/davr-oraligi", params={"davr": "notogri"}, headers=admin_headers
+    )
+    assert javob.status_code == 400

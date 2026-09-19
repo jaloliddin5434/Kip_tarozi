@@ -101,18 +101,6 @@ const Map<String, Map<Til, String>> _matnlar = {
   'ha_yangi_kip': {Til.uz: 'Ha, yangi kip', Til.ru: 'Да, новый кип'},
   'yoq_bekor': {Til.uz: 'Yo\'q, bekor qilish', Til.ru: 'Нет, отменить'},
 
-  'yuk_saqlanmadi_sarlavha': {
-    Til.uz: '⚠️ YUK SAQLANMADI!',
-    Til.ru: '⚠️ ГРУЗ НЕ СОХРАНЁН!',
-  },
-  'yuk_saqlanmadi_matn': {
-    Til.uz:
-        'Tarozi ustiga yuk qo\'yildi, lekin saqlanmasdan olib qo\'yildi. Bu holat qayd etildi.',
-    Til.ru:
-        'Груз был поставлен на весы, но убран без сохранения. Событие зафиксировано.',
-  },
-  'tushundim': {Til.uz: 'Tushundim', Til.ru: 'Понятно'},
-
   'tola': {Til.uz: 'Tola', Til.ru: 'Тола'},
   'lint': {Til.uz: 'Lint', Til.ru: 'Линт'},
   'pux': {Til.uz: 'Pux', Til.ru: 'Пух'},
@@ -367,6 +355,23 @@ const Map<String, Map<Til, String>> _matnlar = {
   'korib_chiqildi': {Til.uz: 'Ko\'rib chiqildi', Til.ru: 'Рассмотрено'},
   'yangi': {Til.uz: 'Yangi', Til.ru: 'Новое'},
   'korib_chiqqan': {Til.uz: 'Ko\'rib chiqqan', Til.ru: 'Рассмотрел'},
+  'kordim': {Til.uz: 'Ko\'rdim', Til.ru: 'Видел'},
+  'shubhali_holat_saqlash_sarlavha': {
+    Til.uz: 'Shubhali holatni kip sifatida saqlash',
+    Til.ru: 'Сохранить событие как кип',
+  },
+  'shubhali_holat_mahsulot_tanlang': {
+    Til.uz: 'Mahsulotni tanlang',
+    Til.ru: 'Выберите продукт',
+  },
+  'shubhali_holat_malumotlar_notogri': {
+    Til.uz: 'Mahsulot va partiya raqamini to\'liq kiriting',
+    Til.ru: 'Укажите продукт и номер партии полностью',
+  },
+  'shubhali_holat_saqlandi': {
+    Til.uz: 'Kip sifatida saqlandi',
+    Til.ru: 'Сохранено как кип',
+  },
   'sana_dan': {Til.uz: 'Sana dan', Til.ru: 'Дата с'},
   'sana_gacha': {Til.uz: 'Sana gacha', Til.ru: 'Дата по'},
   'smena_boyicha': {Til.uz: 'Smena bo\'yicha', Til.ru: 'По сменам'},

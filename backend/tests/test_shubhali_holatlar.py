@@ -3,6 +3,7 @@ from datetime import date, datetime, timezone
 from app.core.config import settings
 from app.core.security import parolni_hash
 from app.models.foydalanuvchi import Foydalanuvchi, Rol, Smena
+from app.models.kip import Kip
 from app.models.shubhali_holat import ShubhaliHolat, ShubhaliHolatStatusi
 
 
@@ -211,3 +212,211 @@ def test_statistika_sana_filtri(client, db, admin_headers, operator):
     natija = javob.json()
     assert natija["smena_boyicha"] == {"A": 0, "B": 0, "C": 0, "D": 0}
     assert natija["operator_boyicha"] == []
+
+
+# ---------------------------------------------------------------------------
+# AUDIT TUZATISHI (UX yangilash): operator endi hodisadan bloklanmaydi —
+# admin panel orqali IKKITA aniq amal bilan hal qilinadi:
+#   - PATCH /{id}/tasdiqla ("Ko'rdim") — soxta signal, hech narsa yaratilmaydi
+#   - POST /{id}/saqlash ("Saqlash") — HAQIQIY bo'lgan, mahsulot/partiya
+#     qo'lda tanlanib HAQIQIY Kip yaratiladi
+# ---------------------------------------------------------------------------
+
+
+def _partiya_yarat(client, operator_headers, mahsulot_kodi: str, raqami: int) -> dict:
+    return client.post(
+        "/api/v1/partiyalar",
+        json={"mahsulot_kodi": mahsulot_kodi, "partiya_raqami": raqami},
+        headers=operator_headers,
+    ).json()
+
+
+def test_tasdiqla_kip_yaratmaydi(client, db, admin_headers):
+    """"Ko'rdim" — hodisani yopadi, lekin HECH QANDAY Kip yaratmaydi (soxta
+    signal ma'nosida)."""
+    hodisa = ShubhaliHolat(vaqt=datetime.now(timezone.utc), smena=Smena.A, ogirlik=5.0)
+    db.add(hodisa)
+    db.commit()
+    db.refresh(hodisa)
+
+    javob = client.patch(f"/api/v1/shubhali-holatlar/{hodisa.id}/tasdiqla", headers=admin_headers)
+    assert javob.status_code == 200
+    assert javob.json()["holati"] == ShubhaliHolatStatusi.korib_chiqildi.value
+
+    assert db.query(Kip).count() == 0
+
+
+def test_saqlash_admin_kip_yaratadi(client, db, admin, admin_headers, operator_headers, mahsulot_tola):
+    """"Saqlash" — admin mahsulot/partiya tanlab yuboradi, tizim HODISANING
+    OG'IRLIGI bilan HAQIQIY Kip yozuvi yaratadi va hodisani yopadi."""
+    partiya = _partiya_yarat(client, operator_headers, "tola", 700)
+
+    hodisa = ShubhaliHolat(vaqt=datetime.now(timezone.utc), smena=Smena.B, ogirlik=123.45)
+    db.add(hodisa)
+    db.commit()
+    db.refresh(hodisa)
+
+    javob = client.post(
+        f"/api/v1/shubhali-holatlar/{hodisa.id}/saqlash",
+        json={"mahsulot_kodi": "tola", "partiya_raqami": 700},
+        headers=admin_headers,
+    )
+    assert javob.status_code == 200
+    kip_javob = javob.json()
+    assert kip_javob["ogirlik"] == 123.45
+    assert kip_javob["smena"] == "B"
+    assert kip_javob["partiya_id"] == partiya["id"]
+    assert kip_javob["kip_raqami"] == 1
+    assert kip_javob["holati"] == "aktiv"
+    # Hodisada operator_id yo'q edi — admin QO'LDA hal qilayotgani uchun
+    # yaratilgan kipning operatori sifatida ADMINNING o'zi yoziladi.
+    assert kip_javob["operator_id"] == admin.id
+
+    db.refresh(hodisa)
+    assert hodisa.holati == ShubhaliHolatStatusi.korib_chiqildi
+    assert hodisa.korib_chiqqan_id == admin.id
+    assert hodisa.korib_chiqilgan_vaqt is not None
+
+    assert db.query(Kip).count() == 1
+
+
+def test_saqlash_mavjud_operatorni_saqlab_qoladi(client, db, admin_headers, operator, operator_headers, mahsulot_tola):
+    """Agar hodisada (kamdan-kam holatda) operator_id BOR bo'lsa — yangi
+    Kip o'sha haqiqiy operatorga yoziladi, admin bilan almashtirilmaydi."""
+    partiya = _partiya_yarat(client, operator_headers, "tola", 701)
+    hodisa = ShubhaliHolat(vaqt=datetime.now(timezone.utc), smena=Smena.A, ogirlik=88.0, operator_id=operator.id)
+    db.add(hodisa)
+    db.commit()
+    db.refresh(hodisa)
+
+    javob = client.post(
+        f"/api/v1/shubhali-holatlar/{hodisa.id}/saqlash",
+        json={"mahsulot_kodi": "tola", "partiya_raqami": 701},
+        headers=admin_headers,
+    )
+    assert javob.status_code == 200
+    assert javob.json()["operator_id"] == operator.id
+    assert partiya["id"]  # partiya yaratilgani sog'lomlik tekshiruvi
+
+
+def test_saqlash_operatorga_taqiqlangan(client, db, operator_headers):
+    hodisa = ShubhaliHolat(vaqt=datetime.now(timezone.utc), smena=Smena.A, ogirlik=5.0)
+    db.add(hodisa)
+    db.commit()
+    db.refresh(hodisa)
+
+    javob = client.post(
+        f"/api/v1/shubhali-holatlar/{hodisa.id}/saqlash",
+        json={"mahsulot_kodi": "tola", "partiya_raqami": 1},
+        headers=operator_headers,
+    )
+    assert javob.status_code == 403
+
+
+def test_saqlash_notogri_id_404(client, admin_headers):
+    javob = client.post(
+        "/api/v1/shubhali-holatlar/999999/saqlash",
+        json={"mahsulot_kodi": "tola", "partiya_raqami": 1},
+        headers=admin_headers,
+    )
+    assert javob.status_code == 404
+
+
+def test_saqlash_notogri_mahsulot_400(client, db, admin_headers):
+    hodisa = ShubhaliHolat(vaqt=datetime.now(timezone.utc), smena=Smena.A, ogirlik=5.0)
+    db.add(hodisa)
+    db.commit()
+    db.refresh(hodisa)
+
+    javob = client.post(
+        f"/api/v1/shubhali-holatlar/{hodisa.id}/saqlash",
+        json={"mahsulot_kodi": "mavjud_emas", "partiya_raqami": 1},
+        headers=admin_headers,
+    )
+    assert javob.status_code == 400
+
+
+def test_saqlash_notogri_partiya_400(client, db, admin_headers, mahsulot_tola):
+    hodisa = ShubhaliHolat(vaqt=datetime.now(timezone.utc), smena=Smena.A, ogirlik=5.0)
+    db.add(hodisa)
+    db.commit()
+    db.refresh(hodisa)
+
+    javob = client.post(
+        f"/api/v1/shubhali-holatlar/{hodisa.id}/saqlash",
+        json={"mahsulot_kodi": "tola", "partiya_raqami": 999999},
+        headers=admin_headers,
+    )
+    assert javob.status_code == 400
+
+
+def test_saqlash_yopiq_partiyaga_400(client, db, admin_headers, operator_headers, mahsulot_tola):
+    partiya = _partiya_yarat(client, operator_headers, "tola", 702)
+    client.patch(f"/api/v1/partiyalar/{partiya['id']}/yopish", headers=operator_headers)
+
+    hodisa = ShubhaliHolat(vaqt=datetime.now(timezone.utc), smena=Smena.A, ogirlik=5.0)
+    db.add(hodisa)
+    db.commit()
+    db.refresh(hodisa)
+
+    javob = client.post(
+        f"/api/v1/shubhali-holatlar/{hodisa.id}/saqlash",
+        json={"mahsulot_kodi": "tola", "partiya_raqami": 702},
+        headers=admin_headers,
+    )
+    assert javob.status_code == 400
+
+
+def test_saqlash_smena_yoq_bolsa_400(client, db, admin_headers, operator_headers, mahsulot_tola):
+    partiya = _partiya_yarat(client, operator_headers, "tola", 703)
+    hodisa = ShubhaliHolat(vaqt=datetime.now(timezone.utc), smena=None, ogirlik=5.0)
+    db.add(hodisa)
+    db.commit()
+    db.refresh(hodisa)
+
+    javob = client.post(
+        f"/api/v1/shubhali-holatlar/{hodisa.id}/saqlash",
+        json={"mahsulot_kodi": "tola", "partiya_raqami": partiya["partiya_raqami"]},
+        headers=admin_headers,
+    )
+    assert javob.status_code == 400
+
+
+def test_saqlash_allaqachon_korib_chiqilgan_409(client, db, admin_headers, operator_headers, mahsulot_tola):
+    partiya = _partiya_yarat(client, operator_headers, "tola", 704)
+    hodisa = ShubhaliHolat(
+        vaqt=datetime.now(timezone.utc),
+        smena=Smena.A,
+        ogirlik=5.0,
+        holati=ShubhaliHolatStatusi.korib_chiqildi,
+    )
+    db.add(hodisa)
+    db.commit()
+    db.refresh(hodisa)
+
+    javob = client.post(
+        f"/api/v1/shubhali-holatlar/{hodisa.id}/saqlash",
+        json={"mahsulot_kodi": "tola", "partiya_raqami": partiya["partiya_raqami"]},
+        headers=admin_headers,
+    )
+    assert javob.status_code == 409
+    assert db.query(Kip).count() == 0
+
+
+def test_saqlash_ikkinchi_marta_ikkinchi_kip_yaratmaydi(client, db, admin_headers, operator_headers, mahsulot_tola):
+    """Bitta hodisadan faqat BITTA Kip yaratilishi mumkin — ikkinchi
+    "Saqlash" urinishi (masalan qo'sh-bosish) 409 bilan rad etiladi."""
+    partiya = _partiya_yarat(client, operator_headers, "tola", 705)
+    hodisa = ShubhaliHolat(vaqt=datetime.now(timezone.utc), smena=Smena.A, ogirlik=5.0)
+    db.add(hodisa)
+    db.commit()
+    db.refresh(hodisa)
+
+    tana = {"mahsulot_kodi": "tola", "partiya_raqami": partiya["partiya_raqami"]}
+    birinchi = client.post(f"/api/v1/shubhali-holatlar/{hodisa.id}/saqlash", json=tana, headers=admin_headers)
+    assert birinchi.status_code == 200
+
+    ikkinchi = client.post(f"/api/v1/shubhali-holatlar/{hodisa.id}/saqlash", json=tana, headers=admin_headers)
+    assert ikkinchi.status_code == 409
+
+    assert db.query(Kip).count() == 1
