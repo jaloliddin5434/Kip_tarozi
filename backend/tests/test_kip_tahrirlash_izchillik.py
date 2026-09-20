@@ -6,6 +6,7 @@ test ichida: TAHRIRLASHDAN OLDIN va KEYIN solishtiriladi, kesh yo'qligi
 kod darajasida ham tasdiqlangan — loyihada `grep -r cache` bo'sh natija beradi)."""
 
 import uuid
+import zipfile
 from datetime import date, datetime, timezone
 from io import BytesIO
 
@@ -98,9 +99,9 @@ def test_smena_excel_darhol_tuzatilgan_holatni_korsatadi(
     client, db, operator, operator_headers, admin_headers, mahsulot_tola
 ):
     """Excel eksporti ham (hisobotlar.py:smena-excel) — real vaqtda bazadan
-    o'qiydi, keshsiz. MUHIM: bu endpoint qat'iy 4 ta mahsulot kodini
-    (tola/lint/pux/ulyuk) qatorga chiqaradi — shuning uchun test HAQIQIY
-    "lint" kodidan foydalanadi, o'zboshimcha kod emas."""
+    o'qiydi, keshsiz. Endi har mahsulot ZIP ichida alohida faylda — ma'lumoti
+    yo'q mahsulot uchun fayl arxivda umuman bo'lmaydi, shuning uchun
+    "soni=0/kg=0.0" holati "fayl yo'q" bilan ifodalanadi."""
     lint = Mahsulot(kod="lint", nomi="Lint")
     db.add(lint)
     db.commit()
@@ -121,21 +122,22 @@ def test_smena_excel_darhol_tuzatilgan_holatni_korsatadi(
         headers=operator_headers,
     ).json()
 
-    def _excel_qator(mahsulot_nomi):
+    def _mahsulot_natija(mahsulot_nomi: str) -> tuple[int, float]:
         javob = client.get(
             "/api/v1/hisobotlar/smena-excel",
             params={"sana": bugun.isoformat(), "smena": operator.smena.value},
             headers=admin_headers,
         )
         assert javob.status_code == 200
-        wb = load_workbook(BytesIO(javob.content))
-        ws = wb.active
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            if row[0] == mahsulot_nomi:
-                return row
-        return None
+        zf = zipfile.ZipFile(BytesIO(javob.content))
+        fayl_nomi = f"Smena_{operator.smena.value}_{mahsulot_nomi}_{bugun.isoformat()}.xlsx"
+        if fayl_nomi not in zf.namelist():
+            return (0, 0.0)
+        ws = load_workbook(BytesIO(zf.read(fayl_nomi))).active
+        kip_qatorlari = [r for r in ws.iter_rows(values_only=True) if isinstance(r[0], int)]
+        return (len(kip_qatorlari), sum(r[3] for r in kip_qatorlari))
 
-    assert _excel_qator("Tola")[1:3] == (1, 80.0)
+    assert _mahsulot_natija("Tola") == (1, 80.0)
 
     client.patch(
         f"/api/v1/kiplar/{kip['id']}",
@@ -143,6 +145,5 @@ def test_smena_excel_darhol_tuzatilgan_holatni_korsatadi(
         headers=admin_headers,
     )
 
-    tola_qatori_keyin = _excel_qator("Tola")
-    assert tola_qatori_keyin[1:3] == (0, 0.0)
-    assert _excel_qator("Lint")[1:3] == (1, 80.0)
+    assert _mahsulot_natija("Tola") == (0, 0.0)
+    assert _mahsulot_natija("Lint") == (1, 80.0)

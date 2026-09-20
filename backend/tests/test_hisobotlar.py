@@ -1,4 +1,5 @@
 import uuid
+import zipfile
 from datetime import date, datetime, timezone
 from io import BytesIO
 
@@ -37,7 +38,20 @@ def _kip_yarat(db, partiya_id, kip_raqami, ogirlik, smena, sana: date, operator_
     return kip
 
 
-def test_smena_excel_admin_togri_malumot_bilan_generatsiya_qiladi(client, db, admin_headers, operator, mahsulot_tola):
+def _zip_fayllari(baytlar: bytes) -> zipfile.ZipFile:
+    return zipfile.ZipFile(BytesIO(baytlar))
+
+
+def _kip_qatorlari(zf: zipfile.ZipFile, fayl_nomi: str) -> list[tuple]:
+    ws = load_workbook(BytesIO(zf.read(fayl_nomi))).active
+    return [r for r in ws.iter_rows(values_only=True) if isinstance(r[0], int)]
+
+
+def test_smena_excel_har_mahsulot_uchun_alohida_fayl_zip_ichida(
+    client, db, admin_headers, operator, mahsulot_tola
+):
+    """2 mahsulotda ma'lumot bor holat: faqat Tola va Lint uchun fayl
+    yaratilishi, Pux/Ulyuk (ma'lumot yo'q) uchun ZIP'da FAYL BO'LMASLIGI kerak."""
     lint = Mahsulot(kod="lint", nomi="Lint")
     pux = Mahsulot(kod="pux", nomi="Pux")
     ulyuk = Mahsulot(kod="ulyuk", nomi="Ulyuk")
@@ -58,31 +72,50 @@ def test_smena_excel_admin_togri_malumot_bilan_generatsiya_qiladi(client, db, ad
         "/api/v1/hisobotlar/smena-excel", params={"sana": sana.isoformat(), "smena": "A"}, headers=admin_headers
     )
     assert javob.status_code == 200
-    assert javob.headers["content-type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    assert f"Smena_A_{sana.isoformat()}.xlsx" in javob.headers["content-disposition"]
+    assert javob.headers["content-type"] == "application/zip"
+    assert f"Smena_A_{sana.isoformat()}.zip" in javob.headers["content-disposition"]
 
-    wb = load_workbook(BytesIO(javob.content))
-    ws = wb.active
+    zf = _zip_fayllari(javob.content)
+    tola_fayl = f"Smena_A_Tola_{sana.isoformat()}.xlsx"
+    lint_fayl = f"Smena_A_Lint_{sana.isoformat()}.xlsx"
+    # AYNAN 2 ta fayl — Pux/Ulyuk uchun bo'sh fayl yaratilmagan.
+    assert sorted(zf.namelist()) == sorted([tola_fayl, lint_fayl])
 
-    qatorlar = {row[0].value: row for row in ws.iter_rows(min_row=2)}
+    tola_qatorlari = _kip_qatorlari(zf, tola_fayl)
+    assert [r[0] for r in tola_qatorlari] == [1, 2]
+    assert sum(r[3] for r in tola_qatorlari) == 210.0
 
-    tola_qatori = qatorlar["Tola"]
-    assert tola_qatori[1].value == 2
-    assert tola_qatori[2].value == 210.0
-    assert tola_qatori[3].value == 105.0
+    lint_qatorlari = _kip_qatorlari(zf, lint_fayl)
+    assert [r[0] for r in lint_qatorlari] == [1]
+    assert lint_qatorlari[0][3] == 50.0
 
-    lint_qatori = qatorlar["Lint"]
-    assert lint_qatori[1].value == 1
-    assert lint_qatori[2].value == 50.0
-    assert lint_qatori[3].value == 50.0
 
-    pux_qatori = qatorlar["Pux"]
-    assert pux_qatori[1].value == 0
-    assert pux_qatori[2].value == 0.0
+def test_smena_excel_bitta_mahsulotda_malumot_bolsa_bitta_fayl(
+    client, db, admin_headers, operator, mahsulot_tola
+):
+    """1 mahsulotda ma'lumot bor holat: ZIP ichida AYNAN 1 ta fayl."""
+    sana = date.today()
+    partiya = _partiya_yarat(db, mahsulot_tola.id, 960)
+    _kip_yarat(db, partiya.id, 1, 120.0, Smena.C, sana, operator.id)
 
-    jami_qatori = qatorlar["JAMI"]
-    assert jami_qatori[1].value == 3
-    assert jami_qatori[2].value == 260.0
+    javob = client.get(
+        "/api/v1/hisobotlar/smena-excel", params={"sana": sana.isoformat(), "smena": "C"}, headers=admin_headers
+    )
+    assert javob.status_code == 200
+    zf = _zip_fayllari(javob.content)
+    assert zf.namelist() == [f"Smena_C_Tola_{sana.isoformat()}.xlsx"]
+
+
+def test_smena_excel_hech_qanday_malumot_bolmasa_bosh_zip(client, admin_headers):
+    """Hech narsa (0 mahsulot) holati: bo'sh, lekin baribir ochiladigan ZIP."""
+    sana = date.today()
+    javob = client.get(
+        "/api/v1/hisobotlar/smena-excel", params={"sana": sana.isoformat(), "smena": "D"}, headers=admin_headers
+    )
+    assert javob.status_code == 200
+    assert javob.headers["content-type"] == "application/zip"
+    zf = _zip_fayllari(javob.content)
+    assert zf.namelist() == []
 
 
 def test_smena_excel_tahrirlangan_kip_hisoblanadi_bekor_hisoblanmaydi(
@@ -99,13 +132,15 @@ def test_smena_excel_tahrirlangan_kip_hisoblanadi_bekor_hisoblanmaydi(
         "/api/v1/hisobotlar/smena-excel", params={"sana": sana.isoformat(), "smena": "A"}, headers=admin_headers
     )
     assert javob.status_code == 200
-    ws = load_workbook(BytesIO(javob.content)).active
-    qatorlar = {row[0].value: row for row in ws.iter_rows(min_row=2)}
+    zf = _zip_fayllari(javob.content)
+    tola_fayl = f"Smena_A_Tola_{sana.isoformat()}.xlsx"
+    # faqat Tola'da ma'lumot bor — bitta fayl
+    assert zf.namelist() == [tola_fayl]
+
     # aktiv (100) + tahrirlangan (60) = 2 ta / 160 kg; bekor (999) chiqib ketadi
-    assert qatorlar["Tola"][1].value == 2
-    assert qatorlar["Tola"][2].value == 160.0
-    assert qatorlar["JAMI"][1].value == 2
-    assert qatorlar["JAMI"][2].value == 160.0
+    qatorlar = _kip_qatorlari(zf, tola_fayl)
+    assert [r[0] for r in qatorlar] == [1, 2]
+    assert sum(r[3] for r in qatorlar) == 160.0
 
 
 def test_smena_excel_operator_oz_smenasini_olishi_mumkin(client, operator_headers, operator):

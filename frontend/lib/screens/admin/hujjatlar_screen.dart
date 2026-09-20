@@ -226,11 +226,13 @@ class _HujjatlarEkraniState extends State<HujjatlarEkrani> {
             });
             try {
               final sana = tanlanganSana.toIso8601String().substring(0, 10);
+              // Backend endi HAR MAHSULOT uchun alohida Excel faylni bitta
+              // ZIP arxiv ichida qaytaradi (qarang hisobotlar.py:smena_excel).
               final baytlar = await holat.api.getBaytlar(
                 '/hisobotlar/smena-excel',
                 query: {'sana': sana, 'smena': tanlanganSmena},
               );
-              final yol = await faylniSaqlash(baytlar, 'Smena_${tanlanganSmena}_$sana.xlsx');
+              final yol = await faylniSaqlash(baytlar, 'Smena_${tanlanganSmena}_$sana.zip');
               if (dialogContext.mounted) Navigator.of(dialogContext).pop();
               if (mounted) {
                 final xabar = yol == null ? lok.t('fayl_yuklab_olindi') : '${lok.t('fayl_saqlandi')}: $yol';

@@ -582,8 +582,10 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
     setState(() => _excelYuklanmoqda = true);
     try {
       final sana = DateTime.now().toIso8601String().substring(0, 10);
+      // Backend endi HAR MAHSULOT uchun alohida Excel faylni bitta ZIP
+      // arxiv ichida qaytaradi (qarang hisobotlar.py:smena_excel).
       final baytlar = await _holat.api.getBaytlar('/hisobotlar/smena-excel', query: {'sana': sana, 'smena': smena});
-      final yol = await faylniSaqlash(baytlar, 'Smena_${smena}_$sana.xlsx');
+      final yol = await faylniSaqlash(baytlar, 'Smena_${smena}_$sana.zip');
       if (mounted) {
         final lok = _holat.lok;
         final xabar = yol == null ? lok.t('fayl_yuklab_olindi') : '${lok.t('fayl_saqlandi')}: $yol';

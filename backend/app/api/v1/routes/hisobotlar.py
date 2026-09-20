@@ -16,11 +16,9 @@ from app.models.kip import HISOBLANADIGAN_HOLATLAR, Kip
 from app.models.mahsulot import Mahsulot
 from app.models.partiya import Partiya
 from app.services.davr import mavsum_boshi_sozlamadan, mavsum_boshlanishi, sargable_oraliq
-from app.services.hisobotlar_excel import smena_mahsulot_jadval
+from app.services.hisobotlar_excel import smena_barcha_mahsulotlar_zip, smena_mahsulot_jadval
 
 router = APIRouter(prefix="/hisobotlar", tags=["hisobotlar"])
-
-_MAHSULOT_TARTIBI = ["tola", "lint", "pux", "ulyuk"]
 
 _HAFTA_KUNLARI = ["Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba", "Yakshanba"]
 _OY_NOMLARI = {
@@ -38,58 +36,23 @@ def smena_excel(
     db: Session = Depends(get_db),
     foydalanuvchi: Foydalanuvchi = Depends(rollarga_ruxsat(Rol.admin, Rol.operator)),
 ) -> StreamingResponse:
+    """Bitta KUN + bitta SMENA uchun eksport — HAR BIR mahsulot uchun ALOHIDA
+    Excel fayl (`/smena-mahsulot-excel` bilan bir xil tor, har-kip ko'rinish),
+    bitta ZIP arxiv ichida (brauzerlar bir vaqtning o'zida bir nechta faylni
+    avtomatik yuklab olishni cheklashi mumkinligi uchun). Faqat o'sha
+    kuni/smenada HAQIQATDA ishlatilgan mahsulotlar uchun fayl yaratiladi."""
     if foydalanuvchi.rol == Rol.operator and foydalanuvchi.smena != smena:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Faqat o'z smenangiz hisobotini olishingiz mumkin",
         )
 
-    mahsulotlar = db.execute(select(Mahsulot.kod, Mahsulot.nomi)).all()
-    nomlar = {kod: nomi for kod, nomi in mahsulotlar}
+    zip_baytlar = smena_barcha_mahsulotlar_zip(db, sana, smena)
 
-    pastki, yuqori = sargable_oraliq(sana, sana)
-    qatorlar = db.execute(
-        select(Mahsulot.kod, func.count(Kip.id), func.coalesce(func.sum(Kip.ogirlik), 0))
-        .join(Partiya, Partiya.mahsulot_id == Mahsulot.id)
-        .join(Kip, Kip.partiya_id == Partiya.id)
-        .where(Kip.holati.in_(HISOBLANADIGAN_HOLATLAR), Kip.smena == smena, Kip.vaqt >= pastki, Kip.vaqt < yuqori)
-        .group_by(Mahsulot.kod)
-    ).all()
-    jamlanma = {kod: (soni, float(kg)) for kod, soni, kg in qatorlar}
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = f"Smena {smena.value}"
-
-    ws.append(["Mahsulot", "Soni", "Jami kg", "O'rtacha kg"])
-    for hujayra in ws[1]:
-        hujayra.font = Font(bold=True)
-
-    jami_soni = 0
-    jami_kg = 0.0
-    for kod in _MAHSULOT_TARTIBI:
-        soni, kg = jamlanma.get(kod, (0, 0.0))
-        ortacha = round(kg / soni, 2) if soni else 0.0
-        ws.append([nomlar.get(kod, kod), soni, round(kg, 2), ortacha])
-        jami_soni += soni
-        jami_kg += kg
-
-    jami_ortacha = round(jami_kg / jami_soni, 2) if jami_soni else 0.0
-    ws.append(["JAMI", jami_soni, round(jami_kg, 2), jami_ortacha])
-    for hujayra in ws[ws.max_row]:
-        hujayra.font = Font(bold=True)
-
-    for i, kenglik in enumerate([20, 10, 12, 14], start=1):
-        ws.column_dimensions[get_column_letter(i)].width = kenglik
-
-    buffer = BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
-
-    fayl_nomi = f"Smena_{smena.value}_{sana.isoformat()}.xlsx"
+    fayl_nomi = f"Smena_{smena.value}_{sana.isoformat()}.zip"
     return StreamingResponse(
-        buffer,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        BytesIO(zip_baytlar),
+        media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{fayl_nomi}"'},
     )
 
@@ -104,8 +67,10 @@ def smena_mahsulot_excel(
 ) -> StreamingResponse:
     """Bitta KUN + bitta SMENA + bitta MAHSULOT uchun tor eksport — shu
     kombinatsiyada tortilgan har bir kip alohida qator (kip raqami, vaqt, kg)
-    va oxirida JAMI qatori. /smena-excel'dan farqli — u barcha mahsulotlarni
-    bitta jamlanma sifatida beradi, bu esa bitta mahsulotning to'liq ro'yxati."""
+    va oxirida JAMI qatori. Bitta aniq mahsulot tanlanganda (masalan Operator
+    ekranidagi "Smena + mahsulot Excel" tugmasi) shu endpoint ishlatiladi —
+    /smena-excel esa BARCHA mahsulotlarni (har biri alohida faylda, ZIP
+    ichida) beradi."""
     if foydalanuvchi.rol == Rol.operator and foydalanuvchi.smena != smena:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
