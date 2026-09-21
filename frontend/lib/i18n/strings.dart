@@ -27,6 +27,7 @@ const Map<String, Map<Til, String>> _matnlar = {
   },
 
   'smena': {Til.uz: 'Smena', Til.ru: 'Смена'},
+  'smenani_tugatish': {Til.uz: 'Smenani tugatish', Til.ru: 'Завершить смену'},
   'smena_holati': {
     Til.uz: 'Smena joriy holati',
     Til.ru: 'Текущее состояние смены',

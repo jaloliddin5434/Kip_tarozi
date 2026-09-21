@@ -673,24 +673,40 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
             ),
           ],
         ),
+        // "Smenani tugatish" tugmasi qo'shilgani uchun AppBar actions endi
+        // tor oynalarda (masalan kichikroq monitor/test-oyna) sig'may qolishi
+        // mumkin edi — shuning uchun butun qator gorizontal skrollga o'ralgan
+        // (odatiy kenglikda ko'rinish o'zgarmaydi, faqat tor bo'lganda
+        // RenderFlex overflow xatosi o'rniga skroll qilinadi).
         actions: [
-          if (_muammoliSoni > 0) _navbatMuammoliIndikatori(lok),
-          if (_navbatUzunligi > 0) _navbatIndikatori(lok),
-          _ulanishIkonkasi(Icons.dns_rounded, lok.t('server'), lok),
-          _ulanishIkonkasi(Icons.videocam_rounded, lok.t('kamera'), lok),
-          _ulanishIkonkasi(Icons.monitor_weight_rounded, lok.t('tarozi'), lok),
-          const SizedBox(width: 12),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: Center(child: SoatWidget())),
-          IconButton(
-            icon: Icon(holat.temaRejimi == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode),
-            onPressed: () => holat.temaniAlmashtirish(),
+          Flexible(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  if (_muammoliSoni > 0) _navbatMuammoliIndikatori(lok),
+                  if (_navbatUzunligi > 0) _navbatIndikatori(lok),
+                  _ulanishIkonkasi(Icons.dns_rounded, lok.t('server'), lok),
+                  _ulanishIkonkasi(Icons.videocam_rounded, lok.t('kamera'), lok),
+                  _ulanishIkonkasi(Icons.monitor_weight_rounded, lok.t('tarozi'), lok),
+                  const SizedBox(width: 12),
+                  Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: Center(child: SoatWidget())),
+                  IconButton(
+                    icon: Icon(holat.temaRejimi == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode),
+                    onPressed: () => holat.temaniAlmashtirish(),
+                  ),
+                  TextButton(
+                    onPressed: () => holat.tilniAlmashtirish(),
+                    child: Text(holat.til.name.toUpperCase(), style: const TextStyle(color: Colors.white)),
+                  ),
+                  IconButton(icon: const Icon(Icons.logout), onPressed: () => holat.chiqish()),
+                  const SizedBox(width: 8),
+                  _smenaniTugatishTugmasi(lok),
+                  const SizedBox(width: 8),
+                ],
+              ),
+            ),
           ),
-          TextButton(
-            onPressed: () => holat.tilniAlmashtirish(),
-            child: Text(holat.til.name.toUpperCase(), style: const TextStyle(color: Colors.white)),
-          ),
-          IconButton(icon: const Icon(Icons.logout), onPressed: () => holat.chiqish()),
-          const SizedBox(width: 8),
         ],
       ),
       // Uch ustunli qat'iy tuzilish. O'rta ustundagi og'irlik qutisi QAT'IY
@@ -783,6 +799,86 @@ class _OperatorEkraniState extends State<OperatorEkrani> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// AppBar'ning eng o'ng burchagidagi, yorqin (to'q sariq) "Smenani
+  /// tugatish" tugmasi — bosilganda 4 mahsulot bo'yicha bugungi soni/kg
+  /// jamlanmasini (mavjud `_smenaHolati`dan, qo'shimcha so'rovsiz)
+  /// ko'rsatuvchi dialog ochadi.
+  Widget _smenaniTugatishTugmasi(dynamic lok) {
+    return ElevatedButton.icon(
+      onPressed: _smenaniTugatishDialogniKorsat,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.deepOrange.shade600,
+        foregroundColor: Colors.white,
+      ),
+      icon: const Icon(Icons.stop_circle_outlined, size: 18),
+      label: Text(lok.t('smenani_tugatish'), style: const TextStyle(fontWeight: FontWeight.bold)),
+    );
+  }
+
+  /// "Smenani tugatish" dialogi — 4 mahsulotning bugungi soni/kg'sini
+  /// (`_smenaHolati`, allaqachon ekranda mavjud — qayta backend so'rovi
+  /// SHART EMAS) ko'rsatadi. "X" bosilsa — dialog yopiladi VA operator
+  /// darhol AVTOMATIK LOGOUT qilinadi (mavjud `AppState.chiqish()` orqali,
+  /// AppBar'dagi oddiy chiqish tugmasi bilan bir xil mantiq) — login
+  /// ekraniga qaytariladi, keyingi operator o'z smenasini tanlab kira oladi.
+  Future<void> _smenaniTugatishDialogniKorsat() async {
+    final lok = _holat.lok;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            Expanded(child: Text(lok.t('smenani_tugatish'))),
+            IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: lok.t('yopish'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                _holat.chiqish();
+              },
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 320,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                lok.t('smena_korsatkichi_bugun'),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 8),
+              for (final m in _mahsulotlar) _smenaYakuniQatori(m),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _smenaYakuniQatori(Mahsulot m) {
+    final h = _mahsulotHolati(m.kod);
+    final rang = mahsulotRangi(m.kod);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Container(width: 12, height: 12, decoration: BoxDecoration(color: rang, shape: BoxShape.circle)),
+          const SizedBox(width: 8),
+          Expanded(child: Text(m.nomi, style: TextStyle(fontWeight: FontWeight.bold, color: rang))),
+          Text('${h?.soni ?? 0}', style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(width: 16),
+          Text(
+            '${(h?.jamiKg ?? 0).toStringAsFixed(1)} kg',
+            style: TextStyle(color: Colors.grey.shade700),
+          ),
+        ],
       ),
     );
   }
