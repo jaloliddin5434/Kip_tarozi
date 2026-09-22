@@ -23,10 +23,15 @@ def _sozlama_ol(db: Session, kalit: str) -> str | None:
     return sozlama.qiymat if sozlama and sozlama.qiymat else None
 
 
-def _yubor(token: str | None, chat_id: str | None, matn: str, *, reply_markup: dict | None = None) -> None:
+def _yubor(token: str | None, chat_id: str | None, matn: str, *, reply_markup: dict | None = None) -> bool:
+    """Muvaffaqiyatli (HTTP so'rov 2xx bilan tugagan) bo'lsa `True`, aks
+    holda (token/chat_id sozlanmagan yoki Telegram xatosi) `False` qaytaradi —
+    chaqiruvchi shu orqali xabar HAQIQATAN yetib borganini bilishi mumkin
+    (masalan kunlik hisobot "oxirgi yuborilgan sana" belgisini shunga qarab
+    yangilaydi, qarang rejalashtiruvchi.py)."""
     if not token or not chat_id:
         logger.warning("[TELEGRAM] Token/chat_id Sozlamalarda kiritilmagan, xabar yuborilmadi: %s", matn)
-        return
+        return False
     try:
         tana: dict = {"chat_id": chat_id, "text": matn}
         if reply_markup is not None:
@@ -37,8 +42,10 @@ def _yubor(token: str | None, chat_id: str | None, matn: str, *, reply_markup: d
             timeout=10,
         )
         javob.raise_for_status()
+        return True
     except httpx.HTTPError:
         logger.exception("Telegramga xabar yuborishda xato")
+        return False
 
 
 def xatolik_xabari(db: Session, matn: str) -> None:
@@ -63,9 +70,10 @@ def xatolik_xabari_tugma_bilan(db: Session, matn: str, *, callback_prefiks: str,
     _yubor(_sozlama_ol(db, XATOLIK_TOKEN_KALITI), _sozlama_ol(db, XATOLIK_CHAT_KALITI), matn, reply_markup=tugmalar)
 
 
-def statistika_xabari(db: Session, matn: str) -> None:
-    """Kunlik/smena statistik hisobotlar — Hazorasp_tekstil statistika guruhi."""
-    _yubor(_sozlama_ol(db, STATISTIKA_TOKEN_KALITI), _sozlama_ol(db, STATISTIKA_CHAT_KALITI), matn)
+def statistika_xabari(db: Session, matn: str) -> bool:
+    """Kunlik/smena statistik hisobotlar — Hazorasp_tekstil statistika guruhi.
+    Muvaffaqiyatli yuborilgan-yuborilmaganini qaytaradi (qarang `_yubor`)."""
+    return _yubor(_sozlama_ol(db, STATISTIKA_TOKEN_KALITI), _sozlama_ol(db, STATISTIKA_CHAT_KALITI), matn)
 
 
 def surat_yubor(

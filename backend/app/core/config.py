@@ -86,6 +86,13 @@ class Settings(BaseSettings):
     # dev kompyuter kechqurun uzluksiz ishlab turmagani sababli hisobot HECH
     # QACHON yetib bormagan (audit topilmasi).
     KUNLIK_HISOBOT_VAQTI: str = "08:30"
+    # Backend ishga tushganda (masalan uzoq vaqt o'chiq/aloqasiz turgandan
+    # keyin) o'tkazib yuborilgan kunlik hisobotlar shu ko'p kunga qoplanadi
+    # (har biri alohida Telegram xabari bilan) — qarang rejalashtiruvchi.py:
+    # _otkazib_yuborilgan_kunlarni_qoplash. Bundan ko'p kun o'tkazib
+    # yuborilgan bo'lsa, faqat shu oxirgi kunlar qoplanadi va bitta
+    # ogohlantirish xabari yuboriladi.
+    KUNLIK_HISOBOT_QOPLASH_MAX_KUN: int = 30
 
     # Moliyaviy bo'lim — qo'shimcha parol bilan himoyalangan qisqa muddatli sessiya
     MOLIYAVIY_TOKEN_MUDDATI_DAQIQA: int = 30
