@@ -7,6 +7,11 @@ venv/
 # Faqat ildizdagi suratlar/hujjatlar papkasi — kod papkasi
 # (backend/app/services/storage/) git'da qoladi.
 /storage/
+# AUDIT TOPILMASI: yuqoridagi `/storage/` ildizga bog'langan (anchor) bo'lgani
+# uchun FAQAT repo ildizidagi storage/ni qamraydi — backend/storage/ (eski,
+# xavfsiz bo'lmagan STORAGE_PATH joylashuvi qoldig'i) hech qanday qoida bilan
+# qamrab olinmagan edi (faqat ichidagi *.db fayli tasodifan ignore bo'lardi).
+backend/storage/
 *.db
 .pytest_cache/
 # Backup
@@ -14,7 +19,6 @@ backups/
 scripts/backup_config.ps1
 build/
 .dart_tool/
-.flutter-plugin-dependencies
 # Byte-compiled / optimized / DLL files
 *.py[codz]
 *$py.class

@@ -1,5 +1,23 @@
 # AUDIT — Hujjatlar vs Statistika ekranlari ma'lumot mosligi
 
+> **HOLATI (2026-09-22 qayta tekshirildi, kodni bevosita o'qib):**
+> - ✅ **FINDING 2 — HAL QILINGAN.** Statistika/Dashboard/Hisobotlar/kunlik
+>   Telegram hisoboti endi barchasi `HISOBLANADIGAN_HOLATLAR = (aktiv,
+>   tahrirlangan)` orqali filtrlaydi (qattiq `holati == 'aktiv'` emas) —
+>   tahrirlangan kiplar endi jamlanmalardan tushib qolmaydi.
+> - ❌ **FINDING 1 — HALI OCHIQ.** `GET /hujjatlar/kiplar`dagi `holati`
+>   parametri hamon ixtiyoriy (sukut bo'yicha `None`) — Hujjatlar ekrani
+>   sukut holatda barcha holatdagi (aktiv + bekor_qilingan + tahrirlangan)
+>   kiplarni ko'rsatishda davom etadi, Statistika esa faqat
+>   `HISOBLANADIGAN_HOLATLAR`ni.
+> - ❌ **FINDING 3 — HALI OCHIQ** (FINDING 1ning to'g'ridan-to'g'ri oqibati).
+>   `/hisobotlar/smena-excel` (Hujjatlar ekranidagi "Excel yuklab olish")
+>   `HISOBLANADIGAN_HOLATLAR`dan foydalanadi, ekrandagi jadval esa
+>   holati bo'yicha filtrlanmagan — ikkalasining soni hamon farq qilishi
+>   mumkin (bekor qilingan kip bo'lgan davrda). Bevosita kuzatilgan: real
+>   sinovda "Hujjatlar: Jami 467 (holatisiz) — Statistika: 26 (faqat
+>   hisoblanadigan)" farqi.
+
 **Sana:** 2026-09-09
 **Turi:** Faqat audit — hech qanday kod o'zgartirilmadi.
 **Baza:** dev (`localhost:47432/kip_tarozi`), faqat O'QISH so'rovlari bilan tekshirildi.

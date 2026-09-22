@@ -1,5 +1,13 @@
 # AUDIT — Statistika "Mavsum" davri: kutilmagan kam son
 
+> ✅ **HAL QILINGAN (2026-09-10)** — bu audit'da topilgan muammo to'liq tuzatildi
+> (variant A: `davr_oraligi("mavsum", ...)` endi hamma joyda — Statistika,
+> Dashboard, Moliyaviy, kunlik Telegram hisoboti — `mavsum_boshlanish_sanasi`
+> sozlamasini o'qiydigan `mavsum_boshi(db, sana)` orqali hisoblanadi, qattiq
+> kodlangan 1-sentyabr qoidasi faqat sozlama topilmaganda zaxira sifatida
+> ishlaydi). Tasdiqlangan: 2026-09-22, kodni bevosita tekshirib. Hujjat faqat
+> tarixiy yozuv sifatida saqlanadi.
+
 **Sana:** 2026-09-09
 **Turi:** Faqat audit — hech qanday kod o'zgartirilmadi.
 **Baza:** dev (`localhost:47432/kip_tarozi`), faqat O'QISH so'rovlari.
